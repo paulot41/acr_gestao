@@ -2,3 +2,7 @@ Django
 djangorestframework
 openpyxl
 Pillow
+
+gunicorn
+psycopg[binary]
+whitenoise
