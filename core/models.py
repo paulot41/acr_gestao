@@ -240,3 +240,50 @@ def compute_price(account: Account, product: Product) -> Decimal:
     if final < Decimal("0.00"):
         final = Decimal("0.00")
     return final
+from django.core.exceptions import ValidationError
+
+class Resource(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="resources")
+    nome = models.CharField(max_length=120)
+    capacidade = models.PositiveIntegerField(default=0, help_text="0 = sem limite")
+
+    def __str__(self):
+        return f"{self.nome} ({self.organization.name})"
+
+
+class ClassTemplate(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="class_templates")
+    nome = models.CharField(max_length=120)
+    duracao_minutos = models.PositiveIntegerField(default=60)
+    capacidade_default = models.PositiveIntegerField(default=0, help_text="0 = usar capacidade do recurso")
+
+    def __str__(self):
+        return f"{self.nome} ({self.organization.name})"
+
+
+class Event(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="events")
+    recurso = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="events")
+    template = models.ForeignKey(ClassTemplate, on_delete=models.SET_NULL, null=True, blank=True)
+    instrutor = models.ForeignKey(Instructor, on_delete=models.SET_NULL, null=True, blank=True)
+    inicio = models.DateTimeField()
+    fim = models.DateTimeField()
+
+    def clean(self):
+        if self.inicio >= self.fim:
+            raise ValidationError("O fim deve ser depois do início.")
+
+    def __str__(self):
+        return f"{self.template or 'Evento'} @ {self.recurso} ({self.inicio:%d-%m %H:%M})"
+
+
+class Booking(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="bookings")
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="bookings")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("event", "person")
+
+    def __str__(self):
+        return f"{self.person.nome} → {self.event}"

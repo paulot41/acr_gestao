@@ -1,9 +1,16 @@
 from django.contrib import admin, messages
-from django.db.models import Q
 
 from .models import (
-    Organization, Person, OrgMembership, Guardian, Athlete, GymClient, Instructor,
-    Modality, Enrollment, Account, Product, Price, DiscountRule,
+    # multi-entidade
+    Organization, Person, OrgMembership,
+    # perfis/contactos
+    Guardian, Athlete, GymClient, Instructor,
+    # modalidades/inscrições
+    Modality, Enrollment,
+    # faturação
+    Account, Product, Price, DiscountRule,
+    # scheduling
+    Resource, ClassTemplate, Event, Booking,
 )
 
 
@@ -11,8 +18,10 @@ from .models import (
 # Mixin: filtra e preenche organization automaticamente
 # ---------------------------
 class ScopedByOrgAdmin(admin.ModelAdmin):
-    """Filtra por request.organization nos modelos com FK 'organization' e
-    preenche automaticamente ao gravar (se ainda não estiver definido)."""
+    """
+    Filtra por request.organization nos modelos com FK 'organization' e
+    preenche automaticamente ao gravar (se ainda não estiver definido).
+    """
 
     org_fk_name = "organization"
 
@@ -80,7 +89,7 @@ class PersonAdmin(admin.ModelAdmin):
             return
         created = 0
         for person in queryset:
-            obj, was_created = OrgMembership.objects.get_or_create(
+            _, was_created = OrgMembership.objects.get_or_create(
                 person=person,
                 organization=org,
                 defaults={"roles": []},
@@ -95,10 +104,9 @@ class PersonAdmin(admin.ModelAdmin):
         if not org:
             messages.error(request, "Sem organização no contexto (domínio).")
             return
-        from .models import Account
         created = 0
         for person in queryset:
-            obj, was_created = Account.objects.get_or_create(
+            _, was_created = Account.objects.get_or_create(
                 person=person,
                 organization=org,
             )
@@ -190,3 +198,49 @@ class DiscountRuleAdmin(ScopedByOrgAdmin):
     list_display = ("name", "organization", "requires_dual_org", "percent")
     list_filter = ("organization", "requires_dual_org")
     search_fields = ("name",)
+
+
+# ---------------------------
+# Scheduling (Resources / Classes / Events / Bookings)
+# ---------------------------
+@admin.register(Resource)
+class ResourceAdmin(ScopedByOrgAdmin):
+    list_display = ("nome", "organization", "capacidade")
+    list_filter = ("organization",)
+    search_fields = ("nome",)
+
+
+@admin.register(ClassTemplate)
+class ClassTemplateAdmin(ScopedByOrgAdmin):
+    list_display = ("nome", "organization", "duracao_minutos", "capacidade_default")
+    list_filter = ("organization",)
+    search_fields = ("nome",)
+
+
+@admin.register(Event)
+class EventAdmin(ScopedByOrgAdmin):
+    list_display = ("inicio", "fim", "recurso", "instrutor", "organization", "template")
+    list_filter = ("organization", "recurso", "instrutor", "template")
+    date_hierarchy = "inicio"
+    search_fields = ("recurso__nome", "template__nome", "instrutor__person__nome")
+
+    def save_model(self, request, obj, form, change):
+        # garante organização a partir do recurso, se não veio do form
+        if obj.recurso and not obj.organization_id:
+            obj.organization = obj.recurso.organization
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Booking)
+class BookingAdmin(admin.ModelAdmin):
+    list_display = ("event", "person", "criado_em")
+    search_fields = ("person__nome", "event__template__nome", "event__recurso__nome")
+    date_hierarchy = "criado_em"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        org = getattr(request, "organization", None)
+        if org:
+            # Booking não tem FK direta para organization; filtramos via event
+            return qs.filter(event__organization=org)
+        return qs
