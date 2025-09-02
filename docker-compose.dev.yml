@@ -1,0 +1,8 @@
+services:
+  web:
+    env_file:
+      - .env.dev
+
+  caddy:
+    env_file:
+      - .env.dev
