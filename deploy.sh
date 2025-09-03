@@ -24,6 +24,19 @@ fi
 
 echo "✅ SECRET_KEY configurada"
 
+# Preparar diretórios com permissões corretas
+echo "📁 Preparando diretórios..."
+mkdir -p staticfiles media logs backups
+
+# Obter UID do usuário appuser do container (1001)
+APPUSER_UID=1001
+APPUSER_GID=1001
+
+# Ajustar permissões para o usuário do container
+sudo chown -R $APPUSER_UID:$APPUSER_GID staticfiles/ media/ logs/
+sudo chown -R $(id -u):$(id -g) backups/
+echo "✅ Permissões ajustadas"
+
 # Build e deploy
 echo "🔨 Construindo containers..."
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
