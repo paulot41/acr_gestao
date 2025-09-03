@@ -3,6 +3,22 @@ set -e
 
 echo "=== ACR Gestão - Deploy com Nginx ==="
 
+# Validar docker-compose.base-nginx.yml antes de qualquer operação
+if [ ! -s "docker-compose.base-nginx.yml" ] || ! grep -q '^services:' docker-compose.base-nginx.yml; then
+    echo "❌ docker-compose.base-nginx.yml está vazio ou inválido!"
+    echo "🔧 Execute: git fetch origin main && git reset --hard origin/main"
+    exit 1
+fi
+
+echo "✅ docker-compose.base-nginx.yml validado"
+
+# Criar backup do docker-compose antes de iniciar deploy
+BACKUP_DIR="backups"
+mkdir -p "$BACKUP_DIR"
+TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
+cp docker-compose.base-nginx.yml "$BACKUP_DIR/docker-compose.base-nginx.yml.$TIMESTAMP.bak"
+echo "✅ Backup criado: $BACKUP_DIR/docker-compose.base-nginx.yml.$TIMESTAMP.bak"
+
 # Verificar se arquivo .env.prod existe
 if [ ! -f ".env.prod" ]; then
     echo "❌ Arquivo .env.prod não encontrado!"

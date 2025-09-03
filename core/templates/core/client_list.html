@@ -1,0 +1,257 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Clientes - ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Clientes</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1><i class="bi bi-people me-2"></i>Clientes</h1>
+        <p class="text-muted">Gestão de clientes do ginásio</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'client_create' %}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-1"></i>Novo Cliente
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-6">
+                <label for="search" class="form-label">Pesquisar</label>
+                <input type="text" class="form-control" id="search" name="search"
+                       value="{{ search }}" placeholder="Nome, email...">
+            </div>
+            <div class="col-md-4">
+                <label for="status" class="form-label">Estado</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">Todos os estados</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Clientes -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Lista de Clientes ({{ clients.paginator.count }} total)</h5>
+        <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary active" data-view="table">
+                <i class="bi bi-table"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-view="grid">
+                <i class="bi bi-grid-3x3"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if clients %}
+            <div class="table-responsive" id="table-view">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Email</th>
+                            <th>Telefone</th>
+                            <th>Estado</th>
+                            <th>Registado em</th>
+                            <th width="100">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for client in clients %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if client.photo %}
+                                        <img src="{{ client.photo.url }}" class="rounded-circle me-2"
+                                             width="32" height="32" alt="{{ client.full_name }}">
+                                    {% else %}
+                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2"
+                                             style="width: 32px; height: 32px;">
+                                            <span class="text-white fw-bold">{{ client.first_name|first }}</span>
+                                        </div>
+                                    {% endif %}
+                                    <div>
+                                        <strong>{{ client.full_name }}</strong>
+                                        {% if client.nif %}
+                                            <br><small class="text-muted">NIF: {{ client.nif }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if client.email %}
+                                    <a href="mailto:{{ client.email }}">{{ client.email }}</a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if client.phone %}
+                                    <a href="tel:{{ client.phone }}">{{ client.phone }}</a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if client.status == 'active' %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% elif client.status == 'suspended' %}
+                                    <span class="badge bg-warning">Suspenso</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ client.created_at|date:"d/m/Y" }}</small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'client_detail' client.pk %}"
+                                       class="btn btn-outline-primary btn-sm" title="Ver detalhes">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'client_edit' client.pk %}"
+                                       class="btn btn-outline-secondary btn-sm" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Vista em Grid (escondida por defeito) -->
+            <div class="row p-3 d-none" id="grid-view">
+                {% for client in clients %}
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            {% if client.photo %}
+                                <img src="{{ client.photo.url }}" class="rounded-circle mb-2"
+                                     width="64" height="64" alt="{{ client.full_name }}">
+                            {% else %}
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2"
+                                     style="width: 64px; height: 64px;">
+                                    <span class="text-white fw-bold fs-4">{{ client.first_name|first }}</span>
+                                </div>
+                            {% endif %}
+                            <h6 class="card-title">{{ client.full_name }}</h6>
+                            {% if client.email %}
+                                <p class="card-text small text-muted">{{ client.email }}</p>
+                            {% endif %}
+                            <div class="d-flex justify-content-center gap-1">
+                                <a href="{% url 'client_detail' client.pk %}" class="btn btn-sm btn-primary">Ver</a>
+                                <a href="{% url 'client_edit' client.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-people fs-1 text-muted"></i>
+                <h5 class="mt-3">Nenhum cliente encontrado</h5>
+                <p class="text-muted">
+                    {% if search or status_filter %}
+                        Tente ajustar os filtros de pesquisa.
+                    {% else %}
+                        Comece por adicionar o seu primeiro cliente.
+                    {% endif %}
+                </p>
+                <a href="{% url 'client_create' %}" class="btn btn-primary">
+                    <i class="bi bi-person-plus me-1"></i>Novo Cliente
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Paginação -->
+{% if clients.has_other_pages %}
+<nav aria-label="Navegação de páginas" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if clients.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Primeira</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ clients.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Anterior</a>
+            </li>
+        {% endif %}
+
+        {% for num in clients.paginator.page_range %}
+            {% if clients.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% elif num > clients.number|add:'-3' and num < clients.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if clients.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ clients.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Próxima</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ clients.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Última</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Toggle entre vista de tabela e grid
+    $('[data-view]').click(function() {
+        const view = $(this).data('view');
+        $('[data-view]').removeClass('active');
+        $(this).addClass('active');
+
+        if (view === 'table') {
+            $('#table-view').removeClass('d-none');
+            $('#grid-view').addClass('d-none');
+        } else {
+            $('#table-view').addClass('d-none');
+            $('#grid-view').removeClass('d-none');
+        }
+    });
+});
+</script>
+{% endblock %}

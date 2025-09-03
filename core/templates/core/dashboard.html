@@ -1,0 +1,191 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item active">Dashboard</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
+        <p class="text-muted">Visão geral do seu ginásio</p>
+    </div>
+</div>
+
+<!-- Cards de Estatísticas -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <i class="bi bi-people fs-1 mb-2"></i>
+                <h3>{{ total_clients }}</h3>
+                <p>Clientes Ativos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card" style="background: linear-gradient(135deg, #198754 0%, #157347 100%);">
+            <div class="card-body text-center">
+                <i class="bi bi-person-badge fs-1 mb-2"></i>
+                <h3>{{ total_instructors }}</h3>
+                <p>Instrutores</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: #000;">
+            <div class="card-body text-center">
+                <i class="bi bi-list-stars fs-1 mb-2"></i>
+                <h3>{{ total_modalities }}</h3>
+                <p>Modalidades</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card" style="background: linear-gradient(135deg, #20c997 0%, #199d76 100%);">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro fs-1 mb-2"></i>
+                <h3>€{{ monthly_revenue|floatformat:0 }}</h3>
+                <p>Receita Mensal</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Próximas Aulas -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Próximas Aulas (24h)</h5>
+                <a href="{% url 'gantt_view' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-calendar-week me-1"></i>Ver Gantt
+                </a>
+            </div>
+            <div class="card-body">
+                {% if upcoming_events %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Aula</th>
+                                    <th>Espaço</th>
+                                    <th>Data/Hora</th>
+                                    <th>Ocupação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in upcoming_events %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ event.title }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ event.resource.name }}</span>
+                                    </td>
+                                    <td>
+                                        {{ event.starts_at|date:"d/m/Y H:i" }}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress flex-grow-1 me-2" style="height: 20px;">
+                                                <div class="progress-bar" role="progressbar"
+                                                     style="width: {% widthratio event.bookings_count event.capacity 100 %}%">
+                                                </div>
+                                            </div>
+                                            <small>{{ event.bookings_count }}/{{ event.capacity }}</small>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar-x fs-1 text-muted"></i>
+                        <p class="text-muted mt-2">Nenhuma aula agendada para as próximas 24 horas</p>
+                        <a href="{% url 'event_create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-1"></i>Agendar Aula
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Ações Rápidas</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'client_create' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-person-plus me-2"></i>Novo Cliente
+                    </a>
+                    <a href="{% url 'event_create' %}" class="btn btn-outline-success">
+                        <i class="bi bi-calendar-plus me-2"></i>Nova Aula
+                    </a>
+                    <a href="{% url 'instructor_create' %}" class="btn btn-outline-info">
+                        <i class="bi bi-person-badge me-2"></i>Novo Instrutor
+                    </a>
+                    <a href="{% url 'modality_create' %}" class="btn btn-outline-warning">
+                        <i class="bi bi-star me-2"></i>Nova Modalidade
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Alertas</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Sistema em funcionamento normal
+                </div>
+                <!-- Aqui podem aparecer alertas dinâmicos no futuro -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos (placeholder para futuro desenvolvimento) -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Ocupação por Espaço (Esta Semana)</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center py-4">
+                    <i class="bi bi-bar-chart fs-1 text-muted"></i>
+                    <p class="text-muted mt-2">Gráficos de ocupação serão implementados na Fase 3</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Atualizar estatísticas a cada 5 minutos
+    setInterval(function() {
+        // TODO: Implementar atualização AJAX das estatísticas
+    }, 300000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,425 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Vista Gantt - ACR Gestão{% endblock %}
+
+{% block extra_css %}
+<!-- FullCalendar CSS -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet' />
+<style>
+    .gantt-toolbar {
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .fc-resource-ginasio { background-color: #e3f2fd; }
+    .fc-resource-pilates { background-color: #f1f8e9; }
+    .fc-resource-pavilhao { background-color: #fff8e1; }
+
+    .resource-legend {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+    }
+
+    #calendar {
+        min-height: 600px;
+    }
+
+    .fc-event {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .fc-event:hover {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Vista Gantt</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1><i class="bi bi-calendar-week me-2"></i>Vista Gantt</h1>
+        <p class="text-muted">Gestão visual dos espaços e aulas</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'event_create' %}" class="btn btn-primary">
+            <i class="bi bi-calendar-plus me-1"></i>Nova Aula
+        </a>
+    </div>
+</div>
+
+<!-- Toolbar de Filtros e Ações -->
+<div class="gantt-toolbar">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label for="filterResource" class="form-label">Espaço</label>
+            <select class="form-select" id="filterResource">
+                <option value="">Todos os espaços</option>
+                {% for resource in resources %}
+                <option value="{{ resource.id }}">{{ resource.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="filterInstructor" class="form-label">Instrutor</label>
+            <select class="form-select" id="filterInstructor">
+                <option value="">Todos os instrutores</option>
+                {% for instructor in instructors %}
+                <option value="{{ instructor.id }}">{{ instructor.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="filterModality" class="form-label">Modalidade</label>
+            <select class="form-select" id="filterModality">
+                <option value="">Todas as modalidades</option>
+                {% for modality in modalities %}
+                <option value="{{ modality.id }}">{{ modality.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <div class="btn-group w-100">
+                <button type="button" class="btn btn-outline-primary" id="todayBtn">Hoje</button>
+                <button type="button" class="btn btn-outline-secondary" id="refreshBtn">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-info dropdown-toggle" data-bs-toggle="dropdown">
+                        Exportar
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" id="exportGoogleCalendar">
+                            <i class="bi bi-google me-2"></i>Google Calendar
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" id="exportICS">
+                            <i class="bi bi-calendar-download me-2"></i>Ficheiro ICS
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Legenda dos Espaços -->
+<div class="resource-legend">
+    {% for resource in resources %}
+    <div class="legend-item">
+        <div class="legend-color" style="background-color:
+            {% if resource.name == 'Ginásio' %}#0d6efd
+            {% elif resource.name == 'Sala de Pilates' %}#198754
+            {% elif resource.name == 'Pavilhão' %}#ffc107
+            {% else %}#6c757d{% endif %};"></div>
+        <span>{{ resource.name }} ({{ resource.capacity }} pessoas)</span>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Calendário Gantt -->
+<div class="gantt-container">
+    <div id="calendar"></div>
+</div>
+
+<!-- Modal para Detalhes/Edição de Evento -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventModalTitle">Detalhes da Aula</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="eventModalBody">
+                <!-- Conteúdo carregado dinamicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="editEventBtn">Editar</button>
+                <button type="button" class="btn btn-danger" id="deleteEventBtn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Nova Marcação Rápida -->
+<div class="modal fade" id="quickBookingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Marcação Rápida</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="quickBookingForm">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="quickTitle" class="form-label">Título da Aula</label>
+                        <input type="text" class="form-control" id="quickTitle" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="quickResource" class="form-label">Espaço</label>
+                            <select class="form-select" id="quickResource" required>
+                                <option value="">Selecione...</option>
+                                {% for resource in resources %}
+                                <option value="{{ resource.id }}">{{ resource.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="quickCapacity" class="form-label">Capacidade</label>
+                            <input type="number" class="form-control" id="quickCapacity" min="1" max="50" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="quickStart" class="form-label">Início</label>
+                            <input type="datetime-local" class="form-control" id="quickStart" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="quickEnd" class="form-label">Fim</label>
+                            <input type="datetime-local" class="form-control" id="quickEnd" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Aula</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- FullCalendar JS -->
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/pt.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    let calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'resourceTimeGridWeek',
+        locale: 'pt',
+        height: 'auto',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'resourceTimeGridDay,resourceTimeGridWeek'
+        },
+        slotMinTime: '06:00:00',
+        slotMaxTime: '24:00:00',
+        slotDuration: '00:30:00',
+        weekends: true,
+        editable: true,
+        selectable: true,
+        selectMirror: true,
+
+        // Recursos (espaços)
+        resources: [
+            {% for resource in resources %}
+            {
+                id: '{{ resource.id }}',
+                title: '{{ resource.name }}',
+                capacity: {{ resource.capacity }},
+                classNames: ['fc-resource-{{ resource.name|lower|cut:" " }}']
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+
+        // Carregar eventos via API
+        events: {
+            url: '{% url "events_json" %}',
+            method: 'GET',
+            failure: function() {
+                alert('Erro ao carregar eventos!');
+            }
+        },
+
+        // Seleção para criar nova aula
+        select: function(selectionInfo) {
+            const modal = new bootstrap.Modal(document.getElementById('quickBookingModal'));
+
+            // Pré-preencher dados
+            document.getElementById('quickResource').value = selectionInfo.resource.id;
+            document.getElementById('quickCapacity').value = selectionInfo.resource.extendedProps.capacity;
+            document.getElementById('quickStart').value = formatDateTimeLocal(selectionInfo.start);
+            document.getElementById('quickEnd').value = formatDateTimeLocal(selectionInfo.end);
+
+            modal.show();
+        },
+
+        // Clique em evento existente
+        eventClick: function(info) {
+            showEventDetails(info.event);
+        },
+
+        // Drag & Drop de eventos
+        eventDrop: function(info) {
+            updateEvent(info.event);
+        },
+
+        eventResize: function(info) {
+            updateEvent(info.event);
+        }
+    });
+
+    calendar.render();
+
+    // Filtros
+    document.getElementById('filterResource').addEventListener('change', function() {
+        applyFilters();
+    });
+
+    document.getElementById('filterInstructor').addEventListener('change', function() {
+        applyFilters();
+    });
+
+    document.getElementById('filterModality').addEventListener('change', function() {
+        applyFilters();
+    });
+
+    // Botões da toolbar
+    document.getElementById('todayBtn').addEventListener('click', function() {
+        calendar.today();
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+        calendar.refetchEvents();
+    });
+
+    // Formulário de marcação rápida
+    document.getElementById('quickBookingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createQuickEvent();
+    });
+
+    // Funções auxiliares
+    function formatDateTimeLocal(date) {
+        const offset = date.getTimezoneOffset();
+        const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+        return localDate.toISOString().slice(0, 16);
+    }
+
+    function showEventDetails(event) {
+        const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+        document.getElementById('eventModalTitle').textContent = event.title;
+
+        const body = document.getElementById('eventModalBody');
+        body.innerHTML = `
+            <div class="row">
+                <div class="col-sm-4"><strong>Espaço:</strong></div>
+                <div class="col-sm-8">${event.extendedProps.resource || 'N/A'}</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-sm-4"><strong>Início:</strong></div>
+                <div class="col-sm-8">${event.start.toLocaleString('pt-PT')}</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-sm-4"><strong>Fim:</strong></div>
+                <div class="col-sm-8">${event.end.toLocaleString('pt-PT')}</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-sm-4"><strong>Capacidade:</strong></div>
+                <div class="col-sm-8">${event.extendedProps.capacity || 'N/A'}</div>
+            </div>
+        `;
+
+        // Configurar botões de ação
+        document.getElementById('editEventBtn').onclick = function() {
+            window.location.href = '/admin/'; // TODO: Implementar edição
+        };
+
+        document.getElementById('deleteEventBtn').onclick = function() {
+            if (confirm('Tem certeza que deseja eliminar esta aula?')) {
+                // TODO: Implementar eliminação
+                console.log('Eliminar evento:', event.id);
+            }
+        };
+
+        modal.show();
+    }
+
+    function createQuickEvent() {
+        const formData = {
+            title: document.getElementById('quickTitle').value,
+            resource: document.getElementById('quickResource').value,
+            capacity: document.getElementById('quickCapacity').value,
+            starts_at: document.getElementById('quickStart').value,
+            ends_at: document.getElementById('quickEnd').value,
+            csrfmiddlewaretoken: document.querySelector('[name=csrfmiddlewaretoken]').value
+        };
+
+        // TODO: Implementar criação via AJAX
+        console.log('Criar evento:', formData);
+
+        // Por agora, redirecionar para o formulário completo
+        const params = new URLSearchParams(formData);
+        window.location.href = '{% url "event_create" %}?' + params.toString();
+    }
+
+    function updateEvent(event) {
+        // TODO: Implementar atualização via AJAX
+        console.log('Atualizar evento:', event.id, {
+            start: event.start,
+            end: event.end,
+            resourceId: event.getResources()[0].id
+        });
+    }
+
+    function applyFilters() {
+        // TODO: Implementar filtros
+        const resource = document.getElementById('filterResource').value;
+        const instructor = document.getElementById('filterInstructor').value;
+        const modality = document.getElementById('filterModality').value;
+
+        console.log('Aplicar filtros:', {resource, instructor, modality});
+
+        // Por agora, apenas atualizar eventos
+        calendar.refetchEvents();
+    }
+
+    // Exportação para Google Calendar
+    document.getElementById('exportGoogleCalendar').addEventListener('click', function(e) {
+        e.preventDefault();
+        // TODO: Implementar exportação para Google Calendar
+        alert('Funcionalidade será implementada na Fase 2');
+    });
+
+    // Exportação ICS
+    document.getElementById('exportICS').addEventListener('click', function(e) {
+        e.preventDefault();
+        // TODO: Implementar exportação ICS
+        alert('Funcionalidade será implementada na Fase 2');
+    });
+});
+</script>
+{% endblock %}

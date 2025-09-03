@@ -1,0 +1,88 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Modalidades - ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Modalidades</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1><i class="bi bi-list-stars me-2"></i>Modalidades</h1>
+        <p class="text-muted">Gestão das modalidades disponíveis</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'modality_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Nova Modalidade
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    {% for modality in modalities %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center"
+                             style="width: 50px; height: 50px; background-color: {{ modality.color }};">
+                            <i class="bi bi-star-fill text-white"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-1">{{ modality.name }}</h5>
+                        <span class="badge bg-{{ modality.is_active|yesno:'success,secondary' }}">
+                            {{ modality.is_active|yesno:'Ativa,Inativa' }}
+                        </span>
+                    </div>
+                </div>
+
+                {% if modality.description %}
+                <p class="card-text small text-muted">{{ modality.description|truncatechars:100 }}</p>
+                {% endif %}
+
+                <div class="row text-center">
+                    <div class="col-6">
+                        <small class="text-muted">Duração</small><br>
+                        <strong>{{ modality.default_duration_minutes }}min</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Capacidade</small><br>
+                        <strong>{{ modality.max_capacity }}</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent">
+                <div class="btn-group w-100">
+                    <button class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil"></i> Editar
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="text-center py-5">
+            <i class="bi bi-list-stars fs-1 text-muted"></i>
+            <h5 class="mt-3">Nenhuma modalidade encontrada</h5>
+            <p class="text-muted">Comece por adicionar a sua primeira modalidade.</p>
+            <a href="{% url 'modality_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>Nova Modalidade
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

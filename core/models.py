@@ -25,6 +25,11 @@ class Organization(models.Model):
 
 class Person(models.Model):
     """Customer/athlete stored under a specific organization."""
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Ativo"
+        INACTIVE = "inactive", "Inativo"
+        SUSPENDED = "suspended", "Suspenso"
+
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120, blank=True)
@@ -33,6 +38,15 @@ class Person(models.Model):
     phone = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
 
+    # Novos campos
+    date_of_birth = models.DateField("Data de Nascimento", null=True, blank=True)
+    address = models.TextField("Morada", blank=True)
+    emergency_contact = models.CharField("Contacto de Emergência", max_length=100, blank=True)
+    photo = models.ImageField("Foto", upload_to='clients/', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    created_at = models.DateTimeField("Criado em", auto_now_add=True)
+    last_activity = models.DateTimeField("Última Atividade", null=True, blank=True)
+
     class Meta:
         unique_together = [("organization", "email"), ("organization", "nif")]
         ordering = ["first_name", "last_name"]
@@ -40,6 +54,54 @@ class Person(models.Model):
     def __str__(self) -> str:
         n = f"{self.first_name} {self.last_name}".strip()
         return f"{n} ({self.organization.name})"
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+
+class Instructor(models.Model):
+    """Personal trainers and instructors."""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    first_name = models.CharField("Nome", max_length=120)
+    last_name = models.CharField("Apelido", max_length=120, blank=True)
+    email = models.EmailField("Email", blank=True)
+    phone = models.CharField("Telefone", max_length=50, blank=True)
+    specialties = models.TextField("Especialidades", blank=True)
+    photo = models.ImageField("Foto", upload_to='instructors/', null=True, blank=True)
+    is_active = models.BooleanField("Ativo", default=True)
+    created_at = models.DateTimeField("Criado em", auto_now_add=True)
+
+    class Meta:
+        unique_together = [("organization", "email")]
+        ordering = ["first_name", "last_name"]
+
+    def __str__(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+
+class Modality(models.Model):
+    """Exercise modalities (Pilates, Weight Training, etc.)."""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    name = models.CharField("Nome", max_length=100)
+    description = models.TextField("Descrição", blank=True)
+    default_duration_minutes = models.PositiveIntegerField("Duração Padrão (min)", default=60)
+    max_capacity = models.PositiveIntegerField("Capacidade Máxima", default=10)
+    color = models.CharField("Cor", max_length=7, default="#0d6efd", help_text="Cor hexadecimal para o Gantt")
+    is_active = models.BooleanField("Ativa", default=True)
+    created_at = models.DateTimeField("Criada em", auto_now_add=True)
+
+    class Meta:
+        unique_together = [("organization", "name")]
+        ordering = ["name"]
+        verbose_name_plural = "Modalities"
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Membership(models.Model):
@@ -240,3 +302,43 @@ class InvoiceItem(models.Model):
         """Auto-update invoice total after saving the line."""
         super().save(*args, **kwargs)
         self.invoice.recompute_total()
+
+
+class Payment(models.Model):
+    """Payment records for clients."""
+    class Method(models.TextChoices):
+        CASH = "cash", "Dinheiro"
+        CARD = "card", "Cartão"
+        TRANSFER = "transfer", "Transferência"
+        MBWAY = "mbway", "MB WAY"
+        OTHER = "other", "Outro"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendente"
+        COMPLETED = "completed", "Pago"
+        CANCELLED = "cancelled", "Cancelado"
+        REFUNDED = "refunded", "Reembolsado"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="payments")
+    amount = models.DecimalField("Valor", max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    method = models.CharField("Método", max_length=20, choices=Method.choices, default=Method.CASH)
+    status = models.CharField("Estado", max_length=20, choices=Status.choices, default=Status.PENDING)
+    description = models.CharField("Descrição", max_length=200, blank=True)
+    due_date = models.DateField("Data de Vencimento", null=True, blank=True)
+    paid_date = models.DateField("Data de Pagamento", null=True, blank=True)
+    notes = models.TextField("Notas", blank=True)
+    created_at = models.DateTimeField("Criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("Atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.person.full_name} - €{self.amount} ({self.status})"
+
+    def is_overdue(self) -> bool:
+        """Check if payment is overdue."""
+        if self.status == self.Status.COMPLETED or not self.due_date:
+            return False
+        return timezone.now().date() > self.due_date

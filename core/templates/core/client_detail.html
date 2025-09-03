@@ -1,0 +1,211 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ client.full_name }} - ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'client_list' %}">Clientes</a></li>
+        <li class="breadcrumb-item active">{{ client.full_name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center">
+            {% if client.photo %}
+                <img src="{{ client.photo.url }}" class="rounded-circle me-3"
+                     width="64" height="64" alt="{{ client.full_name }}">
+            {% else %}
+                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3"
+                     style="width: 64px; height: 64px;">
+                    <span class="text-white fw-bold fs-3">{{ client.first_name|first }}</span>
+                </div>
+            {% endif %}
+            <div>
+                <h1 class="mb-1">{{ client.full_name }}</h1>
+                <span class="badge bg-{{ client.status|yesno:'success,warning,secondary' }}">
+                    {{ client.get_status_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'client_edit' client.pk %}" class="btn btn-primary">
+            <i class="bi bi-pencil me-1"></i>Editar
+        </a>
+        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Voltar
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Informações Pessoais -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Informações Pessoais</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Email:</dt>
+                            <dd class="col-sm-8">
+                                {% if client.email %}
+                                    <a href="mailto:{{ client.email }}">{{ client.email }}</a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-4">Telefone:</dt>
+                            <dd class="col-sm-8">
+                                {% if client.phone %}
+                                    <a href="tel:{{ client.phone }}">{{ client.phone }}</a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-4">NIF:</dt>
+                            <dd class="col-sm-8">{{ client.nif|default:'-' }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-5">Data Nascimento:</dt>
+                            <dd class="col-sm-7">{{ client.date_of_birth|date:"d/m/Y"|default:'-' }}</dd>
+
+                            <dt class="col-sm-5">Contacto Emergência:</dt>
+                            <dd class="col-sm-7">{{ client.emergency_contact|default:'-' }}</dd>
+
+                            <dt class="col-sm-5">Cliente desde:</dt>
+                            <dd class="col-sm-7">{{ client.created_at|date:"d/m/Y" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                {% if client.address %}
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <dt>Morada:</dt>
+                        <dd>{{ client.address }}</dd>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if client.notes %}
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <dt>Notas:</dt>
+                        <dd>{{ client.notes }}</dd>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Reservas Recentes -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Reservas Recentes</h5>
+                <button class="btn btn-sm btn-primary">Nova Reserva</button>
+            </div>
+            <div class="card-body">
+                {% if recent_bookings %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Aula</th>
+                                    <th>Data/Hora</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for booking in recent_bookings %}
+                                <tr>
+                                    <td>{{ booking.event.title }}</td>
+                                    <td>{{ booking.event.starts_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ booking.status|yesno:'success,secondary' }}">
+                                            {{ booking.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-calendar-x fs-3 text-muted"></i>
+                        <p class="text-muted mt-2">Nenhuma reserva encontrada</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Estatísticas Rápidas -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Estatísticas</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h4 class="text-primary mb-0">{{ recent_bookings|length }}</h4>
+                            <small class="text-muted">Reservas</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success mb-0">{{ recent_payments|length }}</h4>
+                        <small class="text-muted">Pagamentos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagamentos Recentes -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Pagamentos</h5>
+                <button class="btn btn-sm btn-success">Novo Pagamento</button>
+            </div>
+            <div class="card-body">
+                {% if recent_payments %}
+                    {% for payment in recent_payments %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>€{{ payment.amount }}</strong><br>
+                            <small class="text-muted">{{ payment.created_at|date:"d/m" }}</small>
+                        </div>
+                        <span class="badge bg-{{ payment.status|yesno:'success,warning,secondary' }}">
+                            {{ payment.get_status_display }}
+                        </span>
+                    </div>
+                    {% if not forloop.last %}<hr>{% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-wallet2 fs-3 text-muted"></i>
+                        <p class="text-muted mt-2">Nenhum pagamento encontrado</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
