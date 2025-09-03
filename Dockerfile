@@ -20,12 +20,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código da aplicação
 COPY . .
 
-# Criar diretórios necessários
-RUN mkdir -p staticfiles media logs
+# Criar usuário não-root para segurança ANTES de criar diretórios
+RUN adduser --disabled-password --gecos '' appuser
 
-# Criar usuário não-root para segurança
-RUN adduser --disabled-password --gecos '' appuser && \
+# Criar diretórios necessários e ajustar permissões
+RUN mkdir -p staticfiles media logs && \
     chown -R appuser:appuser /app
+
+# Mudar para usuário não-root
 USER appuser
 
 # Coletar arquivos estáticos
