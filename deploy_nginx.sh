@@ -31,32 +31,35 @@ fi
 
 echo "✅ Certificados SSL preparados"
 
-# Parar qualquer container anterior
+# Parar qualquer container anterior (incluindo Caddy)
 echo "🛑 Parando containers existentes..."
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml down 2>/dev/null || true
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml down 2>/dev/null || true
+docker-compose -f docker-compose.base-nginx.yml down 2>/dev/null || true
+docker stop $(docker ps -q) 2>/dev/null || true
 
-# Build e deploy
+echo "✅ Containers limpos"
+
+# Build e deploy usando configuração limpa (sem Caddy)
 echo "🔨 Construindo containers..."
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml build
+docker-compose -f docker-compose.base-nginx.yml build
 
 echo "🗄️ Iniciando base de dados..."
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml up -d db
+docker-compose -f docker-compose.base-nginx.yml up -d db
 
 echo "⏳ Aguardando base de dados..."
 sleep 10
 
 echo "🔄 Executando migrações..."
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml run --rm web python manage.py migrate
+docker-compose -f docker-compose.base-nginx.yml run --rm web python manage.py migrate
 
 echo "📦 Coletando arquivos estáticos..."
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml run --rm web python manage.py collectstatic --noinput
+docker-compose -f docker-compose.base-nginx.yml run --rm web python manage.py collectstatic --noinput
 
 echo "🚀 Iniciando todos os serviços..."
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
+docker-compose -f docker-compose.base-nginx.yml up -d
 
 echo "🔍 Verificando estado dos serviços..."
-docker-compose -f docker-compose.yml -f docker-compose.nginx.yml ps
+docker-compose -f docker-compose.base-nginx.yml ps
 
 echo "✅ Deploy com Nginx concluído!"
 echo "🌐 O sistema deve estar disponível em:"
@@ -68,4 +71,4 @@ echo "🔐 Para certificados SSL de produção:"
 echo "   ./setup_ssl.sh production"
 echo ""
 echo "📊 Para monitorar os logs:"
-echo "   docker-compose -f docker-compose.yml -f docker-compose.nginx.yml logs -f"
+echo "   docker-compose -f docker-compose.base-nginx.yml logs -f"
