@@ -1,17 +1,17 @@
 from django import forms
 from django.forms import ModelForm
-from .models import Person, Instructor, Modality, Event, Resource
+from .models import Person, Instructor, Modality, Event, Resource, Organization
 
 
 class PersonForm(ModelForm):
-    """Formulário para criar/editar clientes."""
+    """Formulário para criar/editar clientes com suporte multi-entidade."""
 
     class Meta:
         model = Person
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'nif',
             'date_of_birth', 'address', 'emergency_contact',
-            'photo', 'status', 'notes'
+            'photo', 'status', 'entity_affiliation', 'notes'
         ]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome'}),
@@ -24,18 +24,20 @@ class PersonForm(ModelForm):
             'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contacto de emergência'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
+            'entity_affiliation': forms.Select(attrs={'class': 'form-select'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notas adicionais...'}),
         }
 
 
 class InstructorForm(ModelForm):
-    """Formulário para criar/editar instrutores."""
+    """Formulário para criar/editar instrutores com suporte multi-entidade."""
 
     class Meta:
         model = Instructor
         fields = [
             'first_name', 'last_name', 'email', 'phone',
-            'specialties', 'photo', 'is_active'
+            'specialties', 'photo', 'is_active', 'entity_affiliation',
+            'acr_commission_rate', 'proform_commission_rate'
         ]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome'}),
@@ -45,17 +47,21 @@ class InstructorForm(ModelForm):
             'specialties': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Especialidades (Pilates, Musculação, etc.)'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'entity_affiliation': forms.Select(attrs={'class': 'form-select'}),
+            'acr_commission_rate': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'max': 100, 'step': 0.01}),
+            'proform_commission_rate': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'max': 100, 'step': 0.01}),
         }
 
 
 class ModalityForm(ModelForm):
-    """Formulário para criar/editar modalidades."""
+    """Formulário para criar/editar modalidades com suporte multi-entidade."""
 
     class Meta:
         model = Modality
         fields = [
             'name', 'description', 'default_duration_minutes',
-            'max_capacity', 'color', 'is_active'
+            'max_capacity', 'color', 'is_active', 'entity_type',
+            'price_per_class'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome da modalidade'}),
@@ -64,6 +70,24 @@ class ModalityForm(ModelForm):
             'max_capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 50}),
             'color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'entity_type': forms.Select(attrs={'class': 'form-select'}),
+            'price_per_class': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': 0.01}),
+        }
+
+
+class OrganizationSettingsForm(ModelForm):
+    """Formulário para configurações da organização."""
+
+    class Meta:
+        model = Organization
+        fields = [
+            'name', 'org_type', 'gym_monthly_fee', 'wellness_monthly_fee'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'org_type': forms.Select(attrs={'class': 'form-select'}),
+            'gym_monthly_fee': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': 0.01}),
+            'wellness_monthly_fee': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': 0.01}),
         }
 
 

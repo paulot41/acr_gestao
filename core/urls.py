@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views, web_views
+from . import views, web_views, admin_views
 
 router = DefaultRouter()
 router.register(r'people', views.PersonViewSet)
@@ -14,10 +14,10 @@ api_urlpatterns = [
     path('', include(router.urls)),
 ]
 
-# URLs da interface web
+# URLs da interface web original (manter para compatibilidade)
 web_urlpatterns = [
-    # Dashboard
-    path('', web_views.dashboard, name='dashboard'),
+    # Dashboard original
+    path('dashboard/', web_views.dashboard, name='dashboard'),
 
     # Clientes
     path('clientes/', web_views.client_list, name='client_list'),
@@ -40,6 +40,20 @@ web_urlpatterns = [
     path('api/events.json', web_views.events_json, name='events_json'),
 ]
 
+# URLs da interface admin integrada (NOVA)
+admin_urlpatterns = [
+    # Interface admin principal integrada
+    path('admin/', admin_views.admin_dashboard, name='admin_dashboard'),
+
+    # APIs para operações AJAX no admin
+    path('admin/create-client/', admin_views.admin_create_client, name='admin_create_client'),
+    path('admin/create-instructor/', admin_views.admin_create_instructor, name='admin_create_instructor'),
+    path('admin/create-modality/', admin_views.admin_create_modality, name='admin_create_modality'),
+    path('admin/events.json', admin_views.admin_events_json, name='admin_events_json'),
+]
+
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
-] + web_urlpatterns
+    # Redirecionar root para admin integrado
+    path('', admin_views.admin_dashboard, name='home'),
+] + admin_urlpatterns + web_urlpatterns

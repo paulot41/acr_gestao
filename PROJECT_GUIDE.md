@@ -20,20 +20,45 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 - **Base de Dados**: SQLite (desenvolvimento) / PostgreSQL (produção)
 - **Deploy**: Docker + Nginx
 - **Multi-tenancy**: Sistema baseado em domínios
+- **Multi-entidade**: ACR + Proform com faturação separada
+
+### **Sistema Multi-Entidade (ACR + Proform)**
+O sistema suporta duas entidades distintas na mesma plataforma:
+
+#### **🏋️ ACR (Ginásio)**
+- **Tipo**: Ginásio tradicional
+- **Modalidades**: Musculação, CrossFit, Cardio
+- **Espaços**: Ginásio, Pavilhão
+- **Faturação**: Mensalidades de ginásio
+- **URL**: `/acr/` ou subdomínio acr.dominio.com
+
+#### **🧘 Proform (Pilates/Wellness)**  
+- **Tipo**: Estúdio de Pilates e Wellness
+- **Modalidades**: Pilates, Yoga, Stretching
+- **Espaços**: Sala de Pilates, Sala de Yoga
+- **Faturação**: Mensalidades de pilates/wellness
+- **URL**: `/proform/` ou subdomínio proform.dominio.com
+
+#### **👥 Utilizadores Multi-Entidade**
+- **Clientes**: Podem estar inscritos numa ou ambas entidades
+- **Instrutores**: Podem trabalhar para uma ou ambas entidades  
+- **Faturação Separada**: Cada entidade tem a sua própria estrutura de preços
+- **Comissões Configuráveis**: % para instrutor vs. % para entidade
 
 ### **Modelos Existentes**
-- `Organization` - Entidade tenant (multi-tenant)
+- `Organization` - Entidade tenant (multi-tenant) **- Expandido para multi-entidade**
 - `Person` - Clientes/atletas (expandido com foto, status, dados completos)
-- `Instructor` - Personal Trainers e instrutores (novo)
+- `Instructor` - Personal Trainers e instrutores (novo) **- Suporta multi-entidade**
 - `Modality` - Modalidades de exercício com cores (novo)
-- `Membership` - Subscrições/memberships
+- `Membership` - Subscrições/memberships **- Expandido para multi-entidade**
 - `Product` - Produtos/serviços faturáveis
 - `Price` - Preços com validade temporal
 - `Resource` - Recursos bookáveis (salas/espaços)
 - `ClassTemplate` - Templates para aulas recorrentes
 - `Event` - Eventos/aulas agendadas
 - `Booking` - Reservas de clientes para eventos
-- `Payment` - Registo de pagamentos (novo)
+- `Payment` - Registo de pagamentos (novo) **- Faturação separada por entidade**
+- `InstructorCommission` - Comissões de instrutores (novo)
 
 ### **APIs Existentes**
 - PersonViewSet - CRUD de clientes
@@ -304,4 +329,3 @@ cd /srv/acr_gestao
 6. Coleta de arquivos estáticos
 7. Testes do sistema
 8. Relatório final com URLs e credenciais
-````
