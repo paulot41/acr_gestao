@@ -1,38 +1,46 @@
-# Scheduling validations without importing models at module import time
-# to avoid circular imports with core.models.
-
 from __future__ import annotations
-from django.apps import apps
-from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..models import Event, Booking
 
 
-def _Event():
-    """Lazy model getter to break import cycles."""
-    return apps.get_model("core", "Event")
+def ensure_no_conflict(event: 'Event') -> None:
+    """Validate that the event doesn't overlap with existing events on the same resource."""
+    if not event.resource:
+        return
 
-
-def _Booking():
-    """Lazy model getter to break import cycles."""
-    return apps.get_model("core", "Booking")
-
-
-def ensure_no_conflict(event) -> None:
-    """Raise if there is any overlapping event on the same resource."""
-    Event = _Event()
-    qs = Event.objects.filter(
-        organization=event.organization, resource=event.resource
-    ).exclude(pk=event.pk)
-    overlap = qs.filter(
+    # Get conflicting events (overlapping time ranges on same resource)
+    conflicting_events = event.__class__.objects.filter(
+        resource=event.resource,
+        organization=event.organization
+    ).exclude(pk=event.pk if event.pk else None).filter(
         Q(starts_at__lt=event.ends_at) & Q(ends_at__gt=event.starts_at)
-    ).exists()
-    if overlap:
-        raise ValidationError("Conflict: another event overlaps on this resource.")
+    )
+
+    if conflicting_events.exists():
+        conflict = conflicting_events.first()
+        raise ValidationError(
+            f"Event conflicts with '{conflict.title}' "
+            f"({conflict.starts_at:%H:%M}-{conflict.ends_at:%H:%M})"
+        )
 
 
-def ensure_capacity(booking) -> None:
-    """Raise if event capacity would be exceeded by this booking."""
-    ev = booking.event
-    # Use model property; counts non-cancelled bookings
-    if ev.is_full and booking.status != "cancelled":
-        raise ValidationError("Capacity reached for this event.")
+def ensure_capacity(booking: 'Booking') -> None:
+    """Validate that booking doesn't exceed event capacity."""
+    if not booking.event or booking.status == 'cancelled':
+        return
+
+    # Count confirmed bookings (excluding this one if updating)
+    confirmed_bookings = booking.event.bookings.filter(
+        status='confirmed'
+    ).exclude(pk=booking.pk if booking.pk else None).count()
+
+    # Check if adding this booking would exceed capacity
+    if confirmed_bookings >= booking.event.capacity:
+        raise ValidationError(
+            f"Event '{booking.event.title}' is full "
+            f"({confirmed_bookings}/{booking.event.capacity})"
+        )

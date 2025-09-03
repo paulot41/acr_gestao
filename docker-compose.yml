@@ -5,13 +5,24 @@ services:
       POSTGRES_DB: acrdb
       POSTGRES_USER: acruser
       POSTGRES_PASSWORD: acrpass
-    volumes: [dbdata:/var/lib/postgresql/data]
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./backups:/backups
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U acruser -d acrdb"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # Configurações de performance para produção
+    command: >
+      postgres -c max_connections=100
+               -c shared_buffers=128MB
+               -c effective_cache_size=256MB
+               -c maintenance_work_mem=64MB
+               -c checkpoint_completion_target=0.9
+               -c wal_buffers=16MB
+               -c default_statistics_target=100
 
   web:
     build: .
@@ -21,7 +32,21 @@ services:
     volumes:
       - ./media:/app/media
       - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
     restart: unless-stopped
+    # Limites de recursos
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/admin/', timeout=10)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   caddy:
     image: caddy:2
@@ -30,8 +55,38 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [web]
+      - ./staticfiles:/app/staticfiles:ro
+      - ./media:/app/media:ro
+    depends_on:
+      - web
     restart: unless-stopped
+    # Configurações de performance
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # Serviço de backup automático (opcional)
+  backup:
+    image: postgres:16
+    depends_on:
+      - db
+    volumes:
+      - ./backups:/backups
+      - dbdata:/var/lib/postgresql/data:ro
+    environment:
+      PGPASSWORD: acrpass
+    command: >
+      bash -c "
+      while true; do
+        sleep 86400;
+        pg_dump -h db -U acruser -d acrdb | gzip > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql.gz;
+        find /backups -name '*.sql.gz' -mtime +7 -delete;
+      done"
+    restart: unless-stopped
+    profiles: ["backup"]
 
 volumes:
   dbdata:

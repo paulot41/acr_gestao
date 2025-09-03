@@ -71,15 +71,20 @@ class Product(models.Model):
         ("pack", "Pack"),
         ("other", "Other"),
     )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="other")  # Adicionar este campo
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    duration_months = models.PositiveIntegerField()
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    name = models.CharField(max_length=140)
-    kind = models.CharField(max_length=30, choices=KIND_CHOICES, default="membership")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = [("organization", "name")]
 
-    def __str__(self) -> str:
-        return f"{self.name} @ {self.organization.name}"
+    def __str__(self):
+        return f"{self.name} - {self.organization}"
 
 
 class Price(models.Model):
@@ -153,7 +158,12 @@ class Event(models.Model):
             raise ValidationError("ends_at must be after starts_at")
         if not self.capacity:
             self.capacity = self.resource.capacity
-        ensure_no_conflict(self)  # cross-object validation
+        from .services.scheduling import ensure_no_conflict
+        ensure_no_conflict(self)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     @property
     def bookings_count(self) -> int:

@@ -26,8 +26,9 @@ class OrganizationAdmin(admin.ModelAdmin):
 
 @admin.register(models.Person)
 class PersonAdmin(OrgScopedAdmin):
-    list_display = ("first_name", "last_name", "email", "nif", "organization")
-    search_fields = ("first_name", "last_name", "email", "nif")
+    list_display = ['first_name', 'last_name', 'email', 'organization']
+    list_filter = ['organization']
+    search_fields = ['first_name', 'last_name', 'email']
 
 
 @admin.register(models.Membership)
@@ -59,8 +60,9 @@ class ClassTemplateAdmin(OrgScopedAdmin):
 
 @admin.register(models.Event)
 class EventAdmin(OrgScopedAdmin):
-    list_display = ("title", "resource", "starts_at", "ends_at", "capacity")
-    list_filter = ("resource", "starts_at")
+    list_display = ['title', 'starts_at', 'ends_at', 'capacity', 'resource']
+    list_filter = ['organization', 'resource', 'starts_at']
+    date_hierarchy = 'starts_at'
 
 
 @admin.register(models.Booking)
