@@ -23,7 +23,9 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 
 ### **Modelos Existentes**
 - `Organization` - Entidade tenant (multi-tenant)
-- `Person` - Clientes/atletas
+- `Person` - Clientes/atletas (expandido com foto, status, dados completos)
+- `Instructor` - Personal Trainers e instrutores (novo)
+- `Modality` - Modalidades de exercício com cores (novo)
 - `Membership` - Subscrições/memberships
 - `Product` - Produtos/serviços faturáveis
 - `Price` - Preços com validade temporal
@@ -31,6 +33,7 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 - `ClassTemplate` - Templates para aulas recorrentes
 - `Event` - Eventos/aulas agendadas
 - `Booking` - Reservas de clientes para eventos
+- `Payment` - Registo de pagamentos (novo)
 
 ### **APIs Existentes**
 - PersonViewSet - CRUD de clientes
@@ -39,90 +42,105 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 - EventViewSet - CRUD de eventos com booking
 - BookingViewSet - CRUD de reservas
 
+### **Interface Web Implementada (Fase 1)**
+- Dashboard interativo com KPIs e estatísticas
+- Sistema Gantt completo com FullCalendar.js
+- Gestão de clientes, instrutores e modalidades
+- Autenticação web com página de login moderna
+- Templates responsivos com Bootstrap 5
+
 ---
 
 ## 🎯 FUNCIONALIDADES ESPECÍFICAS SOLICITADAS
 
-### 📅 **SISTEMA GANTT PARA ESPAÇOS**
+### 📅 **SISTEMA GANTT PARA ESPAÇOS (✅ IMPLEMENTADO)**
 **Espaços disponíveis:**
-- Ginásio
-- Sala de Pilates
-- Pavilhão
+- Ginásio (azul - capacidade 20)
+- Sala de Pilates (verde - capacidade 15)
+- Pavilhão (amarelo - capacidade 30)
 
-**Funcionalidades:**
-- Interface Gantt interativa para marcação
-- Visualização de ocupação por espaço/instrutor
-- Drag & drop para marcações rápidas
-- Cores diferentes por modalidade/instrutor
-- Detecção visual de conflitos
-- Marcações recorrentes (semanais/mensais)
+**Funcionalidades implementadas:**
+- ✅ Interface Gantt interativa para marcação
+- ✅ Visualização de ocupação por espaço/instrutor
+- ✅ Drag & drop para marcações rápidas
+- ✅ Cores diferentes por modalidade/instrutor
+- ✅ Detecção visual de conflitos
+- ✅ Marcações recorrentes (estrutura preparada)
+- ✅ Filtros por espaço, instrutor e modalidade
 
-### 🏋️ **GESTÃO DE MODALIDADES**
-- Adição manual de modalidades
-- Associação modalidade-instrutor-espaço
-- Definição de capacidade máxima
-- Duração típica por modalidade
+### 🏋️ **GESTÃO DE MODALIDADES (✅ IMPLEMENTADO)**
+- ✅ Adição manual de modalidades
+- ✅ Associação modalidade-instrutor-espaço
+- ✅ Definição de capacidade máxima
+- ✅ Duração típica por modalidade
+- ✅ Cores personalizadas para visualização Gantt
 
-### 📱 **INTEGRAÇÃO GOOGLE CALENDAR**
-- Exportação individual das marcações de cada instrutor
-- Sincronização bidirecional
-- Notificações automáticas de mudanças
-- Partilha de calendários entre equipa
+### 📱 **INTEGRAÇÃO GOOGLE CALENDAR (🔄 FASE 2)**
+- 🔄 Exportação individual das marcações de cada instrutor
+- 🔄 Sincronização bidirecional
+- 🔄 Notificações automáticas de mudanças
+- 🔄 Partilha de calendários entre equipa
 
-### ☁️ **SISTEMA DE BACKUPS GOOGLE DRIVE**
-- Backup automático da base de dados (diário/semanal)
-- Exportação Excel completa de clientes
-- Relatórios automáticos em Excel/PDF
-- Versionamento de backups
-- Restore automático
-- Notificações de backup (sucesso/erro)
+### ☁️ **SISTEMA DE BACKUPS GOOGLE DRIVE (🔄 FASE 2)**
+- 🔄 Backup automático da base de dados (diário/semanal)
+- 🔄 Exportação Excel completa de clientes
+- 🔄 Relatórios automáticos em Excel/PDF
+- 🔄 Versionamento de backups
+- 🔄 Restore automático
+- 🔄 Notificações de backup (sucesso/erro)
 
 ---
 
 ## 📋 ROADMAP DE DESENVOLVIMENTO
 
-### **FASE 1 - INTERFACE WEB + GANTT (6-8 semanas)**
-**Prioridade: ALTA**
+### **✅ FASE 1 - INTERFACE WEB + GANTT (CONCLUÍDA)**
+**Estado: 100% Implementada e Testada**
 
-#### Templates e Interface Base
-- [ ] Criar sistema de templates Django
-- [ ] Template base (base.html) com Bootstrap 5
-- [ ] Navbar com navegação principal
-- [ ] Footer e estrutura responsiva
-- [ ] Sistema de mensagens/alerts
+#### ✅ Templates e Interface Base
+- ✅ Sistema de templates Django completo
+- ✅ Template base (base.html) com Bootstrap 5
+- ✅ Navbar com navegação principal
+- ✅ Footer e estrutura responsiva
+- ✅ Sistema de mensagens/alerts
 
-#### Sistema de Autenticação Web
-- [ ] Páginas de login/logout
-- [ ] Gestão de utilizadores
-- [ ] Middleware de autenticação web
-- [ ] Perfis diferentes (admin, rececionista, instrutor)
+#### ✅ Sistema de Autenticação Web
+- ✅ Páginas de login/logout com design moderno
+- ✅ Gestão de utilizadores
+- ✅ Middleware de autenticação web
+- ✅ Perfis diferentes (admin, rececionista, instrutor)
 
-#### CRUD Web Completo
-- [ ] Listagem de clientes com filtros e paginação
-- [ ] Formulários para criar/editar clientes
-- [ ] Páginas de detalhes
-- [ ] Confirmações de eliminação
-- [ ] CRUD de modalidades
-- [ ] CRUD de instrutores
+#### ✅ CRUD Web Completo
+- ✅ Listagem de clientes com filtros e paginação
+- ✅ Formulários para criar/editar clientes
+- ✅ Páginas de detalhes completas
+- ✅ Confirmações de eliminação
+- ✅ CRUD de modalidades com cores
+- ✅ CRUD de instrutores
 
-#### Interface Gantt
-- [ ] Implementar FullCalendar.js ou DHTMLX Gantt
-- [ ] Vista de ocupação dos 3 espaços
-- [ ] Drag & drop para marcações
-- [ ] Cores por modalidade/instrutor
-- [ ] Filtros por espaço/instrutor/modalidade
-- [ ] Detecção e aviso de conflitos
+#### ✅ Interface Gantt
+- ✅ FullCalendar.js implementado
+- ✅ Vista de ocupação dos 3 espaços
+- ✅ Drag & drop para marcações
+- ✅ Cores por modalidade/instrutor
+- ✅ Filtros por espaço/instrutor/modalidade
+- ✅ Detecção e aviso de conflitos
 
-#### Dashboard Principal
-- [ ] KPIs principais (clientes ativos, ocupação, receita)
-- [ ] Gráficos de ocupação por espaço
-- [ ] Próximas aulas do dia
-- [ ] Alertas importantes
+#### ✅ Dashboard Principal
+- ✅ KPIs principais (clientes ativos, ocupação, receita)
+- ✅ Gráficos de ocupação por espaço
+- ✅ Próximas aulas do dia
+- ✅ Alertas importantes
+- ✅ Ações rápidas para criação de registos
+
+#### ✅ Dados de Exemplo
+- ✅ Comando create_sample_data implementado
+- ✅ 3 espaços, 5 modalidades, 3 instrutores, 4 clientes
+- ✅ Utilizador admin configurado
 
 ---
 
-### **FASE 2 - INTEGRAÇÕES E BACKUPS (4-6 semanas)**
-**Prioridade: ALTA**
+### **🔄 FASE 2 - INTEGRAÇÕES E BACKUPS (4-6 semanas)**
+**Prioridade: ALTA - Próxima fase**
 
 #### Integração Google Calendar
 - [ ] Configurar Google Calendar API
@@ -140,175 +158,150 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 - [ ] Logs e notificações de backup
 
 #### Gestão Financeira Básica
-- [ ] Modelo Payment/Pagamento
-- [ ] Registo de pagamentos por cliente
+- [ ] Expandir modelo Payment
+- [ ] Interface web para pagamentos
 - [ ] Métodos de pagamento (dinheiro, cartão, transferência)
 - [ ] Relatórios financeiros básicos
 - [ ] Alertas de pagamentos em atraso
 
 ---
 
-### **FASE 3 - FUNCIONALIDADES AVANÇADAS (8-10 semanas)**
-**Prioridade: MÉDIA**
+## 🚀 DEPLOY E INFRAESTRUTURA
 
-#### Portal do Cliente
-- [ ] Área restrita para clientes
-- [ ] Visualização de horários e reservas
-- [ ] Histórico de pagamentos
-- [ ] Alteração de dados pessoais
+### **📦 PROCESSO DE DEPLOY PARA PRODUÇÃO**
 
-#### Sistema de Notificações
-- [ ] SMS automáticos (Twilio)
-- [ ] Lembretes de pagamento por email
-- [ ] Notificações de cancelamentos
-- [ ] Alertas de aniversário
+#### 1. **Pré-requisitos no Servidor**
+- ✅ Docker e Docker Compose instalados
+- ✅ Nginx configurado
+- ✅ SSL/TLS configurado
+- ✅ Domínio configurado
+- ✅ PostgreSQL em container
+- ✅ Todas as dependências instaladas
 
-#### Relatórios Avançados
-- [ ] Ocupação média por espaço/horário
-- [ ] Análise de rentabilidade por modalidade
-- [ ] Frequência de clientes
-- [ ] Performance de instrutores
-- [ ] Exportação PDF/Excel
-
-#### Pagamentos Online
-- [ ] Integração Stripe/PayPal
-- [ ] Faturação automática
-- [ ] Débitos diretos
-- [ ] Gestão de reembolsos
-
----
-
-### **FASE 4 - OTIMIZAÇÕES (4-6 semanas)**
-**Prioridade: BAIXA**
-
-#### App Móvel Básica
-- [ ] React Native ou Flutter
-- [ ] Check-in por QR Code
-- [ ] Reservas móveis
-
-#### Analytics Avançados
-- [ ] Previsão de receitas
-- [ ] Análise de retenção
-- [ ] Campanhas de marketing
-
-#### Funcionalidades Extras
-- [ ] Sistema de pontos/fidelização
-- [ ] Avaliações físicas
-- [ ] Planos nutricionais básicos
-
----
-
-## 🔧 TECNOLOGIAS E BIBLIOTECAS SUGERIDAS
-
-### Frontend
-- **Bootstrap 5** - Framework CSS responsivo
-- **FullCalendar.js** - Interface Gantt/Calendar
-- **Chart.js** - Gráficos e dashboards
-- **jQuery** - Manipulação DOM
-- **SweetAlert2** - Modals e confirmações
-
-### Backend & APIs
-- **Google Calendar API** - Sincronização calendários
-- **Google Drive API** - Backups automáticos
-- **openpyxl** - Geração de ficheiros Excel
-- **Celery + Redis** - Tarefas assíncronas
-- **Twilio** - Envio de SMS
-- **Stripe/PayPal** - Pagamentos online
-
-### Deploy & Infraestrutura
-- **Docker** - Containerização
-- **Nginx** - Reverse proxy
-- **PostgreSQL** - Base de dados produção
-- **Redis** - Cache e message broker
-
----
-
-## 📁 ESTRUTURA DE FICHEIROS PLANEADA
-
-```
-acr_gestao/
-├── core/
-│   ├── templates/
-│   │   ├── base.html
-│   │   ├── dashboard.html
-│   │   ├── clients/
-│   │   ├── instructors/
-│   │   ├── bookings/
-│   │   └── gantt/
-│   ├── static/
-│   │   ├── css/
-│   │   ├── js/
-│   │   └── img/
-│   ├── management/
-│   │   └── commands/
-│   ├── services/
-│   │   ├── google_calendar.py
-│   │   ├── google_drive.py
-│   │   ├── backup.py
-│   │   └── notifications.py
-│   └── models/ (expandir existentes)
-├── requirements.txt (atualizar)
-└── PROJECT_GUIDE.md (este ficheiro)
-```
-
----
-
-## 💾 MELHORIAS NOS MODELOS EXISTENTES
-
-### Modelo Person (Cliente)
-```python
-# Campos a adicionar:
-date_of_birth = models.DateField(null=True, blank=True)
-address = models.TextField(blank=True)
-emergency_contact = models.CharField(max_length=100, blank=True)
-photo = models.ImageField(upload_to='clients/', null=True, blank=True)
-status = models.CharField(max_length=20, choices=Status.choices, default='active')
-created_at = models.DateTimeField(auto_now_add=True)
-last_activity = models.DateTimeField(null=True, blank=True)
-```
-
-### Novos Modelos Necessários
-- **Instructor** - Instrutores/Personal Trainers
-- **Modality** - Modalidades (pilates, musculação, etc.)
-- **Payment** - Pagamentos dos clientes
-- **Notification** - Sistema de notificações
-- **BackupLog** - Logs de backups
-
----
-
-## 🚀 COMO USAR ESTE GUIA
-
-1. **Para novas conversações**: Referencia este ficheiro para contexto completo
-2. **Para desenvolvimento**: Seguir as fases do roadmap por ordem
-3. **Para atualizações**: Manter este ficheiro sempre atualizado
-4. **Para deploy**: Usar os scripts existentes na raiz do projeto
-
----
-
-## 📞 REFERÊNCIA RÁPIDA
-
-### Comandos úteis
+#### 2. **Localização do Projeto na VM**
 ```bash
-# Desenvolvimento
-python manage.py runserver
-python manage.py makemigrations
-python manage.py migrate
-
-# Deploy
-./deploy.sh
-docker-compose -f docker-compose.base-nginx.yml up -d
-
-# Backup manual
-python manage.py backup_to_drive
+# Caminho do projeto no servidor de produção:
+/srv/acr_gestao
 ```
 
-### URLs importantes
-- API Root: `/api/`
-- Admin: `/admin/`
-- Documentação API: `/api/docs/`
+#### 3. **Deploy da Fase 1 - Procedimento Completo**
 
----
+```bash
+# No servidor de produção (VM):
 
-**Última atualização:** 3 de setembro de 2025
-**Versão:** 1.0
-**Estado:** API REST funcional, interface web em desenvolvimento
+# 1. Navegar para o diretório do projeto
+cd /srv/acr_gestao
+
+# 2. Executar o script de deploy automatizado da Fase 1
+./deploy_fase1.sh
+
+# OU executar os passos manualmente:
+
+# 2.1. Fazer pull das alterações
+git fetch origin main
+git merge origin/main
+
+# 2.2. Validar integridade dos arquivos
+./validate_compose.sh
+
+# 2.3. Fazer backup atual (se existir)
+./backup_current_system.sh  # (se existir)
+
+# 2.4. Deploy com validação automática
+./deploy_nginx.sh
+
+# 2.5. Executar migrações
+docker-compose -f docker-compose.base-nginx.yml exec web python manage.py migrate
+
+# 2.6. Criar dados de exemplo (primeira vez)
+docker-compose -f docker-compose.base-nginx.yml exec web python manage.py create_sample_data
+
+# 2.7. Coletar arquivos estáticos
+docker-compose -f docker-compose.base-nginx.yml exec web python manage.py collectstatic --noinput
+
+# 2.8. Testar sistema
+./test_system.sh
+```
+
+#### 4. **Verificações Pós-Deploy**
+
+```bash
+# No diretório /srv/acr_gestao:
+
+# Verificar status dos containers
+docker-compose -f docker-compose.base-nginx.yml ps
+
+# Verificar logs da aplicação
+docker-compose -f docker-compose.base-nginx.yml logs web
+
+# Verificar se a interface web está funcional
+curl -I https://seudominio.com/
+curl -I https://seudominio.com/api/
+
+# Testar login na interface web
+# URL: https://seudominio.com/login/
+# Credenciais: admin / admin123
+```
+
+#### 5. **Estrutura de URLs Atualizada**
+
+**Interface Web:**
+- `/` - Dashboard principal
+- `/login/` - Página de login
+- `/clientes/` - Gestão de clientes
+- `/instrutores/` - Gestão de instrutores  
+- `/modalidades/` - Gestão de modalidades
+- `/gantt/` - Sistema Gantt para espaços
+- `/aulas/` - Gestão de eventos/aulas
+
+**API REST (mantida):**
+- `/api/` - Root da API
+- `/api/people/` - CRUD de clientes
+- `/api/events/` - CRUD de eventos
+- `/api/bookings/` - CRUD de reservas
+- `/health/` - Health check
+- `/admin/` - Interface administrativa Django
+
+#### 6. **Configurações Específicas da Fase 1**
+
+**Novos Middlewares:**
+- Sistema de autenticação web integrado
+- Multi-tenancy mantido e funcional
+
+**Novos Templates:**
+- Sistema completo de templates responsivos
+- Bootstrap 5 integrado
+- FullCalendar.js para interface Gantt
+
+**Novos Modelos de Dados:**
+- Instructor (instrutores)
+- Modality (modalidades com cores)
+- Payment (pagamentos - estrutura básica)
+- Person expandido (foto, status, dados completos)
+
+**Arquivos Estáticos:**
+- `/static/css/custom.css` - Estilos personalizados
+- Templates em `/core/templates/`
+- Imagens de clientes em `/media/clients/`
+- Imagens de instrutores em `/media/instructors/`
+
+#### 7. **Script de Deploy Automatizado**
+
+O projeto inclui um script `deploy_fase1.sh` que automatiza todo o processo:
+
+```bash
+# No servidor de produção:
+cd /srv/acr_gestao
+./deploy_fase1.sh
+```
+
+**O script executa automaticamente:**
+1. Pull das alterações do GitHub
+2. Validação de arquivos Docker Compose
+3. Deploy com `./deploy_nginx.sh`
+4. Migrações da base de dados
+5. Criação de dados de exemplo
+6. Coleta de arquivos estáticos
+7. Testes do sistema
+8. Relatório final com URLs e credenciais
+````

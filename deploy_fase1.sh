@@ -1,15 +1,23 @@
 #!/bin/bash
 # DEPLOY DA FASE 1 - INTERFACE WEB + SISTEMA GANTT
-# Script para executar no servidor de produção
+# Script para executar no servidor de produção (/srv/acr_gestao)
 
 echo "🚀 INICIANDO DEPLOY DA FASE 1 - ACR GESTÃO"
 echo "============================================="
+echo "📍 Servidor: VM de Produção"
+echo "📂 Caminho: /srv/acr_gestao"
+echo ""
 
 # Verificar se está no diretório correto
 if [ ! -f "manage.py" ]; then
     echo "❌ ERRO: Execute este script no diretório raiz do projeto ACR Gestão"
+    echo "💡 Navegue para: cd /srv/acr_gestao"
     exit 1
 fi
+
+# Mostrar localização atual
+echo "📍 Diretório atual: $(pwd)"
+echo ""
 
 echo "📥 1. Fazendo pull das alterações do GitHub..."
 git fetch origin main
