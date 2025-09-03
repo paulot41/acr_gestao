@@ -31,6 +31,11 @@ fi
 
 echo "✅ Certificados SSL preparados"
 
+# Parar qualquer container anterior
+echo "🛑 Parando containers existentes..."
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml down 2>/dev/null || true
+docker-compose -f docker-compose.yml -f docker-compose.nginx.yml down 2>/dev/null || true
+
 # Build e deploy
 echo "🔨 Construindo containers..."
 docker-compose -f docker-compose.yml -f docker-compose.nginx.yml build
