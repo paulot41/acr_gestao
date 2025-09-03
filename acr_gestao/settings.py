@@ -13,6 +13,10 @@ if not SECRET_KEY:
 DEBUG = os.getenv("DEBUG", "0") in {"1", "true", "True"}
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
 
+# Adicionar localhost para health checks em produção
+if not DEBUG and "localhost" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("localhost")
+
 # Construir CSRF_TRUSTED_ORIGINS a partir dos hosts
 CSRF_TRUSTED_ORIGINS = []
 for host in ALLOWED_HOSTS:
