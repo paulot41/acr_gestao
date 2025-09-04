@@ -3,11 +3,54 @@
 
 {% block title %}Dashboard - ACR Gestão{% endblock %}
 
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+        color: white;
+        border: none;
+        transition: transform 0.3s ease;
+    }
+
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .entity-badge {
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: white;
+    }
+
+    .acr-badge { background-color: #0d6efd; }
+    .proform-badge { background-color: #198754; }
+    .both-badge { background: linear-gradient(90deg, #0d6efd 50%, #198754 50%); }
+
+    .sync-indicator {
+        position: fixed;
+        top: 70px;
+        right: 20px;
+        z-index: 1000;
+        display: none;
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item active">Dashboard</li>
     </ol>
+
+    <!-- Indicador de sincronização -->
+    <div id="syncIndicator" class="sync-indicator">
+        <div class="alert alert-info alert-dismissible">
+            <i class="bi bi-arrow-repeat me-2"></i>
+            Dados sincronizados com o admin
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    </div>
 </nav>
 {% endblock %}
 
@@ -15,45 +58,128 @@
 <div class="row mb-4">
     <div class="col-12">
         <h1><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
-        <p class="text-muted">Visão geral do seu ginásio</p>
+        <p class="text-muted">Visão geral do {{ organization.name }} ({{ organization.get_org_type_display }})</p>
+
+        <!-- Botão para acesso ao admin -->
+        <div class="mb-3">
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-primary me-2">
+                <i class="bi bi-gear me-1"></i>Admin Completo
+            </a>
+            <button onclick="refreshData()" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-clockwise me-1"></i>Atualizar Dados
+            </button>
+        </div>
     </div>
 </div>
 
-<!-- Cards de Estatísticas -->
+<!-- Cards de Estatísticas Detalhadas -->
 <div class="row mb-4">
-    <div class="col-md-3 mb-3">
+    <!-- Clientes -->
+    <div class="col-md-4 mb-3">
         <div class="card stats-card">
-            <div class="card-body text-center">
-                <i class="bi bi-people fs-1 mb-2"></i>
-                <h3>{{ total_clients }}</h3>
-                <p>Clientes Ativos</p>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">CLIENTES ATIVOS</h6>
+                        <h2 class="mb-0">{{ total_clients }}</h2>
+                    </div>
+                    <i class="bi bi-people fs-1 opacity-75"></i>
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between text-sm">
+                        <span><span class="entity-badge acr-badge">ACR</span> {{ acr_clients }}</span>
+                        <span><span class="entity-badge proform-badge">Proform</span> {{ proform_clients }}</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+
+    <!-- Instrutores -->
+    <div class="col-md-4 mb-3">
         <div class="card stats-card" style="background: linear-gradient(135deg, #198754 0%, #157347 100%);">
-            <div class="card-body text-center">
-                <i class="bi bi-person-badge fs-1 mb-2"></i>
-                <h3>{{ total_instructors }}</h3>
-                <p>Instrutores</p>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">INSTRUTORES</h6>
+                        <h2 class="mb-0">{{ total_instructors }}</h2>
+                    </div>
+                    <i class="bi bi-person-badge fs-1 opacity-75"></i>
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between text-sm">
+                        <span><span class="entity-badge acr-badge">ACR</span> {{ acr_instructors }}</span>
+                        <span><span class="entity-badge proform-badge">Proform</span> {{ proform_instructors }}</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+
+    <!-- Modalidades -->
+    <div class="col-md-4 mb-3">
         <div class="card stats-card" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: #000;">
-            <div class="card-body text-center">
-                <i class="bi bi-list-stars fs-1 mb-2"></i>
-                <h3>{{ total_modalities }}</h3>
-                <p>Modalidades</p>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">MODALIDADES</h6>
+                        <h2 class="mb-0">{{ total_modalities }}</h2>
+                    </div>
+                    <i class="bi bi-list-stars fs-1 opacity-75"></i>
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between text-sm">
+                        <span><span class="entity-badge acr-badge">ACR</span> {{ acr_modalities }}</span>
+                        <span><span class="entity-badge proform-badge">Proform</span> {{ proform_modalities }}</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+</div>
+
+<!-- Receita Mensal -->
+<div class="row mb-4">
+    <div class="col-md-6">
         <div class="card stats-card" style="background: linear-gradient(135deg, #20c997 0%, #199d76 100%);">
             <div class="card-body text-center">
                 <i class="bi bi-currency-euro fs-1 mb-2"></i>
                 <h3>€{{ monthly_revenue|floatformat:0 }}</h3>
                 <p>Receita Mensal</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Clientes Recentes</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_clients %}
+                    {% for client in recent_clients %}
+                    <div class="d-flex align-items-center mb-2">
+                        {% if client.photo %}
+                            <img src="{{ client.photo.url }}" alt="{{ client.full_name }}"
+                                 class="rounded-circle me-2" width="32" height="32">
+                        {% else %}
+                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2"
+                                 style="width: 32px; height: 32px;">
+                                <i class="bi bi-person text-white"></i>
+                            </div>
+                        {% endif %}
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">{{ client.full_name }}</div>
+                            <small class="text-muted">{{ client.created_at|date:"d/m/Y" }}</small>
+                        </div>
+                        <span class="entity-badge {% if client.entity_affiliation == 'acr_only' %}acr-badge{% elif client.entity_affiliation == 'proform_only' %}proform-badge{% else %}both-badge{% endif %}">
+                            {% if client.entity_affiliation == 'acr_only' %}ACR{% elif client.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center">Nenhum cliente recente</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -76,6 +202,7 @@
                             <thead>
                                 <tr>
                                     <th>Aula</th>
+                                    <th>Instrutor</th>
                                     <th>Espaço</th>
                                     <th>Data/Hora</th>
                                     <th>Ocupação</th>
@@ -86,6 +213,16 @@
                                 <tr>
                                     <td>
                                         <strong>{{ event.title }}</strong>
+                                        {% if event.modality %}
+                                            <br><small class="text-muted">{{ event.modality.name }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if event.instructor %}
+                                            {{ event.instructor.full_name }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <span class="badge bg-secondary">{{ event.resource.name }}</span>
@@ -142,36 +279,20 @@
                         <i class="bi bi-star me-2"></i>Nova Modalidade
                     </a>
                 </div>
-            </div>
-        </div>
 
-        <!-- Alertas -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Alertas</h5>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info" role="alert">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Sistema em funcionamento normal
-                </div>
-                <!-- Aqui podem aparecer alertas dinâmicos no futuro -->
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Gráficos (placeholder para futuro desenvolvimento) -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Ocupação por Espaço (Esta Semana)</h5>
-            </div>
-            <div class="card-body">
-                <div class="text-center py-4">
-                    <i class="bi bi-bar-chart fs-1 text-muted"></i>
-                    <p class="text-muted mt-2">Gráficos de ocupação serão implementados na Fase 3</p>
+                <!-- Links para admin -->
+                <hr>
+                <h6 class="text-muted">Administração</h6>
+                <div class="d-grid gap-1">
+                    <a href="{% url 'admin_dashboard' %}?section=clients" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-people me-1"></i>Gerir Clientes
+                    </a>
+                    <a href="{% url 'admin_dashboard' %}?section=payments" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-credit-card me-1"></i>Pagamentos
+                    </a>
+                    <a href="{% url 'admin_dashboard' %}?section=reports" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-graph-up me-1"></i>Relatórios
+                    </a>
                 </div>
             </div>
         </div>
@@ -181,11 +302,26 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Atualizar estatísticas a cada 5 minutos
-    setInterval(function() {
-        // TODO: Implementar atualização AJAX das estatísticas
-    }, 300000);
-});
+function refreshData() {
+    // Mostrar indicador de carregamento
+    document.getElementById('syncIndicator').style.display = 'block';
+
+    // Recarregar a página para obter dados atualizados
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
+}
+
+// Auto-atualizar a cada 5 minutos
+setInterval(refreshData, 300000);
+
+// Mostrar indicador se vier do admin
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('synced') === 'true') {
+    document.getElementById('syncIndicator').style.display = 'block';
+    setTimeout(() => {
+        document.getElementById('syncIndicator').style.display = 'none';
+    }, 3000);
+}
 </script>
 {% endblock %}

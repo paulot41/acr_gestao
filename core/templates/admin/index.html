@@ -1,0 +1,153 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div class="dashboard-stats">
+    <!-- Estatísticas de Clientes -->
+    <div class="stat-card">
+        <div style="display: flex; justify-content-between; align-items: center;">
+            <div>
+                <h3>{{ stats.total_clients }}</h3>
+                <p><i class="bi bi-people me-1"></i>Clientes Ativos</p>
+            </div>
+            <i class="bi bi-people" style="font-size: 2rem; color: #ccc;"></i>
+        </div>
+        <div style="margin-top: 15px; font-size: 0.8rem;">
+            <span class="entity-badge acr">ACR: {{ stats.acr_clients }}</span>
+            <span class="entity-badge proform ms-2">Proform: {{ stats.proform_clients }}</span>
+        </div>
+    </div>
+
+    <!-- Estatísticas de Instrutores -->
+    <div class="stat-card">
+        <div style="display: flex; justify-content-between; align-items: center;">
+            <div>
+                <h3>{{ stats.total_instructors }}</h3>
+                <p><i class="bi bi-person-badge me-1"></i>Instrutores</p>
+            </div>
+            <i class="bi bi-person-badge" style="font-size: 2rem; color: #ccc;"></i>
+        </div>
+        <div style="margin-top: 15px; font-size: 0.8rem;">
+            <span class="entity-badge acr">ACR: {{ stats.acr_instructors }}</span>
+            <span class="entity-badge proform ms-2">Proform: {{ stats.proform_instructors }}</span>
+        </div>
+    </div>
+
+    <!-- Modalidades -->
+    <div class="stat-card">
+        <div style="display: flex; justify-content-between; align-items: center;">
+            <div>
+                <h3>{{ stats.total_modalities }}</h3>
+                <p><i class="bi bi-list-stars me-1"></i>Modalidades</p>
+            </div>
+            <i class="bi bi-list-stars" style="font-size: 2rem; color: #ccc;"></i>
+        </div>
+        <div style="margin-top: 15px; font-size: 0.8rem;">
+            <span class="entity-badge acr">ACR: {{ stats.acr_modalities }}</span>
+            <span class="entity-badge proform ms-2">Proform: {{ stats.proform_modalities }}</span>
+        </div>
+    </div>
+
+    <!-- Receita Mensal -->
+    <div class="stat-card proform">
+        <div style="display: flex; justify-content-between; align-items: center;">
+            <div>
+                <h3>€{{ stats.monthly_revenue|floatformat:0 }}</h3>
+                <p><i class="bi bi-currency-euro me-1"></i>Receita Mensal</p>
+            </div>
+            <i class="bi bi-currency-euro" style="font-size: 2rem; color: #ccc;"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Ações Rápidas -->
+<div class="custom-actions">
+    <h3><i class="bi bi-lightning-charge me-2"></i>Ações Rápidas</h3>
+    <div class="action-buttons">
+        <a href="{% url 'admin:core_person_add' %}" class="action-btn primary">
+            <i class="bi bi-person-plus me-1"></i>Novo Cliente
+        </a>
+        <a href="{% url 'admin:core_instructor_add' %}" class="action-btn success">
+            <i class="bi bi-person-badge me-1"></i>Novo Instrutor
+        </a>
+        <a href="{% url 'admin:core_modality_add' %}" class="action-btn warning">
+            <i class="bi bi-star me-1"></i>Nova Modalidade
+        </a>
+        <a href="{% url 'admin:core_event_add' %}" class="action-btn info">
+            <i class="bi bi-calendar-plus me-1"></i>Nova Aula
+        </a>
+    </div>
+</div>
+
+<!-- Próximas Aulas -->
+{% if stats.upcoming_events %}
+<div class="custom-actions">
+    <h3><i class="bi bi-calendar-event me-2"></i>Próximas Aulas (24h)</h3>
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Aula</th>
+                    <th>Espaço</th>
+                    <th>Instrutor</th>
+                    <th>Data/Hora</th>
+                    <th>Ocupação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in stats.upcoming_events %}
+                <tr>
+                    <td>
+                        <strong>{{ event.title }}</strong>
+                        {% if event.modality %}
+                            <br><small class="text-muted">{{ event.modality.name }}</small>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-secondary">{{ event.resource.name }}</span></td>
+                    <td>
+                        {% if event.instructor %}
+                            {{ event.instructor.full_name }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ event.starts_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar" style="width: {% widthratio event.bookings_count event.capacity 100 %}%"></div>
+                        </div>
+                        <small>{{ event.bookings_count }}/{{ event.capacity }}</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Clientes Recentes -->
+{% if stats.recent_clients %}
+<div class="custom-actions">
+    <h3><i class="bi bi-person-plus me-2"></i>Clientes Recentes</h3>
+    {% for client in stats.recent_clients %}
+    <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee;">
+        {% if client.photo %}
+            <img src="{{ client.photo.url }}" alt="{{ client.full_name }}" class="rounded-circle me-3" width="40" height="40">
+        {% else %}
+            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                <i class="bi bi-person text-white"></i>
+            </div>
+        {% endif %}
+        <div class="flex-grow-1">
+            <div class="fw-bold">{{ client.full_name }}</div>
+            <small class="text-muted">{{ client.created_at|date:"d/m/Y" }}</small>
+        </div>
+        <span class="entity-badge {% if client.entity_affiliation == 'acr_only' %}acr{% elif client.entity_affiliation == 'proform_only' %}proform{% else %}both{% endif %}">
+            {% if client.entity_affiliation == 'acr_only' %}ACR{% elif client.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
+        </span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

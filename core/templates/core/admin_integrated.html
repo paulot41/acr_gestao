@@ -523,6 +523,310 @@
                 </div>
             </div>
 
+        <!-- Pagamentos Section -->
+        {% elif current_section == 'payments' %}
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Gestão de Pagamentos</h1>
+                <button class="btn btn-primary" onclick="showCreateModal('payment')">
+                    <i class="bi bi-credit-card me-1"></i>Novo Pagamento
+                </button>
+            </div>
+
+            <!-- Estatísticas de Pagamentos -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="number text-warning">{{ total_pending }}</div>
+                        <div class="label">Pendentes</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="number text-danger">{{ total_overdue }}</div>
+                        <div class="label">Em Atraso</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stats-card">
+                        <div class="number text-success">€{{ monthly_revenue|floatformat:0 }}</div>
+                        <div class="label">Receita Mensal</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros de Pagamentos -->
+            <div class="admin-card mb-4">
+                <div class="admin-card-body">
+                    <form method="GET" class="row g-3">
+                        <input type="hidden" name="section" value="payments">
+                        <div class="col-md-3">
+                            <select class="form-select" name="status">
+                                <option value="">Todos os estados</option>
+                                {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" name="method">
+                                <option value="">Todos os métodos</option>
+                                {% for value, label in method_choices %}
+                                <option value="{{ value }}" {% if method_filter == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" name="client">
+                                <option value="">Todos os clientes</option>
+                                {% for client in clients %}
+                                <option value="{{ client.id }}" {% if client_filter == client.id|slugify %}selected{% endif %}>{{ client.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-outline-primary w-100">Filtrar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabela de Pagamentos -->
+            <div class="admin-table">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Valor</th>
+                            <th>Método</th>
+                            <th>Estado</th>
+                            <th>Vencimento</th>
+                            <th>Pago em</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %}
+                        <tr {% if payment.is_overdue %}class="table-warning"{% endif %}>
+                            <td><strong>{{ payment.person.full_name }}</strong></td>
+                            <td><strong>€{{ payment.amount }}</strong></td>
+                            <td>{{ payment.get_method_display }}</td>
+                            <td>
+                                <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                                {% if payment.is_overdue %}
+                                    <small class="text-danger"><br>Em atraso</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ payment.due_date|date:"d/m/Y"|default:"-" }}</td>
+                            <td>{{ payment.paid_date|date:"d/m/Y"|default:"-" }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editPayment({{ payment.id }})">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="bi bi-credit-card fs-1 text-muted"></i>
+                                <p class="text-muted mt-2">Nenhum pagamento encontrado</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        <!-- Relatórios Section -->
+        {% elif current_section == 'reports' %}
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Relatórios</h1>
+                <div class="btn-group">
+                    <a href="?section=reports&period=week" class="btn btn-outline-primary {% if period == 'week' %}active{% endif %}">Semana</a>
+                    <a href="?section=reports&period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">Mês</a>
+                    <a href="?section=reports&period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">Ano</a>
+                </div>
+            </div>
+
+            <!-- Estatísticas de Receitas -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="admin-card">
+                        <div class="admin-card-header text-success">
+                            <i class="bi bi-currency-euro me-2"></i>Receitas
+                        </div>
+                        <div class="admin-card-body text-center">
+                            <h3 class="text-success">€{{ revenue_stats.total_revenue|floatformat:0 }}</h3>
+                            <p>Total ({{ period }})</p>
+                            <hr>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>€{{ revenue_stats.acr_revenue|floatformat:0 }}</strong>
+                                    <br><small class="text-primary">ACR</small>
+                                </div>
+                                <div class="col-6">
+                                    <strong>€{{ revenue_stats.proform_revenue|floatformat:0 }}</strong>
+                                    <br><small class="text-success">Proform</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="admin-card">
+                        <div class="admin-card-header text-primary">
+                            <i class="bi bi-people me-2"></i>Clientes
+                        </div>
+                        <div class="admin-card-body text-center">
+                            <h3 class="text-primary">{{ client_stats.total_clients }}</h3>
+                            <p>Total Ativos</p>
+                            <hr>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>{{ client_stats.acr_clients }}</strong>
+                                    <br><small class="text-primary">ACR</small>
+                                </div>
+                                <div class="col-6">
+                                    <strong>{{ client_stats.proform_clients }}</strong>
+                                    <br><small class="text-success">Proform</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="admin-card">
+                        <div class="admin-card-header text-warning">
+                            <i class="bi bi-calendar-event me-2"></i>Atividade
+                        </div>
+                        <div class="admin-card-body text-center">
+                            <h3 class="text-warning">{{ event_stats.total_events }}</h3>
+                            <p>Aulas ({{ period }})</p>
+                            <hr>
+                            <div class="text-center">
+                                <strong>{{ event_stats.total_bookings }}</strong>
+                                <br><small>Total Reservas</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Modalidades -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <i class="bi bi-bar-chart me-2"></i>Modalidades Mais Populares
+                </div>
+                <div class="admin-card-body">
+                    {% if top_modalities %}
+                        {% for modality in top_modalities %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex align-items-center">
+                                <div class="me-2" style="width: 12px; height: 12px; background-color: {{ modality.color }}; border-radius: 50%;"></div>
+                                <strong>{{ modality.name }}</strong>
+                                <small class="text-muted ms-2">({{ modality.get_entity_type_display }})</small>
+                            </div>
+                            <span class="badge bg-primary">{{ modality.event_count }} aulas</span>
+                        </div>
+                        {% if not forloop.last %}<hr>{% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-bar-chart fs-1 text-muted"></i>
+                            <p class="text-muted mt-2">Nenhuma modalidade com aulas no período</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        <!-- Configurações Section -->
+        {% elif current_section == 'settings' %}
+            <h1 class="mb-4">Configurações</h1>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <i class="bi bi-gear me-2"></i>Configurações da Organização
+                        </div>
+                        <div class="admin-card-body">
+                            <form method="post" action="{% url 'admin_update_settings' %}">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Nome da Organização</label>
+                                        <input type="text" class="form-control" name="name" value="{{ organization.name }}" readonly>
+                                        <small class="text-muted">Contacte o administrador para alterar</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Tipo de Organização</label>
+                                        <select class="form-select" name="org_type">
+                                            {% for value, label in org_choices %}
+                                            <option value="{{ value }}" {% if org_type == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Mensalidade ACR (Ginásio)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">€</span>
+                                            <input type="number" class="form-control" name="gym_monthly_fee"
+                                                   value="{{ gym_monthly_fee }}" step="0.01" min="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Mensalidade Proform (Pilates)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">€</span>
+                                            <input type="number" class="form-control" name="wellness_monthly_fee"
+                                                   value="{{ wellness_monthly_fee }}" step="0.01" min="0">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="text-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check-circle me-1"></i>Guardar Configurações
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <i class="bi bi-info-circle me-2"></i>Informações do Sistema
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="mb-3">
+                                <strong>Domínio:</strong><br>
+                                <code>{{ organization.domain }}</code>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Total Clientes:</strong><br>
+                                {{ total_clients }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Total Instrutores:</strong><br>
+                                {{ total_instructors }}
+                            </div>
+                            <div class="alert alert-info">
+                                <i class="bi bi-lightbulb me-1"></i>
+                                <strong>Dica:</strong> As mensalidades são calculadas automaticamente baseadas na afiliação dos clientes.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         <!-- Outras seções (placeholder) -->
         {% else %}
             <h1>{{ current_section|capfirst }}</h1>

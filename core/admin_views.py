@@ -197,6 +197,8 @@ def _get_gantt_data(org):
 
 def _get_payments_data(request, org):
     """Dados para a secção pagamentos."""
+    from django.db.models import Sum
+
     payments = Payment.objects.filter(organization=org).select_related('person')
 
     status_filter = request.GET.get('status')
@@ -227,64 +229,159 @@ def _get_settings_data(org):
 @login_required
 @require_http_methods(["POST"])
 def admin_create_client(request):
-    """API para criar cliente via AJAX."""
-    form = PersonForm(request.POST, request.FILES)
-    if form.is_valid():
-        client = form.save(commit=False)
-        client.organization = request.organization
-        client.save()
+    """Criar cliente via AJAX no admin integrado."""
+    try:
+        data = json.loads(request.body)
+        client = Person.objects.create(
+            organization=request.organization,
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name', ''),
+            email=data.get('email', ''),
+            phone=data.get('phone', ''),
+            nif=data.get('nif', ''),
+            entity_affiliation=data.get('entity_affiliation', 'acr_only'),
+            status=data.get('status', 'active')
+        )
+
         return JsonResponse({
             'success': True,
             'message': f'Cliente {client.full_name} criado com sucesso!',
-            'redirect': f'/admin/?section=clients'
+            'client': {
+                'id': client.id,
+                'name': client.full_name,
+                'entity': client.get_entity_affiliation_display(),
+                'email': client.email
+            }
         })
-    else:
+    except Exception as e:
         return JsonResponse({
             'success': False,
-            'errors': form.errors
-        })
+            'message': f'Erro ao criar cliente: {str(e)}'
+        }, status=400)
 
 
 @login_required
 @require_http_methods(["POST"])
 def admin_create_instructor(request):
-    """API para criar instrutor via AJAX."""
-    form = InstructorForm(request.POST, request.FILES)
-    if form.is_valid():
-        instructor = form.save(commit=False)
-        instructor.organization = request.organization
-        instructor.save()
+    """Criar instrutor via AJAX no admin integrado."""
+    try:
+        data = json.loads(request.body)
+        instructor = Instructor.objects.create(
+            organization=request.organization,
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name', ''),
+            email=data.get('email', ''),
+            phone=data.get('phone', ''),
+            specialties=data.get('specialties', ''),
+            entity_affiliation=data.get('entity_affiliation', 'acr_only'),
+            acr_commission_rate=data.get('acr_commission_rate', 60),
+            proform_commission_rate=data.get('proform_commission_rate', 70)
+        )
+
         return JsonResponse({
             'success': True,
             'message': f'Instrutor {instructor.full_name} criado com sucesso!',
-            'redirect': f'/admin/?section=instructors'
+            'instructor': {
+                'id': instructor.id,
+                'name': instructor.full_name,
+                'entity': instructor.get_entity_affiliation_display(),
+                'email': instructor.email
+            }
         })
-    else:
+    except Exception as e:
         return JsonResponse({
             'success': False,
-            'errors': form.errors
-        })
+            'message': f'Erro ao criar instrutor: {str(e)}'
+        }, status=400)
 
 
 @login_required
 @require_http_methods(["POST"])
 def admin_create_modality(request):
-    """API para criar modalidade via AJAX."""
-    form = ModalityForm(request.POST)
-    if form.is_valid():
-        modality = form.save(commit=False)
-        modality.organization = request.organization
-        modality.save()
+    """Criar modalidade via AJAX no admin integrado."""
+    try:
+        data = json.loads(request.body)
+        modality = Modality.objects.create(
+            organization=request.organization,
+            name=data.get('name'),
+            description=data.get('description', ''),
+            entity_type=data.get('entity_type', 'acr'),
+            default_duration_minutes=data.get('duration', 60),
+            max_capacity=data.get('capacity', 10),
+            price_per_class=data.get('price', 15.00),
+            color=data.get('color', '#0d6efd')
+        )
+
         return JsonResponse({
             'success': True,
             'message': f'Modalidade {modality.name} criada com sucesso!',
-            'redirect': f'/admin/?section=modalities'
+            'modality': {
+                'id': modality.id,
+                'name': modality.name,
+                'entity': modality.get_entity_type_display(),
+                'price': str(modality.price_per_class)
+            }
         })
-    else:
+    except Exception as e:
         return JsonResponse({
             'success': False,
-            'errors': form.errors
-        })
+            'message': f'Erro ao criar modalidade: {str(e)}'
+        }, status=400)
+
+
+@login_required
+def admin_sync_dashboard(request):
+    """Redirecionar para dashboard com indicador de sincronização."""
+    return redirect('/dashboard/?synced=true')
+
+
+@login_required
+def admin_bulk_action(request):
+    """Ações em lote no admin (eliminar, atualizar status, etc.)."""
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        selected_ids = request.POST.getlist('selected_items')
+
+        try:
+            if action == 'activate_clients':
+                Person.objects.filter(
+                    id__in=selected_ids,
+                    organization=request.organization
+                ).update(status='active')
+                messages.success(request, f'{len(selected_ids)} clientes ativados.')
+
+            elif action == 'deactivate_clients':
+                Person.objects.filter(
+                    id__in=selected_ids,
+                    organization=request.organization
+                ).update(status='inactive')
+                messages.success(request, f'{len(selected_ids)} clientes desativados.')
+
+            elif action == 'delete_clients':
+                count = Person.objects.filter(
+                    id__in=selected_ids,
+                    organization=request.organization
+                ).delete()[0]
+                messages.success(request, f'{count} clientes eliminados.')
+
+            elif action == 'activate_instructors':
+                Instructor.objects.filter(
+                    id__in=selected_ids,
+                    organization=request.organization
+                ).update(is_active=True)
+                messages.success(request, f'{len(selected_ids)} instrutores ativados.')
+
+            elif action == 'deactivate_instructors':
+                Instructor.objects.filter(
+                    id__in=selected_ids,
+                    organization=request.organization
+                ).update(is_active=False)
+                messages.success(request, f'{len(selected_ids)} instrutores desativados.')
+
+        except Exception as e:
+            messages.error(request, f'Erro na ação em lote: {str(e)}')
+
+    return redirect(request.META.get('HTTP_REFERER', '/admin/'))
 
 
 @login_required

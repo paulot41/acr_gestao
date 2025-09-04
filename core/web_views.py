@@ -13,13 +13,39 @@ from .forms import PersonForm, InstructorForm, ModalityForm, EventForm
 
 @login_required
 def dashboard(request):
-    """Dashboard principal com estatísticas e KPIs."""
+    """Dashboard principal com estatísticas e KPIs sincronizados."""
     org = request.organization
 
-    # Estatísticas básicas
+    # Estatísticas detalhadas por entidade (igual ao admin)
     total_clients = Person.objects.filter(organization=org, status='active').count()
+    acr_clients = Person.objects.filter(
+        organization=org, status='active',
+        entity_affiliation__in=['acr_only', 'both']
+    ).count()
+    proform_clients = Person.objects.filter(
+        organization=org, status='active',
+        entity_affiliation__in=['proform_only', 'both']
+    ).count()
+
     total_instructors = Instructor.objects.filter(organization=org, is_active=True).count()
+    acr_instructors = Instructor.objects.filter(
+        organization=org, is_active=True,
+        entity_affiliation__in=['acr_only', 'both']
+    ).count()
+    proform_instructors = Instructor.objects.filter(
+        organization=org, is_active=True,
+        entity_affiliation__in=['proform_only', 'both']
+    ).count()
+
     total_modalities = Modality.objects.filter(organization=org, is_active=True).count()
+    acr_modalities = Modality.objects.filter(
+        organization=org, is_active=True,
+        entity_type__in=['acr', 'both']
+    ).count()
+    proform_modalities = Modality.objects.filter(
+        organization=org, is_active=True,
+        entity_type__in=['proform', 'both']
+    ).count()
 
     # Próximas aulas (próximas 24h)
     tomorrow = timezone.now() + timedelta(days=1)
@@ -27,22 +53,43 @@ def dashboard(request):
         organization=org,
         starts_at__gte=timezone.now(),
         starts_at__lte=tomorrow
-    ).order_by('starts_at')[:5]
+    ).select_related('resource', 'modality', 'instructor').order_by('starts_at')[:5]
 
-    # Receitas do mês atual
+    # Receitas do mês atual (corrigido)
     current_month = timezone.now().replace(day=1)
-    monthly_revenue = Payment.objects.filter(
+    monthly_payments = Payment.objects.filter(
         organization=org,
         status='completed',
         paid_date__gte=current_month
-    ).aggregate(total=Count('amount'))['total'] or 0
+    )
+    monthly_revenue = sum(payment.amount for payment in monthly_payments)
+
+    # Clientes recentes (últimos 7 dias)
+    week_ago = timezone.now() - timedelta(days=7)
+    recent_clients = Person.objects.filter(
+        organization=org,
+        created_at__gte=week_ago
+    ).order_by('-created_at')[:5]
 
     context = {
+        # Estatísticas gerais
         'total_clients': total_clients,
+        'acr_clients': acr_clients,
+        'proform_clients': proform_clients,
         'total_instructors': total_instructors,
+        'acr_instructors': acr_instructors,
+        'proform_instructors': proform_instructors,
         'total_modalities': total_modalities,
+        'acr_modalities': acr_modalities,
+        'proform_modalities': proform_modalities,
+
+        # Dados dinâmicos
         'upcoming_events': upcoming_events,
         'monthly_revenue': monthly_revenue,
+        'recent_clients': recent_clients,
+
+        # Configurações da organização
+        'organization': org,
     }
     return render(request, 'core/dashboard.html', context)
 

@@ -12,14 +12,14 @@ def health(_request):
     return JsonResponse({"status": "ok"})
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Health check (manter para monitorização)
     path('health/', health),
 
     # Autenticação
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
 
-    # Interface web e API
+    # Tudo através do core (que agora só tem admin unificado)
     path('', include('core.urls')),
 ]
 
