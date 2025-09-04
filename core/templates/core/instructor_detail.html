@@ -1,0 +1,292 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ instructor.full_name }} - Instrutores - ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'instructor_list' %}">Instrutores</a></li>
+        <li class="breadcrumb-item active">{{ instructor.full_name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- Header com informações principais -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center">
+            {% if instructor.photo %}
+                <img src="{{ instructor.photo.url }}" alt="{{ instructor.full_name }}"
+                     class="rounded-circle me-4" width="80" height="80">
+            {% else %}
+                <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-4"
+                     style="width: 80px; height: 80px;">
+                    <i class="bi bi-person text-white" style="font-size: 2rem;"></i>
+                </div>
+            {% endif %}
+            <div>
+                <h1 class="mb-1">{{ instructor.full_name }}</h1>
+                <p class="text-muted mb-2">{{ instructor.email }}</p>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="entity-badge {% if instructor.entity_affiliation == 'acr_only' %}acr{% elif instructor.entity_affiliation == 'proform_only' %}proform{% else %}both{% endif %}">
+                        {% if instructor.entity_affiliation == 'acr_only' %}ACR{% elif instructor.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
+                    </span>
+                    {% if instructor.is_active %}
+                        <span class="badge bg-success">Ativo</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Inativo</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="btn-group">
+            <a href="{% url 'instructor_edit' instructor.pk %}" class="btn btn-warning">
+                <i class="bi bi-pencil me-1"></i>Editar
+            </a>
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                <span class="visually-hidden">Toggle Dropdown</span>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" onclick="toggleStatus()">
+                    <i class="bi bi-{% if instructor.is_active %}pause{% else %}play{% endif %} me-2"></i>
+                    {% if instructor.is_active %}Desativar{% else %}Ativar{% endif %}
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete()">
+                    <i class="bi bi-trash me-2"></i>Eliminar
+                </a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- KPIs do Instrutor -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card modern-card border-left-primary">
+            <div class="card-body text-center">
+                <h4 class="text-primary mb-1">{{ instructor.modalities.count }}</h4>
+                <small class="text-muted">Especialidades</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card modern-card border-left-success">
+            <div class="card-body text-center">
+                <h4 class="text-success mb-1">{{ instructor.events.count }}</h4>
+                <small class="text-muted">Total de Aulas</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card modern-card border-left-warning">
+            <div class="card-body text-center">
+                <h4 class="text-warning mb-1">{{ instructor.commission_percentage|floatformat:0 }}%</h4>
+                <small class="text-muted">Comissão</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card modern-card border-left-info">
+            <div class="card-body text-center">
+                <h4 class="text-info mb-1">€{{ monthly_earnings|floatformat:0 }}</h4>
+                <small class="text-muted">Ganhos Mês</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Informações Pessoais -->
+    <div class="col-md-6 mb-4">
+        <div class="card modern-card h-100">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-person me-2"></i>Informações Pessoais
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Nome Completo:</strong></div>
+                    <div class="col-sm-8">{{ instructor.full_name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Email:</strong></div>
+                    <div class="col-sm-8">
+                        <a href="mailto:{{ instructor.email }}">{{ instructor.email }}</a>
+                    </div>
+                </div>
+                {% if instructor.phone %}
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Telefone:</strong></div>
+                    <div class="col-sm-8">
+                        <a href="tel:{{ instructor.phone }}">{{ instructor.phone }}</a>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Data de Registo:</strong></div>
+                    <div class="col-sm-8">{{ instructor.created_at|date:"d/m/Y H:i" }}</div>
+                </div>
+                {% if instructor.notes %}
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Notas:</strong></div>
+                    <div class="col-sm-8">{{ instructor.notes|linebreaks }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Especialidades e Configurações -->
+    <div class="col-md-6 mb-4">
+        <div class="card modern-card h-100">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-success">
+                    <i class="bi bi-star me-2"></i>Especialidades e Configurações
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <strong class="d-block mb-2">Modalidades:</strong>
+                    {% if instructor.modalities.all %}
+                        {% for modality in instructor.modalities.all %}
+                            <span class="badge me-2 mb-2" style="background-color: {{ modality.color }};">
+                                {{ modality.name }}
+                            </span>
+                        {% endfor %}
+                    {% else %}
+                        <small class="text-muted">Nenhuma modalidade associada</small>
+                    {% endif %}
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-6"><strong>Comissão:</strong></div>
+                    <div class="col-sm-6">{{ instructor.commission_percentage|floatformat:0 }}%</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-6"><strong>Entidade:</strong></div>
+                    <div class="col-sm-6">
+                        <span class="entity-badge {% if instructor.entity_affiliation == 'acr_only' %}acr{% elif instructor.entity_affiliation == 'proform_only' %}proform{% else %}both{% endif %}">
+                            {% if instructor.entity_affiliation == 'acr_only' %}ACR{% elif instructor.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-6"><strong>Estado:</strong></div>
+                    <div class="col-sm-6">
+                        {% if instructor.is_active %}
+                            <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Próximas Aulas -->
+<div class="row">
+    <div class="col-12">
+        <div class="card modern-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-calendar-check me-2"></i>Próximas Aulas
+                </h6>
+                <a href="{% url 'gantt_view' %}?instructor={{ instructor.id }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-calendar-plus me-1"></i>Nova Aula
+                </a>
+            </div>
+            <div class="card-body">
+                {% if upcoming_events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Modalidade</th>
+                                    <th>Espaço</th>
+                                    <th>Ocupação</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in upcoming_events %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ event.starts_at|date:"d/m/Y" }}</div>
+                                        <small class="text-muted">{{ event.starts_at|date:"H:i" }} - {{ event.ends_at|date:"H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background-color: {{ event.modality.color }};">
+                                            {{ event.modality.name }}
+                                        </span>
+                                    </td>
+                                    <td>{{ event.resource.name }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2">{{ event.bookings.count }}/{{ event.capacity }}</span>
+                                            <div class="progress flex-grow-1" style="height: 6px;">
+                                                <div class="progress-bar" style="width: {% widthratio event.bookings.count event.capacity 100 %}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if event.starts_at > now %}
+                                            <span class="badge bg-info">Agendada</span>
+                                        {% elif event.ends_at > now %}
+                                            <span class="badge bg-success">Em Curso</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Concluída</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">Nenhuma aula agendada</p>
+                        <a href="{% url 'gantt_view' %}?instructor={{ instructor.id }}" class="btn btn-primary">
+                            <i class="bi bi-calendar-plus me-1"></i>Agendar Primeira Aula
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleStatus() {
+    const isActive = {% if instructor.is_active %}true{% else %}false{% endif %};
+    const action = isActive ? 'desativar' : 'ativar';
+
+    if (confirm(`Tem certeza que deseja ${action} este instrutor?`)) {
+        // Aqui seria feita a chamada AJAX para toggle do status
+        // Por agora, redirect para a página de edição
+        window.location.href = "{% url 'instructor_edit' instructor.pk %}";
+    }
+}
+
+function confirmDelete() {
+    if (confirm('Tem certeza que deseja eliminar este instrutor? Esta ação não pode ser desfeita.')) {
+        // Aqui seria feita a chamada para eliminação
+        alert('Funcionalidade de eliminação será implementada em versão futura');
+    }
+}
+</script>
+{% endblock %}

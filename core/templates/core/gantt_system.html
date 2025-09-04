@@ -1,0 +1,526 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Sistema Gantt - Gestão de Espaços | ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Sistema Gantt</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="bi bi-calendar-week me-2"></i>Sistema Gantt - Gestão de Espaços</h1>
+                <p class="text-muted">Visualize e gerencie a ocupação dos espaços ACR e Proform</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#eventModal">
+                    <i class="bi bi-plus-circle me-1"></i>Nova Marcação
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros e Controlos -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card modern-card">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-funnel me-2"></i>Filtros e Visualização</h5>
+
+                <div class="row g-3">
+                    <!-- Filtro por Espaço/Resource -->
+                    <div class="col-md-3">
+                        <label class="form-label">Espaços:</label>
+                        <div class="form-check">
+                            <input class="form-check-input resource-filter" type="checkbox" value="ginasio" id="filterGinasio" checked>
+                            <label class="form-check-label" for="filterGinasio">
+                                <span class="badge" style="background-color: #0d6efd;">Ginásio</span> (Cap. 20)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input resource-filter" type="checkbox" value="pilates" id="filterPilates" checked>
+                            <label class="form-check-label" for="filterPilates">
+                                <span class="badge" style="background-color: #198754;">Sala Pilates</span> (Cap. 15)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input resource-filter" type="checkbox" value="pavilhao" id="filterPavilhao" checked>
+                            <label class="form-check-label" for="filterPavilhao">
+                                <span class="badge" style="background-color: #ffc107; color: #000;">Pavilhão</span> (Cap. 30)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Filtro por Instrutor -->
+                    <div class="col-md-3">
+                        <label for="instructorFilter" class="form-label">Instrutor:</label>
+                        <select class="form-select" id="instructorFilter">
+                            <option value="">Todos os instrutores</option>
+                            {% for instructor in instructors %}
+                            <option value="{{ instructor.id }}">{{ instructor.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Modalidade -->
+                    <div class="col-md-3">
+                        <label for="modalityFilter" class="form-label">Modalidade:</label>
+                        <select class="form-select" id="modalityFilter">
+                            <option value="">Todas as modalidades</option>
+                            {% for modality in modalities %}
+                            <option value="{{ modality.id }}">{{ modality.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Vista do Calendário -->
+                    <div class="col-md-3">
+                        <label class="form-label">Vista:</label>
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" class="btn btn-outline-primary" id="viewWeek">
+                                <i class="bi bi-calendar-week me-1"></i>Semana
+                            </button>
+                            <button type="button" class="btn btn-outline-primary active" id="viewDay">
+                                <i class="bi bi-calendar-day me-1"></i>Dia
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legenda -->
+                <div class="mt-3 pt-3 border-top">
+                    <small class="text-muted">
+                        <strong>Legenda:</strong>
+                        <span class="entity-badge acr ms-2">ACR</span>
+                        <span class="entity-badge proform ms-2">Proform</span>
+                        <span class="badge bg-warning text-dark ms-2">Conflito</span>
+                        <span class="badge bg-danger ms-2">Lotado</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sistema Gantt (FullCalendar) -->
+<div class="row">
+    <div class="col-12">
+        <div class="card modern-card">
+            <div class="card-body">
+                <!-- Loading indicator -->
+                <div id="calendarLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <div class="mt-2">Carregando Sistema Gantt...</div>
+                </div>
+
+                <!-- FullCalendar Container -->
+                <div id="calendar" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Nova Marcação/Edição -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-plus me-2"></i>
+                    <span id="modalTitle">Nova Marcação</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="eventForm">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="eventTitle" class="form-label">Título da Aula*</label>
+                            <input type="text" class="form-control" id="eventTitle" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventResource" class="form-label">Espaço*</label>
+                            <select class="form-select" id="eventResource" required>
+                                <option value="">Selecionar espaço...</option>
+                                {% for resource in resources %}
+                                <option value="{{ resource.id }}">{{ resource.name }} (Cap. {{ resource.capacity }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventInstructor" class="form-label">Instrutor*</label>
+                            <select class="form-select" id="eventInstructor" required>
+                                <option value="">Selecionar instrutor...</option>
+                                {% for instructor in instructors %}
+                                <option value="{{ instructor.id }}">{{ instructor.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventModality" class="form-label">Modalidade*</label>
+                            <select class="form-select" id="eventModality" required>
+                                <option value="">Selecionar modalidade...</option>
+                                {% for modality in modalities %}
+                                <option value="{{ modality.id }}" data-color="{{ modality.color }}">{{ modality.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventStart" class="form-label">Data/Hora Início*</label>
+                            <input type="datetime-local" class="form-control" id="eventStart" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventEnd" class="form-label">Data/Hora Fim*</label>
+                            <input type="datetime-local" class="form-control" id="eventEnd" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventCapacity" class="form-label">Capacidade</label>
+                            <input type="number" class="form-control" id="eventCapacity" min="1" max="50" value="10">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventPrice" class="form-label">Preço por Pessoa (€)</label>
+                            <input type="number" class="form-control" id="eventPrice" min="0" step="0.01" value="15.00">
+                        </div>
+                        <div class="col-12">
+                            <label for="eventDescription" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="eventDescription" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Aviso de conflitos -->
+                    <div id="conflictWarning" class="alert alert-warning mt-3" style="display: none;">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Conflito detectado:</strong> Já existe uma marcação neste horário e espaço.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-danger" id="deleteEventBtn" style="display: none;">
+                        <i class="bi bi-trash me-1"></i>Eliminar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Estatísticas rápidas -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card modern-card text-center">
+            <div class="card-body">
+                <i class="bi bi-calendar-check fs-1 text-primary"></i>
+                <h3 id="todayEvents">-</h3>
+                <p class="text-muted">Aulas Hoje</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card modern-card text-center">
+            <div class="card-body">
+                <i class="bi bi-people fs-1 text-success"></i>
+                <h3 id="todayCapacity">-</h3>
+                <p class="text-muted">Capacidade Hoje</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card modern-card text-center">
+            <div class="card-body">
+                <i class="bi bi-exclamation-triangle fs-1 text-warning"></i>
+                <h3 id="conflictsCount">0</h3>
+                <p class="text-muted">Conflitos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card modern-card text-center">
+            <div class="card-body">
+                <i class="bi bi-percent fs-1 text-info"></i>
+                <h3 id="occupancyRate">-%</h3>
+                <p class="text-muted">Ocupação</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let calendar;
+    let currentEvents = [];
+
+    // Inicializar FullCalendar
+    function initializeCalendar() {
+        const calendarEl = document.getElementById('calendar');
+
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            // Configuração básica
+            locale: 'pt',
+            initialView: 'resourceTimelineDay',
+            height: 'auto',
+
+            // Plugins necessários
+            schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+
+            // Header toolbar
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'resourceTimelineDay,resourceTimelineWeek'
+            },
+
+            // Recursos (Espaços)
+            resources: [
+                {
+                    id: 'ginasio',
+                    title: 'Ginásio',
+                    eventColor: '#0d6efd'
+                },
+                {
+                    id: 'pilates',
+                    title: 'Sala de Pilates',
+                    eventColor: '#198754'
+                },
+                {
+                    id: 'pavilhao',
+                    title: 'Pavilhão',
+                    eventColor: '#ffc107'
+                }
+            ],
+
+            // Carregar eventos
+            events: function(fetchInfo, successCallback, failureCallback) {
+                loadEvents(fetchInfo, successCallback, failureCallback);
+            },
+
+            // Configurações de tempo
+            slotMinTime: '06:00:00',
+            slotMaxTime: '23:00:00',
+            slotDuration: '00:30:00',
+
+            // Interatividade
+            editable: true,
+            droppable: true,
+            selectable: true,
+            selectMirror: true,
+
+            // Eventos de interação
+            select: function(selectInfo) {
+                openEventModal(null, selectInfo);
+            },
+
+            eventClick: function(clickInfo) {
+                openEventModal(clickInfo.event);
+            },
+
+            eventDrop: function(dropInfo) {
+                updateEvent(dropInfo.event);
+            },
+
+            eventResize: function(resizeInfo) {
+                updateEvent(resizeInfo.event);
+            }
+        });
+
+        calendar.render();
+        document.getElementById('calendarLoading').style.display = 'none';
+        document.getElementById('calendar').style.display = 'block';
+    }
+
+    // Carregar eventos da API
+    function loadEvents(fetchInfo, successCallback, failureCallback) {
+        const params = new URLSearchParams({
+            start: fetchInfo.startStr,
+            end: fetchInfo.endStr
+        });
+
+        // Aplicar filtros
+        const instructorFilter = document.getElementById('instructorFilter').value;
+        const modalityFilter = document.getElementById('modalityFilter').value;
+
+        if (instructorFilter) params.append('instructor', instructorFilter);
+        if (modalityFilter) params.append('modality', modalityFilter);
+
+        fetch(`/api/events.json?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                currentEvents = data;
+                updateStatistics();
+                successCallback(data);
+            })
+            .catch(error => {
+                console.error('Erro ao carregar eventos:', error);
+                failureCallback(error);
+            });
+    }
+
+    // Abrir modal para criar/editar evento
+    function openEventModal(event, selectInfo = null) {
+        const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+        const form = document.getElementById('eventForm');
+
+        // Limpar formulário
+        form.reset();
+
+        if (event) {
+            // Editar evento existente
+            document.getElementById('modalTitle').textContent = 'Editar Marcação';
+            document.getElementById('deleteEventBtn').style.display = 'block';
+
+            // Preencher formulário
+            document.getElementById('eventTitle').value = event.title;
+            document.getElementById('eventResource').value = event.getResources()[0].id;
+            document.getElementById('eventStart').value = event.start.toISOString().slice(0, 16);
+            document.getElementById('eventEnd').value = event.end.toISOString().slice(0, 16);
+
+        } else if (selectInfo) {
+            // Novo evento
+            document.getElementById('modalTitle').textContent = 'Nova Marcação';
+            document.getElementById('deleteEventBtn').style.display = 'none';
+
+            document.getElementById('eventResource').value = selectInfo.resource.id;
+            document.getElementById('eventStart').value = selectInfo.startStr.slice(0, 16);
+            document.getElementById('eventEnd').value = selectInfo.endStr.slice(0, 16);
+        }
+
+        modal.show();
+    }
+
+    // Guardar evento
+    document.getElementById('eventForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = {
+            title: document.getElementById('eventTitle').value,
+            resource: document.getElementById('eventResource').value,
+            instructor: document.getElementById('eventInstructor').value,
+            modality: document.getElementById('eventModality').value,
+            start: document.getElementById('eventStart').value,
+            end: document.getElementById('eventEnd').value,
+            capacity: document.getElementById('eventCapacity').value,
+            price: document.getElementById('eventPrice').value,
+            description: document.getElementById('eventDescription').value
+        };
+
+        // Verificar conflitos
+        if (checkConflicts(formData)) {
+            document.getElementById('conflictWarning').style.display = 'block';
+            return;
+        }
+
+        saveEvent(formData);
+    });
+
+    // Verificar conflitos de horário
+    function checkConflicts(eventData) {
+        // Implementar lógica de detecção de conflitos
+        return false; // Placeholder
+    }
+
+    // Salvar evento via API
+    function saveEvent(eventData) {
+        fetch('/api/events/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(eventData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            calendar.refetchEvents();
+            bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+
+            // Mostrar mensagem de sucesso
+            showAlert('success', 'Marcação guardada com sucesso!');
+        })
+        .catch(error => {
+            console.error('Erro ao guardar evento:', error);
+            showAlert('error', 'Erro ao guardar marcação.');
+        });
+    }
+
+    // Atualizar estatísticas
+    function updateStatistics() {
+        const today = new Date().toISOString().slice(0, 10);
+        const todayEvents = currentEvents.filter(event =>
+            event.start.startsWith(today)
+        );
+
+        document.getElementById('todayEvents').textContent = todayEvents.length;
+
+        const totalCapacity = todayEvents.reduce((sum, event) =>
+            sum + (event.capacity || 10), 0
+        );
+        document.getElementById('todayCapacity').textContent = totalCapacity;
+    }
+
+    // Mostrar alertas
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.querySelector('.container-fluid').prepend(alertDiv);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+
+    // Event listeners para filtros
+    document.querySelectorAll('.resource-filter').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            calendar.refetchEvents();
+        });
+    });
+
+    document.getElementById('instructorFilter').addEventListener('change', function() {
+        calendar.refetchEvents();
+    });
+
+    document.getElementById('modalityFilter').addEventListener('change', function() {
+        calendar.refetchEvents();
+    });
+
+    // Botões de vista
+    document.getElementById('viewWeek').addEventListener('click', function() {
+        calendar.changeView('resourceTimelineWeek');
+        this.classList.add('active');
+        document.getElementById('viewDay').classList.remove('active');
+    });
+
+    document.getElementById('viewDay').addEventListener('click', function() {
+        calendar.changeView('resourceTimelineDay');
+        this.classList.add('active');
+        document.getElementById('viewWeek').classList.remove('active');
+    });
+
+    // Inicializar calendário
+    initializeCalendar();
+});
+</script>
+{% endblock %}

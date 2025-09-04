@@ -46,6 +46,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     'core.middleware.OrganizationMiddleware',
+    'core.auth_views.UserRoleMiddleware',  # Middleware personalizado para papéis de utilizador
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     #"acr_gestao.multitenant.OrganizationMiddleware",

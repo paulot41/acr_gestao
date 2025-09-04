@@ -1,0 +1,246 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Instrutores - ACR Gestão{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Instrutores</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1><i class="bi bi-person-badge me-2"></i>Instrutores</h1>
+        <p class="text-muted">Gestão de instrutores e personal trainers</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'instructor_create' %}" class="btn btn-success">
+            <i class="bi bi-person-plus me-1"></i>Novo Instrutor
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card modern-card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-8">
+                <label for="search" class="form-label">Pesquisar</label>
+                <input type="text" class="form-control" id="search" name="search"
+                       value="{{ search }}" placeholder="Nome, email, especialidade...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if search %}
+                    <a href="{% url 'instructor_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="view" id="grid" value="grid" {% if view != 'table' %}checked{% endif %}>
+                    <label class="btn btn-outline-secondary" for="grid">
+                        <i class="bi bi-grid-3x3-gap"></i>
+                    </label>
+                    <input type="radio" class="btn-check" name="view" id="table" value="table" {% if view == 'table' %}checked{% endif %}>
+                    <label class="btn btn-outline-secondary" for="table">
+                        <i class="bi bi-list"></i>
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if instructors %}
+    {% if view == 'table' %}
+        <!-- Vista em Tabela -->
+        <div class="card modern-card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-modern">
+                        <thead>
+                            <tr>
+                                <th>Instrutor</th>
+                                <th>Entidade</th>
+                                <th>Especialidades</th>
+                                <th>Comissão</th>
+                                <th>Estado</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for instructor in instructors %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if instructor.photo %}
+                                            <img src="{{ instructor.photo.url }}" alt="{{ instructor.full_name }}"
+                                                 class="rounded-circle me-3" width="40" height="40">
+                                        {% else %}
+                                            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 40px; height: 40px;">
+                                                <i class="bi bi-person text-white"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <div class="fw-bold">{{ instructor.full_name }}</div>
+                                            <small class="text-muted">{{ instructor.email }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="entity-badge {% if instructor.entity_affiliation == 'acr_only' %}acr{% elif instructor.entity_affiliation == 'proform_only' %}proform{% else %}both{% endif %}">
+                                        {% if instructor.entity_affiliation == 'acr_only' %}ACR{% elif instructor.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% for modality in instructor.modalities.all|slice:":2" %}
+                                        <span class="badge bg-secondary me-1">{{ modality.name }}</span>
+                                    {% endfor %}
+                                    {% if instructor.modalities.count > 2 %}
+                                        <small class="text-muted">+{{ instructor.modalities.count|add:"-2" }} mais</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ instructor.commission_percentage|floatformat:0 }}%</span>
+                                </td>
+                                <td>
+                                    {% if instructor.is_active %}
+                                        <span class="badge bg-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'instructor_detail' instructor.pk %}" class="btn btn-outline-primary" title="Ver detalhes">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'instructor_edit' instructor.pk %}" class="btn btn-outline-warning" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Vista em Cards (Grid) -->
+        <div class="row">
+            {% for instructor in instructors %}
+            <div class="col-xl-4 col-md-6 mb-4">
+                <div class="card modern-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            {% if instructor.photo %}
+                                <img src="{{ instructor.photo.url }}" alt="{{ instructor.full_name }}"
+                                     class="rounded-circle me-3" width="60" height="60">
+                            {% else %}
+                                <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3"
+                                     style="width: 60px; height: 60px;">
+                                    <i class="bi bi-person text-white" style="font-size: 1.5rem;"></i>
+                                </div>
+                            {% endif %}
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">{{ instructor.full_name }}</h6>
+                                <small class="text-muted">{{ instructor.email }}</small>
+                                <div class="mt-1">
+                                    <span class="entity-badge {% if instructor.entity_affiliation == 'acr_only' %}acr{% elif instructor.entity_affiliation == 'proform_only' %}proform{% else %}both{% endif %}">
+                                        {% if instructor.entity_affiliation == 'acr_only' %}ACR{% elif instructor.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Especialidades -->
+                        <div class="mb-3">
+                            <small class="text-muted fw-bold">Especialidades:</small>
+                            <div class="mt-1">
+                                {% for modality in instructor.modalities.all %}
+                                    <span class="badge bg-secondary me-1 mb-1">{{ modality.name }}</span>
+                                {% empty %}
+                                    <small class="text-muted">Nenhuma especialidade definida</small>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Informações adicionais -->
+                        <div class="row text-center mb-3">
+                            <div class="col-4">
+                                <small class="text-muted d-block">Comissão</small>
+                                <strong>{{ instructor.commission_percentage|floatformat:0 }}%</strong>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Estado</small>
+                                {% if instructor.is_active %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Aulas</small>
+                                <strong>{{ instructor.events.count }}</strong>
+                            </div>
+                        </div>
+
+                        <!-- Ações -->
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'instructor_detail' instructor.pk %}" class="btn btn-outline-primary btn-sm flex-fill">
+                                <i class="bi bi-eye me-1"></i>Ver Detalhes
+                            </a>
+                            <a href="{% url 'instructor_edit' instructor.pk %}" class="btn btn-outline-warning btn-sm">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% else %}
+    <!-- Estado vazio -->
+    <div class="card modern-card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-person-badge text-muted" style="font-size: 4rem;"></i>
+            <h4 class="mt-3 text-muted">Nenhum instrutor encontrado</h4>
+            {% if search %}
+                <p class="text-muted">Nenhum resultado para "{{ search }}"</p>
+                <a href="{% url 'instructor_list' %}" class="btn btn-outline-secondary me-2">
+                    <i class="bi bi-arrow-left me-1"></i>Ver Todos
+                </a>
+            {% else %}
+                <p class="text-muted">Comece por adicionar o seu primeiro instrutor</p>
+            {% endif %}
+            <a href="{% url 'instructor_create' %}" class="btn btn-success">
+                <i class="bi bi-person-plus me-1"></i>Novo Instrutor
+            </a>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle entre vista grid e tabela
+document.querySelectorAll('input[name="view"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        this.form.submit();
+    });
+});
+</script>
+{% endblock %}

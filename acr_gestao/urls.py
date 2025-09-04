@@ -6,7 +6,6 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
-from django.contrib.auth import views as auth_views
 
 def health(_request):
     return JsonResponse({"status": "ok"})
@@ -15,11 +14,7 @@ urlpatterns = [
     # Health check (manter para monitorização)
     path('health/', health),
 
-    # Autenticação
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
-
-    # Tudo através do core (que agora só tem admin unificado)
+    # Tudo através do core (inclui autenticação personalizada e todas as funcionalidades)
     path('', include('core.urls')),
 ]
 

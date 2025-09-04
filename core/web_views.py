@@ -2,21 +2,21 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 
-from .models import Person, Instructor, Modality, Event, Resource, Booking, Payment
+from .models import Person, Instructor, Modality, Event, Resource, Payment
 from .forms import PersonForm, InstructorForm, ModalityForm, EventForm
 
 
 @login_required
 def dashboard(request):
-    """Dashboard principal com estatísticas e KPIs sincronizados."""
+    """Dashboard principal moderno com KPIs e gráficos interativos."""
     org = request.organization
 
-    # Estatísticas detalhadas por entidade (igual ao admin)
+    # Estatísticas detalhadas por entidade
     total_clients = Person.objects.filter(organization=org, status='active').count()
     acr_clients = Person.objects.filter(
         organization=org, status='active',
@@ -69,7 +69,7 @@ def dashboard(request):
     recent_clients = Person.objects.filter(
         organization=org,
         created_at__gte=week_ago
-    ).order_by('-created_at')[:5]
+    ).order_by('-created_at')[:6]  # Aumentado para 6 para melhor layout
 
     context = {
         # Estatísticas gerais
@@ -91,7 +91,7 @@ def dashboard(request):
         # Configurações da organização
         'organization': org,
     }
-    return render(request, 'core/dashboard.html', context)
+    return render(request, 'core/dashboard_main.html', context)
 
 
 # CLIENTES VIEWS
@@ -248,19 +248,37 @@ def modality_create(request):
 
 # GANTT E EVENTOS
 @login_required
-def gantt_view(request):
-    """Vista Gantt para marcação de espaços."""
+def gantt_system(request):
+    """Vista do Sistema Gantt completo para gestão de espaços."""
     org = request.organization
-    resources = Resource.objects.filter(organization=org)
-    instructors = Instructor.objects.filter(organization=org, is_active=True)
-    modalities = Modality.objects.filter(organization=org, is_active=True)
+
+    # Carregar dados necessários para o Sistema Gantt
+    resources = Resource.objects.filter(organization=org).order_by('name')
+    instructors = Instructor.objects.filter(organization=org, is_active=True).order_by('first_name', 'last_name')
+    modalities = Modality.objects.filter(organization=org, is_active=True).order_by('entity_type', 'name')
+
+    # Estatísticas rápidas para o dashboard do Gantt
+    today = timezone.now().date()
+    today_events = Event.objects.filter(
+        organization=org,
+        starts_at__date=today
+    ).count()
 
     context = {
         'resources': resources,
         'instructors': instructors,
         'modalities': modalities,
+        'today_events': today_events,
+        'page_title': 'Sistema Gantt - Gestão de Espaços',
     }
-    return render(request, 'core/gantt_view.html', context)
+
+    return render(request, 'core/gantt_system.html', context)
+
+
+@login_required
+def gantt_view(request):
+    """Manter compatibilidade com URL antiga, redirecionar para o novo Sistema Gantt."""
+    return redirect('gantt_system')
 
 
 @login_required
@@ -327,3 +345,4 @@ def event_list(request):
 
     context = {'events': events}
     return render(request, 'core/event_list.html', context)
+

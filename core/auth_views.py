@@ -1,0 +1,113 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.forms import AuthenticationForm
+
+class CustomLoginView(LoginView):
+    """Vista personalizada de login com suporte a multi-entidade."""
+    template_name = 'registration/login.html'
+    redirect_authenticated_user = True
+
+    def get_success_url(self):
+        """Redirecionar após login bem-sucedido."""
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        return reverse('dashboard')
+
+    def form_valid(self, form):
+        """Processar login válido com informação da entidade."""
+        entity = self.request.POST.get('entity', 'acr')
+        remember_me = self.request.POST.get('remember_me')
+
+        # Configurar duração da sessão
+        if remember_me:
+            self.request.session.set_expiry(1209600)  # 2 semanas
+        else:
+            self.request.session.set_expiry(0)  # Até fechar o browser
+
+        # Armazenar entidade preferida na sessão
+        self.request.session['preferred_entity'] = entity
+
+        messages.success(
+            self.request,
+            f'Bem-vindo ao ACR Gestão! Entidade: {"ACR Ginásio" if entity == "acr" else "Proform Wellness"}'
+        )
+
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        """Processar login inválido com mensagem personalizada."""
+        messages.error(
+            self.request,
+            'Credenciais inválidas. Por favor, verifique o seu nome de utilizador e palavra-passe.'
+        )
+        return super().form_invalid(form)
+
+class CustomLogoutView(LogoutView):
+    """Vista personalizada de logout."""
+    template_name = 'registration/logout.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        """Processar logout com mensagem de confirmação."""
+        if request.user.is_authenticated:
+            messages.success(request, 'Sessão terminada com sucesso. Até à próxima!')
+        return super().dispatch(request, *args, **kwargs)
+
+@login_required
+def profile_view(request):
+    """Vista do perfil do utilizador."""
+    context = {
+        'user': request.user,
+        'preferred_entity': request.session.get('preferred_entity', 'acr'),
+        'session_info': {
+            'last_login': request.user.last_login,
+            'is_staff': request.user.is_staff,
+            'is_superuser': request.user.is_superuser,
+        }
+    }
+    return render(request, 'registration/profile.html', context)
+
+def check_user_permissions(user, required_permission=None):
+    """Verificar permissões do utilizador."""
+    if not user.is_authenticated:
+        return False
+
+    if required_permission:
+        return user.has_perm(required_permission)
+
+    return True
+
+def get_user_role(user):
+    """Determinar o papel do utilizador no sistema."""
+    if user.is_superuser:
+        return 'admin'
+    elif user.is_staff:
+        return 'staff'
+    elif user.groups.filter(name='Instrutores').exists():
+        return 'instructor'
+    elif user.groups.filter(name='Rececionistas').exists():
+        return 'receptionist'
+    else:
+        return 'client'
+
+class UserRoleMiddleware:
+    """Middleware para determinar e armazenar o papel do utilizador."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            request.user_role = get_user_role(request.user)
+            request.preferred_entity = request.session.get('preferred_entity', 'acr')
+        else:
+            request.user_role = None
+            request.preferred_entity = 'acr'
+
+        response = self.get_response(request)
+        return response

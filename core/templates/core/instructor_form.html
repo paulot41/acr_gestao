@@ -7,7 +7,7 @@
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'client_list' %}">Clientes</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'instructor_list' %}">Instrutores</a></li>
         <li class="breadcrumb-item active">{{ title }}</li>
     </ol>
 </nav>
@@ -19,7 +19,7 @@
         <div class="card modern-card">
             <div class="card-header">
                 <h5 class="m-0">
-                    <i class="bi bi-person{% if client %}-check{% else %}-plus{% endif %} me-2"></i>{{ title }}
+                    <i class="bi bi-person-badge me-2"></i>{{ title }}
                 </h5>
             </div>
             <div class="card-body">
@@ -30,7 +30,7 @@
                     <div class="row mb-4">
                         <div class="col-12">
                             <h6 class="text-primary mb-3">
-                                <i class="bi bi-person me-2"></i>Informações Pessoais
+                                <i class="bi bi-person me-2"></i>Informações Básicas
                             </h6>
                         </div>
 
@@ -48,7 +48,7 @@
 
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.last_name.id_for_label }}" class="form-label">
-                                Apelido
+                                Apelido <span class="text-danger">*</span>
                             </label>
                             {{ form.last_name }}
                             {% if form.last_name.errors %}
@@ -60,7 +60,7 @@
 
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.email.id_for_label }}" class="form-label">
-                                Email
+                                Email <span class="text-danger">*</span>
                             </label>
                             {{ form.email }}
                             {% if form.email.errors %}
@@ -82,41 +82,17 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.nif.id_for_label }}" class="form-label">
-                                NIF
-                            </label>
-                            {{ form.nif }}
-                            {% if form.nif.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.nif.errors.0 }}
-                                </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.date_of_birth.id_for_label }}" class="form-label">
-                                Data de Nascimento
-                            </label>
-                            {{ form.date_of_birth }}
-                            {% if form.date_of_birth.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.date_of_birth.errors.0 }}
-                                </div>
-                            {% endif %}
-                        </div>
-
                         <!-- Foto -->
                         <div class="col-12 mb-3">
                             <label for="{{ form.photo.id_for_label }}" class="form-label">
-                                Foto do Cliente
+                                Foto do Instrutor
                             </label>
                             <div class="d-flex align-items-center">
-                                {% if client and client.photo %}
-                                    <img src="{{ client.photo.url }}" alt="Foto atual"
+                                {% if instructor and instructor.photo %}
+                                    <img src="{{ instructor.photo.url }}" alt="Foto atual"
                                          class="rounded-circle me-3" width="60" height="60" id="currentPhoto">
                                 {% else %}
-                                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3"
+                                    <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3"
                                          style="width: 60px; height: 60px;" id="placeholderPhoto">
                                         <i class="bi bi-person text-white"></i>
                                     </div>
@@ -136,39 +112,12 @@
                         </div>
                     </div>
 
-                    <!-- Informações de Contacto e Morada -->
+                    <!-- Configurações Profissionais -->
                     <div class="row mb-4">
                         <div class="col-12">
                             <h6 class="text-success mb-3">
-                                <i class="bi bi-geo-alt me-2"></i>Contacto e Morada
+                                <i class="bi bi-briefcase me-2"></i>Configurações Profissionais
                             </h6>
-                        </div>
-
-                        <div class="col-12 mb-3">
-                            <label for="{{ form.address.id_for_label }}" class="form-label">
-                                Morada Completa
-                            </label>
-                            {{ form.address }}
-                            {% if form.address.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.address.errors.0 }}
-                                </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.emergency_contact.id_for_label }}" class="form-label">
-                                Contacto de Emergência
-                            </label>
-                            {{ form.emergency_contact }}
-                            <small class="form-text text-muted">
-                                Nome e telefone de pessoa a contactar em emergências
-                            </small>
-                            {% if form.emergency_contact.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.emergency_contact.errors.0 }}
-                                </div>
-                            {% endif %}
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -177,7 +126,7 @@
                             </label>
                             {{ form.entity_affiliation }}
                             <small class="form-text text-muted">
-                                Selecione a que entidade(s) o cliente pertence
+                                Selecione para que entidade(s) o instrutor trabalhará
                             </small>
                             {% if form.entity_affiliation.errors %}
                                 <div class="invalid-feedback d-block">
@@ -185,50 +134,68 @@
                                 </div>
                             {% endif %}
                         </div>
-                    </div>
-
-                    <!-- Estado e Observações -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-info mb-3">
-                                <i class="bi bi-gear me-2"></i>Estado e Observações
-                            </h6>
-                        </div>
 
                         <div class="col-md-6 mb-3">
-                            <label for="{{ form.status.id_for_label }}" class="form-label">
-                                Estado do Cliente
+                            <label for="{{ form.commission_percentage.id_for_label }}" class="form-label">
+                                Percentagem de Comissão <span class="text-danger">*</span>
                             </label>
-                            {{ form.status }}
-                            {% if form.status.errors %}
+                            <div class="input-group">
+                                {{ form.commission_percentage }}
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="form-text text-muted">
+                                Percentagem que o instrutor recebe por cada aula
+                            </small>
+                            {% if form.commission_percentage.errors %}
                                 <div class="invalid-feedback d-block">
-                                    {{ form.status.errors.0 }}
+                                    {{ form.commission_percentage.errors.0 }}
                                 </div>
                             {% endif %}
                         </div>
 
                         <div class="col-12 mb-3">
-                            <label for="{{ form.medical_conditions.id_for_label }}" class="form-label">
-                                Condições Médicas/Alergias
+                            <label for="{{ form.modalities.id_for_label }}" class="form-label">
+                                Especialidades/Modalidades
                             </label>
-                            {{ form.medical_conditions }}
+                            {{ form.modalities }}
                             <small class="form-text text-muted">
-                                Informações importantes para a prática de exercício
+                                Selecione as modalidades que o instrutor pode lecionar (Ctrl+clique para múltiplas)
                             </small>
-                            {% if form.medical_conditions.errors %}
+                            {% if form.modalities.errors %}
                                 <div class="invalid-feedback d-block">
-                                    {{ form.medical_conditions.errors.0 }}
+                                    {{ form.modalities.errors.0 }}
                                 </div>
                             {% endif %}
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                    Instrutor Ativo
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Instrutores inativos não poderão ter novas aulas agendadas
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas Adicionais -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-info mb-3">
+                                <i class="bi bi-chat-text me-2"></i>Informações Adicionais
+                            </h6>
                         </div>
 
                         <div class="col-12 mb-3">
                             <label for="{{ form.notes.id_for_label }}" class="form-label">
-                                Notas Adicionais
+                                Notas/Observações
                             </label>
                             {{ form.notes }}
                             <small class="form-text text-muted">
-                                Observações gerais sobre o cliente
+                                Informações adicionais sobre o instrutor, certificações, etc.
                             </small>
                             {% if form.notes.errors %}
                                 <div class="invalid-feedback d-block">
@@ -243,13 +210,13 @@
                         <div class="col-12">
                             <hr>
                             <div class="d-flex justify-content-between">
-                                <a href="{% if client %}{% url 'client_detail' client.pk %}{% else %}{% url 'client_list' %}{% endif %}"
+                                <a href="{% if instructor %}{% url 'instructor_detail' instructor.pk %}{% else %}{% url 'instructor_list' %}{% endif %}"
                                    class="btn btn-outline-secondary">
                                     <i class="bi bi-arrow-left me-1"></i>Cancelar
                                 </a>
-                                <button type="submit" class="btn btn-primary">
+                                <button type="submit" class="btn btn-success">
                                     <i class="bi bi-check-lg me-1"></i>
-                                    {% if client %}Atualizar{% else %}Criar{% endif %} Cliente
+                                    {% if instructor %}Atualizar{% else %}Criar{% endif %} Instrutor
                                 </button>
                             </div>
                         </div>
@@ -270,6 +237,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!field.classList.contains('btn') && !field.classList.contains('form-check-input')) {
             field.classList.add('form-control');
         }
+    });
+
+    // Aplicar classe específica para checkboxes
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.classList.remove('form-control');
+        checkbox.classList.add('form-check-input');
     });
 
     // Preview da foto
@@ -294,30 +268,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Formatação automática do NIF
-    const nifInput = document.getElementById('{{ form.nif.id_for_label }}');
-    if (nifInput) {
-        nifInput.addEventListener('input', function() {
-            // Remove tudo que não for número
-            this.value = this.value.replace(/\D/g, '');
-            // Limita a 9 dígitos
-            if (this.value.length > 9) {
-                this.value = this.value.substr(0, 9);
+    // Validação da percentagem de comissão
+    const commissionInput = document.getElementById('{{ form.commission_percentage.id_for_label }}');
+    if (commissionInput) {
+        commissionInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value < 0) {
+                this.value = 0;
+            } else if (value > 100) {
+                this.value = 100;
             }
         });
     }
 
-    // Formatação do telefone
-    const phoneInput = document.getElementById('{{ form.phone.id_for_label }}');
-    if (phoneInput) {
-        phoneInput.addEventListener('input', function() {
-            // Permite apenas números, espaços, + e -
-            this.value = this.value.replace(/[^\d\s\+\-]/g, '');
-        });
+    // Melhorar seleção múltipla de modalidades
+    const modalitiesSelect = document.getElementById('{{ form.modalities.id_for_label }}');
+    if (modalitiesSelect) {
+        modalitiesSelect.classList.add('form-select');
+        modalitiesSelect.style.height = 'auto';
+        modalitiesSelect.size = Math.min(modalitiesSelect.options.length, 6);
     }
 });
 
-// Validação do formulário
+// Validação do formulário antes de submeter
 document.querySelector('form').addEventListener('submit', function(e) {
     let isValid = true;
     const requiredFields = document.querySelectorAll('[required]');
