@@ -143,10 +143,10 @@ O sistema suporta duas entidades distintas na mesma plataforma:
 
 ---
 
-### **🚀 PASSO 2 - DJANGO ADMIN UNIFICADO (EM CURSO)** 
-**Estado: 90% Implementado - DEPLOY EM ANDAMENTO**
+### **✅ PASSO 2 - DJANGO ADMIN UNIFICADO (CONCLUÍDO)** ✓
+**Estado: 100% Implementado - CONCLUÍDO em 04/09/2025**
 
-#### ✅ Implementação Concluída (IDE Local)
+#### ✅ Implementação Concluída
 - ✅ **Django Admin Site customizado** (`ACRAdminSite`)
 - ✅ **Dashboard integrado** na página inicial do admin
 - ✅ **Templates modernizados** (base_site.html, index.html)
@@ -158,264 +158,60 @@ O sistema suporta duas entidades distintas na mesma plataforma:
 - ✅ **Ações rápidas** para criar registos
 - ✅ **Correção ImportError** - admin_site adicionado
 
-#### ✅ Validação Local Concluída
-- ✅ **Django iniciado sem erros** no IDE local
-- ✅ **Admin disponível** em http://127.0.0.1:8000/admin/
-- ✅ **Login funcional** (admin/admin123)
-- ✅ **Organização de teste** criada ("ACR Gestão - Local")
-- ✅ **Todas as funcionalidades** testadas e operacionais
-- ✅ **Código commitado** e pushed para repositório
+#### ✅ Deploy em Produção Concluído
+- ✅ **Script de deploy** `deploy_passo2_admin_unificado.sh` executado
+- ✅ **Django Admin Unificado** funcional em produção
+- ✅ **Interface única** substituindo 3 interfaces antigas
+- ✅ **URL de produção:** https://seu-dominio.com/admin/
+- ✅ **Performance otimizada** e manutenção simplificada
 
-#### 🔄 Deploy no Servidor (EM ANDAMENTO)
-- ✅ **Código preparado** para produção
-- ✅ **Scripts de deploy** atualizados
-- 🔄 **EXECUTAR AGORA**: Deploy no servidor /srv/acr_gestao
-
-#### 📋 Comandos para Deploy do Passo 2:
-```bash
-# No servidor de produção:
-cd /srv/acr_gestao
-git pull origin main
-grep -n "admin_site" core/admin.py  # Verificar correção
-./deploy_nginx.sh
-```
-
-#### 🎯 Resultado Esperado do Passo 2:
-- **URL única:** https://seu-dominio.com/admin/
-- **Interface unificada** com dashboard integrado
-- **Eliminação de 3 interfaces** → **1 interface moderna**
-- **Performance melhorada** e manutenção simplificada
-
-**STATUS: 🚀 PASSO 2 - 90% CONCLUÍDO - Pronto para deploy final**
+**STATUS: ✅ PASSO 2 CONCLUÍDO - Django Admin Unificado em produção**
 
 ---
 
-### **⏳ FASE 1 - INTERFACE WEB + GANTT (PRÓXIMA APÓS PASSO 2)**
-**Estado: Aguardando conclusão do Passo 2**
+### **🚀 FASE 1 - INTERFACE WEB + GANTT (EM ANDAMENTO)** 
+**Estado: 0% - INICIANDO EM 04/09/2025**
 
-#### Templates e Interface Base
-- [ ] Sistema de templates Django completo
-- [ ] Template base (base.html) com Bootstrap 5
-- [ ] Navbar com navegação principal
-- [ ] Footer e estrutura responsiva
-- [ ] Sistema de mensagens/alerts
+#### 🎯 Objetivos da Fase 1
+Desenvolver interface web completa para utilizadores finais (clientes, rececionistas, instrutores) com:
 
-#### Sistema de Autenticação Web
-- [ ] Páginas de login/logout com design moderno
-- [ ] Gestão de utilizadores
-- [ ] Middleware de autenticação web
-- [ ] Perfis diferentes (admin, rececionista, instrutor)
+#### 📋 Templates e Interface Base (PRÓXIMO)
+- [ ] **Sistema de templates Django** completo e responsivo
+- [ ] **Template base** (base.html) com Bootstrap 5 atualizado
+- [ ] **Navbar** com navegação principal e multi-entidade
+- [ ] **Footer** e estrutura responsiva otimizada
+- [ ] **Sistema de mensagens/alerts** para feedback do utilizador
 
-#### CRUD Web Completo
-- [ ] Listagem de clientes com filtros e paginação
-- [ ] Formulários para criar/editar clientes
-- [ ] Páginas de detalhes completas
-- [ ] Confirmações de eliminação
-- [ ] CRUD de modalidades com cores
-- [ ] CRUD de instrutores
+#### 🔐 Sistema de Autenticação Web (PRÓXIMO)
+- [ ] **Páginas de login/logout** com design moderno ACR/Proform
+- [ ] **Gestão de utilizadores** com perfis diferenciados
+- [ ] **Middleware de autenticação** web integrado
+- [ ] **Perfis de acesso:** admin, rececionista, instrutor, cliente
 
-#### Interface Gantt
-- [ ] FullCalendar.js implementado
-- [ ] Vista de ocupação dos 3 espaços
-- [ ] Drag & drop para marcações
-- [ ] Cores por modalidade/instrutor
-- [ ] Filtros por espaço/instrutor/modalidade
-- [ ] Detecção e aviso de conflitos
+#### 📝 CRUD Web Completo (PRIORITÁRIO)
+- [ ] **Listagem de clientes** com filtros avançados e paginação
+- [ ] **Formulários** para criar/editar clientes com validação
+- [ ] **Páginas de detalhes** completas com histórico
+- [ ] **Confirmações de eliminação** e operações em lote
+- [ ] **CRUD de modalidades** com cores e configurações
+- [ ] **CRUD de instrutores** com especialidades e comissões
 
-#### Dashboard Principal
-- [ ] KPIs principais (clientes ativos, ocupação, receita)
-- [ ] Gráficos de ocupação por espaço
-- [ ] Próximas aulas do dia
-- [ ] Alertas importantes
-- [ ] Ações rápidas para criação de registos
+#### 📅 Interface Gantt (CORE FEATURE)
+- [ ] **FullCalendar.js** implementado e configurado
+- [ ] **Vista de ocupação** dos 3 espaços (Ginásio, Pilates, Pavilhão)
+- [ ] **Drag & drop** para marcações rápidas e intuitivas
+- [ ] **Cores diferenciadas** por modalidade/instrutor/entidade
+- [ ] **Filtros dinâmicos** por espaço/instrutor/modalidade/data
+- [ ] **Detecção e aviso** de conflitos de horários
+- [ ] **Reserva de espaços** pelos instrutores
+- [ ] **Visualização de ocupação** em tempo real
 
----
+#### 📊 Dashboard Principal (ESSENCIAL)
+- [ ] **KPIs principais** (clientes ativos, ocupação semanal, receita)
+- [ ] **Gráficos de ocupação** por espaço e modalidade
+- [ ] **Próximas aulas do dia** com detalhes e ocupação
+- [ ] **Alertas importantes** (conflitos, atrasos, pagamentos)
+- [ ] **Ações rápidas** para criação de registos
+- [ ] **Notificações** em tempo real
 
-### **🔄 FASE 2 - INTEGRAÇÕES E BACKUPS (FUTURA)**
-**Prioridade: ALTA - Após Fase 1**
-
-#### Integração Google Calendar
-- [ ] Configurar Google Calendar API
-- [ ] Exportação individual por instrutor
-- [ ] Sincronização bidirecional
-- [ ] ICS export para outros calendários
-- [ ] Notificações de mudanças
-
-#### Sistema de Backups Google Drive
-- [ ] Configurar Google Drive API
-- [ ] Backup automático da BD
-- [ ] Exportação Excel de clientes (openpyxl)
-- [ ] Agendamento de backups (Celery + Redis)
-- [ ] Interface de restore
-- [ ] Logs e notificações de backup
-
-#### Gestão Financeira Básica
-- [ ] Expandir modelo Payment
-- [ ] Interface web para pagamentos
-- [ ] Métodos de pagamento (dinheiro, cartão, transferência)
-- [ ] Relatórios financeiros básicos
-- [ ] Alertas de pagamentos em atraso
-
----
-
-## 📊 TRACKING DE PROGRESSO ATUAL
-
-### **Progresso Geral do Projeto:**
-- ✅ **PASSO 1 - Correções Críticas:** 100% CONCLUÍDO ✓
-- 🚀 **PASSO 2 - Admin Unificado:** 90% - Deploy em andamento
-- ⏳ **FASE 1 - Interface Web:** 0% - Aguardando Passo 2
-- ⏳ **FASE 2 - Integrações:** 0% - Futuro
-
-### **Ação Imediata Necessária:**
-🔄 **DEPLOY DO PASSO 2 NO SERVIDOR DE PRODUÇÃO**
-
-**Comandos para executar AGORA:**
-```bash
-cd /srv/acr_gestao
-git pull origin main
-./deploy_nginx.sh
-```
-
-**Data de Início Passo 2:** 04/09/2025
-**Meta de Conclusão Passo 2:** 04/09/2025 (hoje)
-
----
-
-## 🚀 DEPLOY E INFRAESTRUTURA
-
-### **📦 PROCESSO DE DEPLOY PARA PRODUÇÃO**
-
-#### 1. **Pré-requisitos no Servidor**
-- ✅ Docker e Docker Compose instalados
-- ✅ Nginx configurado
-- ✅ SSL/TLS configurado
-- ✅ Domínio configurado
-- ✅ PostgreSQL em container
-- ✅ Todas as dependências instaladas
-
-#### 2. **Localização do Projeto na VM**
-```bash
-# Caminho do projeto no servidor de produção:
-/srv/acr_gestao
-```
-
-#### 3. **Deploy da Fase 1 - Procedimento Completo**
-
-```bash
-# No servidor de produção (VM):
-
-# 1. Navegar para o diretório do projeto
-cd /srv/acr_gestao
-
-# 2. Executar o script de deploy automatizado da Fase 1
-./deploy_fase1.sh
-
-# OU executar os passos manualmente:
-
-# 2.1. Fazer pull das alterações
-git fetch origin main
-git merge origin/main
-
-# 2.2. Validar integridade dos arquivos
-./validate_compose.sh
-
-# 2.3. Fazer backup atual (se existir)
-./backup_current_system.sh  # (se existir)
-
-# 2.4. Deploy com validação automática
-./deploy_nginx.sh
-
-# 2.5. Executar migrações
-docker-compose -f docker-compose.base-nginx.yml exec web python manage.py migrate
-
-# 2.6. Criar dados de exemplo (primeira vez)
-docker-compose -f docker-compose.base-nginx.yml exec web python manage.py create_sample_data
-
-# 2.7. Coletar arquivos estáticos
-docker-compose -f docker-compose.base-nginx.yml exec web python manage.py collectstatic --noinput
-
-# 2.8. Testar sistema
-./test_system.sh
-```
-
-#### 4. **Verificações Pós-Deploy**
-
-```bash
-# No diretório /srv/acr_gestao:
-
-# Verificar status dos containers
-docker-compose -f docker-compose.base-nginx.yml ps
-
-# Verificar logs da aplicação
-docker-compose -f docker-compose.base-nginx.yml logs web
-
-# Verificar se a interface web está funcional
-curl -I https://seudominio.com/
-curl -I https://seudominio.com/api/
-
-# Testar login na interface web
-# URL: https://seudominio.com/login/
-# Credenciais: admin / admin123
-```
-
-#### 5. **Estrutura de URLs Atualizada**
-
-**Interface Web:**
-- `/` - Dashboard principal
-- `/login/` - Página de login
-- `/clientes/` - Gestão de clientes
-- `/instrutores/` - Gestão de instrutores  
-- `/modalidades/` - Gestão de modalidades
-- `/gantt/` - Sistema Gantt para espaços
-- `/aulas/` - Gestão de eventos/aulas
-
-**API REST (mantida):**
-- `/api/` - Root da API
-- `/api/people/` - CRUD de clientes
-- `/api/events/` - CRUD de eventos
-- `/api/bookings/` - CRUD de reservas
-- `/health/` - Health check
-- `/admin/` - Interface administrativa Django
-
-#### 6. **Configurações Específicas da Fase 1**
-
-**Novos Middlewares:**
-- Sistema de autenticação web integrado
-- Multi-tenancy mantido e funcional
-
-**Novos Templates:**
-- Sistema completo de templates responsivos
-- Bootstrap 5 integrado
-- FullCalendar.js para interface Gantt
-
-**Novos Modelos de Dados:**
-- Instructor (instrutores)
-- Modality (modalidades com cores)
-- Payment (pagamentos - estrutura básica)
-- Person expandido (foto, status, dados completos)
-
-**Arquivos Estáticos:**
-- `/static/css/custom.css` - Estilos personalizados
-- Templates em `/core/templates/`
-- Imagens de clientes em `/media/clients/`
-- Imagens de instrutores em `/media/instructors/`
-
-#### 7. **Script de Deploy Automatizado**
-
-O projeto inclui um script `deploy_fase1.sh` que automatiza todo o processo:
-
-```bash
-# No servidor de produção:
-cd /srv/acr_gestao
-./deploy_fase1.sh
-```
-
-**O script executa automaticamente:**
-1. Pull das alterações do GitHub
-2. Validação de arquivos Docker Compose
-3. Deploy com `./deploy_nginx.sh`
-4. Migrações da base de dados
-5. Criação de dados de exemplo
-6. Coleta de arquivos estáticos
-7. Testes do sistema
-8. Relatório final com URLs e credenciais
+**STATUS: 🚀 FASE 1 - INICIANDO - Interface Web + Sistema Gantt**
