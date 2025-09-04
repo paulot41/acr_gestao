@@ -116,56 +116,123 @@ O sistema suporta duas entidades distintas na mesma plataforma:
 
 ---
 
-## 📋 ROADMAP DE DESENVOLVIMENTO
+## 📋 ROADMAP DE DESENVOLVIMENTO - TRACKING DE PROGRESSO
 
-### **✅ FASE 1 - INTERFACE WEB + GANTT (CONCLUÍDA)**
-**Estado: 100% Implementada e Testada**
+### **✅ PASSO 1 - PROBLEMA "EMPTY COMPOSE FILE" (CONCLUÍDO)** ✓
+**Estado: 100% Resolvido - CONCLUÍDO em 04/09/2025**
 
-#### ✅ Templates e Interface Base
-- ✅ Sistema de templates Django completo
-- ✅ Template base (base.html) com Bootstrap 5
-- ✅ Navbar com navegação principal
-- ✅ Footer e estrutura responsiva
-- ✅ Sistema de mensagens/alerts
+#### ✅ Resolução Imediata
+- ✅ Erro "empty compose file" identificado e corrigido
+- ✅ Arquivo docker-compose.base-nginx.yml restaurado via git
+- ✅ Servidor de produção restaurado ao funcionamento
 
-#### ✅ Sistema de Autenticação Web
-- ✅ Páginas de login/logout com design moderno
-- ✅ Gestão de utilizadores
-- ✅ Middleware de autenticação web
-- ✅ Perfis diferentes (admin, rececionista, instrutor)
+#### ✅ Medidas Preventivas Implementadas
+- ✅ Script `validate_compose.sh` criado
+- ✅ Script `recover.sh` para recuperação automática
+- ✅ `deploy_nginx.sh` atualizado com validações
+- ✅ `test_system.sh` para verificação do sistema
+- ✅ Documentação completa em `TROUBLESHOOTING.md`
 
-#### ✅ CRUD Web Completo
-- ✅ Listagem de clientes com filtros e paginação
-- ✅ Formulários para criar/editar clientes
-- ✅ Páginas de detalhes completas
-- ✅ Confirmações de eliminação
-- ✅ CRUD de modalidades com cores
-- ✅ CRUD de instrutores
+#### ✅ Scripts de Prevenção
+- ✅ Validação automática antes de cada deploy
+- ✅ Backup automático de arquivos críticos
+- ✅ Recuperação automatizada em caso de problemas
+- ✅ Logs detalhados para troubleshooting
 
-#### ✅ Interface Gantt
-- ✅ FullCalendar.js implementado
-- ✅ Vista de ocupação dos 3 espaços
-- ✅ Drag & drop para marcações
-- ✅ Cores por modalidade/instrutor
-- ✅ Filtros por espaço/instrutor/modalidade
-- ✅ Detecção e aviso de conflitos
-
-#### ✅ Dashboard Principal
-- ✅ KPIs principais (clientes ativos, ocupação, receita)
-- ✅ Gráficos de ocupação por espaço
-- ✅ Próximas aulas do dia
-- ✅ Alertas importantes
-- ✅ Ações rápidas para criação de registos
-
-#### ✅ Dados de Exemplo
-- ✅ Comando create_sample_data implementado
-- ✅ 3 espaços, 5 modalidades, 3 instrutores, 4 clientes
-- ✅ Utilizador admin configurado
+**STATUS: ✅ PASSO 1 CONCLUÍDO - Problema resolvido com medidas preventivas**
 
 ---
 
-### **🔄 FASE 2 - INTEGRAÇÕES E BACKUPS (4-6 semanas)**
-**Prioridade: ALTA - Próxima fase**
+### **🚀 PASSO 2 - DJANGO ADMIN UNIFICADO (EM CURSO)** 
+**Estado: 90% Implementado - DEPLOY EM ANDAMENTO**
+
+#### ✅ Implementação Concluída (IDE Local)
+- ✅ **Django Admin Site customizado** (`ACRAdminSite`)
+- ✅ **Dashboard integrado** na página inicial do admin
+- ✅ **Templates modernizados** (base_site.html, index.html)
+- ✅ **URLs simplificadas** (eliminadas interfaces redundantes)
+- ✅ **Estatísticas detalhadas** por entidade (ACR/Proform)
+- ✅ **Interface responsiva** com Bootstrap 5 e Bootstrap Icons
+- ✅ **Auto-refresh** automático a cada 5 minutos
+- ✅ **Badges coloridos** para identificar entidades
+- ✅ **Ações rápidas** para criar registos
+- ✅ **Correção ImportError** - admin_site adicionado
+
+#### ✅ Validação Local Concluída
+- ✅ **Django iniciado sem erros** no IDE local
+- ✅ **Admin disponível** em http://127.0.0.1:8000/admin/
+- ✅ **Login funcional** (admin/admin123)
+- ✅ **Organização de teste** criada ("ACR Gestão - Local")
+- ✅ **Todas as funcionalidades** testadas e operacionais
+- ✅ **Código commitado** e pushed para repositório
+
+#### 🔄 Deploy no Servidor (EM ANDAMENTO)
+- ✅ **Código preparado** para produção
+- ✅ **Scripts de deploy** atualizados
+- 🔄 **EXECUTAR AGORA**: Deploy no servidor /srv/acr_gestao
+
+#### 📋 Comandos para Deploy do Passo 2:
+```bash
+# No servidor de produção:
+cd /srv/acr_gestao
+git pull origin main
+grep -n "admin_site" core/admin.py  # Verificar correção
+./deploy_nginx.sh
+```
+
+#### 🎯 Resultado Esperado do Passo 2:
+- **URL única:** https://seu-dominio.com/admin/
+- **Interface unificada** com dashboard integrado
+- **Eliminação de 3 interfaces** → **1 interface moderna**
+- **Performance melhorada** e manutenção simplificada
+
+**STATUS: 🚀 PASSO 2 - 90% CONCLUÍDO - Pronto para deploy final**
+
+---
+
+### **⏳ FASE 1 - INTERFACE WEB + GANTT (PRÓXIMA APÓS PASSO 2)**
+**Estado: Aguardando conclusão do Passo 2**
+
+#### Templates e Interface Base
+- [ ] Sistema de templates Django completo
+- [ ] Template base (base.html) com Bootstrap 5
+- [ ] Navbar com navegação principal
+- [ ] Footer e estrutura responsiva
+- [ ] Sistema de mensagens/alerts
+
+#### Sistema de Autenticação Web
+- [ ] Páginas de login/logout com design moderno
+- [ ] Gestão de utilizadores
+- [ ] Middleware de autenticação web
+- [ ] Perfis diferentes (admin, rececionista, instrutor)
+
+#### CRUD Web Completo
+- [ ] Listagem de clientes com filtros e paginação
+- [ ] Formulários para criar/editar clientes
+- [ ] Páginas de detalhes completas
+- [ ] Confirmações de eliminação
+- [ ] CRUD de modalidades com cores
+- [ ] CRUD de instrutores
+
+#### Interface Gantt
+- [ ] FullCalendar.js implementado
+- [ ] Vista de ocupação dos 3 espaços
+- [ ] Drag & drop para marcações
+- [ ] Cores por modalidade/instrutor
+- [ ] Filtros por espaço/instrutor/modalidade
+- [ ] Detecção e aviso de conflitos
+
+#### Dashboard Principal
+- [ ] KPIs principais (clientes ativos, ocupação, receita)
+- [ ] Gráficos de ocupação por espaço
+- [ ] Próximas aulas do dia
+- [ ] Alertas importantes
+- [ ] Ações rápidas para criação de registos
+
+---
+
+### **🔄 FASE 2 - INTEGRAÇÕES E BACKUPS (FUTURA)**
+**Prioridade: ALTA - Após Fase 1**
 
 #### Integração Google Calendar
 - [ ] Configurar Google Calendar API
@@ -188,6 +255,29 @@ O sistema suporta duas entidades distintas na mesma plataforma:
 - [ ] Métodos de pagamento (dinheiro, cartão, transferência)
 - [ ] Relatórios financeiros básicos
 - [ ] Alertas de pagamentos em atraso
+
+---
+
+## 📊 TRACKING DE PROGRESSO ATUAL
+
+### **Progresso Geral do Projeto:**
+- ✅ **PASSO 1 - Correções Críticas:** 100% CONCLUÍDO ✓
+- 🚀 **PASSO 2 - Admin Unificado:** 90% - Deploy em andamento
+- ⏳ **FASE 1 - Interface Web:** 0% - Aguardando Passo 2
+- ⏳ **FASE 2 - Integrações:** 0% - Futuro
+
+### **Ação Imediata Necessária:**
+🔄 **DEPLOY DO PASSO 2 NO SERVIDOR DE PRODUÇÃO**
+
+**Comandos para executar AGORA:**
+```bash
+cd /srv/acr_gestao
+git pull origin main
+./deploy_nginx.sh
+```
+
+**Data de Início Passo 2:** 04/09/2025
+**Meta de Conclusão Passo 2:** 04/09/2025 (hoje)
 
 ---
 
