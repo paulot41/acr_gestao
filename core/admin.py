@@ -1,16 +1,11 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.shortcuts import render
-from django.utils import timezone
-from datetime import timedelta
 from django.urls import path
 from django.http import JsonResponse
 from . import models
 
 
 class OrgScopedAdmin(admin.ModelAdmin):
-    list_filter = ["organization"]
-
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         org = getattr(request, "organization", None)
@@ -48,6 +43,9 @@ class ACRAdminSite(admin.AdminSite):
                 'total_clients': models.Person.objects.filter(organization=org, status='active').count(),
                 'total_instructors': models.Instructor.objects.filter(organization=org, is_active=True).count(),
                 'total_modalities': models.Modality.objects.filter(organization=org, is_active=True).count(),
+                'total_resources': models.Resource.objects.filter(organization=org, is_available=True).count(),
+                'total_payment_plans': models.PaymentPlan.objects.filter(organization=org, is_active=True).count(),
+                'total_class_groups': models.ClassGroup.objects.filter(organization=org, is_active=True).count(),
             }
             extra_context['stats'] = stats
 
@@ -63,6 +61,9 @@ class ACRAdminSite(admin.AdminSite):
             'total_clients': models.Person.objects.filter(organization=org, status='active').count(),
             'total_instructors': models.Instructor.objects.filter(organization=org, is_active=True).count(),
             'total_modalities': models.Modality.objects.filter(organization=org, is_active=True).count(),
+            'total_resources': models.Resource.objects.filter(organization=org, is_available=True).count(),
+            'total_payment_plans': models.PaymentPlan.objects.filter(organization=org, is_active=True).count(),
+            'total_class_groups': models.ClassGroup.objects.filter(organization=org, is_active=True).count(),
         }
         return JsonResponse(stats)
 
@@ -70,77 +71,166 @@ class ACRAdminSite(admin.AdminSite):
 admin_site = ACRAdminSite(name='acr_admin')
 
 
-@admin.register(models.Organization)
+# Definir Admin Classes
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = ("name", "domain", "org_type", "gym_monthly_fee", "wellness_monthly_fee")
     list_filter = ("org_type",)
     search_fields = ("name", "domain")
 
 
-@admin.register(models.Person)
 class PersonAdmin(OrgScopedAdmin):
-    list_display = ['full_name', 'email', 'phone', 'status', 'created_at']
-    list_filter = ['organization', 'status', 'entity_affiliation', 'created_at']
+    list_display = ['full_name', 'email', 'phone', 'entity_affiliation', 'status', 'created_at']
+    list_filter = ['status', 'entity_affiliation', 'created_at']
     search_fields = ['first_name', 'last_name', 'email', 'phone', 'nif']
+    fieldsets = (
+        ('Informações Pessoais', {
+            'fields': ('first_name', 'last_name', 'email', 'phone', 'nif', 'photo')
+        }),
+        ('Detalhes', {
+            'fields': ('date_of_birth', 'address', 'emergency_contact', 'entity_affiliation')
+        }),
+        ('Estado e Notas', {
+            'fields': ('status', 'notes'),
+            'classes': ('collapse',)
+        })
+    )
 
 
-@admin.register(models.Instructor)
 class InstructorAdmin(OrgScopedAdmin):
-    list_display = ['full_name', 'email', 'phone', 'is_active']
-    list_filter = ['organization', 'entity_affiliation', 'is_active', 'created_at']
+    list_display = ['full_name', 'email', 'phone', 'entity_affiliation', 'is_active']
+    list_filter = ['entity_affiliation', 'is_active', 'created_at']
     search_fields = ['first_name', 'last_name', 'email', 'phone']
+    fieldsets = (
+        ('Informações Pessoais', {
+            'fields': ('first_name', 'last_name', 'email', 'phone', 'photo')
+        }),
+        ('Especialidades e Afiliação', {
+            'fields': ('specialties', 'entity_affiliation')
+        }),
+        ('Comissões', {
+            'fields': ('acr_commission_rate', 'proform_commission_rate'),
+            'classes': ('collapse',)
+        }),
+        ('Estado', {
+            'fields': ('is_active',)
+        })
+    )
 
 
-@admin.register(models.Modality)
+class ClassGroupAdmin(OrgScopedAdmin):
+    """Admin para gestão de turmas."""
+    list_display = ['name', 'modality', 'instructor', 'current_members_count', 'max_students', 'level', 'is_active']
+    list_filter = ['modality', 'instructor', 'level', 'is_active', 'created_at']
+    search_fields = ['name', 'description', 'modality__name', 'instructor__first_name', 'instructor__last_name']
+    filter_horizontal = ['members']
+
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('name', 'description', 'modality', 'instructor')
+        }),
+        ('Configurações', {
+            'fields': ('max_students', 'level', 'start_date', 'end_date')
+        }),
+        ('Membros', {
+            'fields': ('members',),
+            'description': 'Selecione os clientes que fazem parte desta turma'
+        }),
+        ('Estado', {
+            'fields': ('is_active',)
+        })
+    )
+
+    def current_members_count(self, obj):
+        return obj.current_members_count
+    current_members_count.short_description = 'Membros Ativos'
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('modality', 'instructor').prefetch_related('members')
+
+
 class ModalityAdmin(OrgScopedAdmin):
-    list_display = ['name', 'entity_type', 'price_per_class', 'is_active']
-    list_filter = ['organization', 'entity_type', 'is_active']
+    list_display = ['name', 'entity_type', 'default_duration_minutes', 'max_capacity', 'color_preview', 'is_active']
+    list_filter = ['entity_type', 'is_active', 'created_at']
     search_fields = ['name', 'description']
 
-
-@admin.register(models.Payment)
-class PaymentAdmin(OrgScopedAdmin):
-    list_display = ['person', 'amount', 'method', 'status', 'due_date']
-    list_filter = ['organization', 'method', 'status']
-    search_fields = ['person__first_name', 'person__last_name']
-
-
-@admin.register(models.Membership)
-class MembershipAdmin(OrgScopedAdmin):
-    list_display = ("person", "plan", "status", "starts_on", "ends_on")
-    list_filter = ("status", "starts_on")
+    def color_preview(self, obj):
+        return format_html(
+            '<span style="background-color: {}; padding: 5px 10px; border-radius: 3px; color: white;">{}</span>',
+            obj.color, obj.color
+        )
+    color_preview.short_description = 'Cor'
 
 
-@admin.register(models.Product)
-class ProductAdmin(OrgScopedAdmin):
-    list_display = ("name", "kind", "price", "duration_months")
-    list_filter = ("kind", "created_at")
-
-
-@admin.register(models.Resource)
 class ResourceAdmin(OrgScopedAdmin):
-    list_display = ("name", "capacity")
+    list_display = ['name', 'entity_type', 'capacity', 'is_available']
+    list_filter = ['entity_type', 'is_available', 'created_at']
+    search_fields = ['name', 'description']
+
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('name', 'description', 'entity_type')
+        }),
+        ('Capacidade e Disponibilidade', {
+            'fields': ('capacity', 'is_available')
+        }),
+        ('Equipamentos e Características', {
+            'fields': ('equipment_list', 'special_features'),
+            'classes': ('collapse',)
+        })
+    )
 
 
-@admin.register(models.Event)
 class EventAdmin(OrgScopedAdmin):
-    list_display = ['title', 'resource', 'starts_at', 'ends_at', 'capacity']
-    list_filter = ['organization', 'resource', 'starts_at']
+    list_display = ['display_title', 'resource', 'instructor', 'event_type', 'starts_at', 'ends_at', 'capacity', 'bookings_count']
+    list_filter = ['event_type', 'resource', 'modality', 'instructor', 'starts_at']
+    search_fields = ['title', 'description', 'resource__name', 'instructor__first_name', 'instructor__last_name']
+    date_hierarchy = 'starts_at'
+
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('title', 'description', 'event_type')
+        }),
+        ('Localização e Modalidade', {
+            'fields': ('resource', 'modality', 'instructor')
+        }),
+        ('Participantes', {
+            'fields': ('class_group', 'individual_client', 'capacity'),
+            'description': 'Configure os participantes baseado no tipo de evento'
+        }),
+        ('Horário', {
+            'fields': ('starts_at', 'ends_at')
+        }),
+        ('Google Calendar', {
+            'fields': ('google_calendar_sync_enabled',),
+            'classes': ('collapse',)
+        })
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'resource', 'modality', 'instructor', 'class_group', 'individual_client'
+        ).annotate(
+            bookings_count_annotated=models.Count('bookings', filter=models.Q(bookings__status='confirmed'))
+        )
 
 
-@admin.register(models.Booking)
-class BookingAdmin(OrgScopedAdmin):
-    list_display = ("event", "person", "status", "created_at")
-    list_filter = ["status", "created_at"]
+class PaymentPlanAdmin(OrgScopedAdmin):
+    list_display = ['name', 'plan_type', 'entity_type', 'price', 'credits_included', 'is_active']
+    list_filter = ['plan_type', 'entity_type', 'is_active']
+    search_fields = ['name', 'description']
+    filter_horizontal = ['modalities']
 
-# Registrar todos os modelos no custom admin site
+
+# Registar todos os modelos no custom admin site
 admin_site.register(models.Organization, OrganizationAdmin)
 admin_site.register(models.Person, PersonAdmin)
 admin_site.register(models.Instructor, InstructorAdmin)
+admin_site.register(models.ClassGroup, ClassGroupAdmin)
 admin_site.register(models.Modality, ModalityAdmin)
-admin_site.register(models.Payment, PaymentAdmin)
-admin_site.register(models.Membership, MembershipAdmin)
-admin_site.register(models.Product, ProductAdmin)
 admin_site.register(models.Resource, ResourceAdmin)
 admin_site.register(models.Event, EventAdmin)
-admin_site.register(models.Booking, BookingAdmin)
+admin_site.register(models.PaymentPlan, PaymentPlanAdmin)
+admin_site.register(models.ClientSubscription)
+admin_site.register(models.Booking)
+admin_site.register(models.Payment)
+admin_site.register(models.InstructorCommission)

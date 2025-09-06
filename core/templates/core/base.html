@@ -149,7 +149,30 @@
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'event_list' %}">
-                                    <i class="bi bi-calendar-event me-2"></i>Aulas/Eventos
+                                    <i class="bi bi-calendar-event me-2"></i>Eventos/Aulas
+                                </a></li>
+                            </ul>
+                        </li>
+
+                        <!-- 📱 GOOGLE CALENDAR INTEGRATION (FASE 2) -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="googleCalendarDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-google me-1"></i>Google Calendar
+                                <span class="badge bg-success ms-1" style="font-size: 0.6rem;">FASE 2</span>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'google_calendar_setup' %}">
+                                    <i class="bi bi-gear me-2"></i>Configuração
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'google_calendar_instructors' %}">
+                                    <i class="bi bi-people me-2"></i>Gerir Instrutores
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'google_calendar_sync_logs' %}">
+                                    <i class="bi bi-list-ul me-2"></i>Logs de Sincronização
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'google_calendar_settings' %}">
+                                    <i class="bi bi-sliders me-2"></i>Configurações Avançadas
                                 </a></li>
                             </ul>
                         </li>

@@ -1,0 +1,281 @@
+{% extends 'core/dashboard_base.html' %}
+{% load static %}
+
+{% block stats_cards %}
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-primary mb-2">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.upcoming_bookings }}</h3>
+            <p class="text-muted mb-0">Próximas Aulas</p>
+        </div>
+    </div>
+</div>
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-success mb-2">
+                <i class="fas fa-coins"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.total_credits }}</h3>
+            <p class="text-muted mb-0">Créditos Disponíveis</p>
+        </div>
+    </div>
+</div>
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-info mb-2">
+                <i class="fas fa-dumbbell"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.monthly_bookings }}</h3>
+            <p class="text-muted mb-0">Aulas Este Mês</p>
+        </div>
+    </div>
+</div>
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-warning mb-2">
+                <i class="fas fa-credit-card"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.active_plans }}</h3>
+            <p class="text-muted mb-0">Planos Ativos</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="col-lg-8">
+    <!-- Próximas Reservas -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-calendar-alt me-2"></i>Próximas Aulas
+            </h5>
+            <a href="{% url 'core:gantt_view' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus me-1"></i>Nova Reserva
+            </a>
+        </div>
+        <div class="card-body">
+            {% if upcoming_bookings %}
+                {% for booking in upcoming_bookings %}
+                <div class="upcoming-event p-3 rounded mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="mb-1">{{ booking.event.title }}</h6>
+                            <p class="text-muted mb-1">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ booking.event.resource.name }}
+                                {% if booking.event.instructor %}
+                                    • <i class="fas fa-user me-1"></i>{{ booking.event.instructor.full_name }}
+                                {% endif %}
+                            </p>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ booking.event.starts_at|date:"d/m/Y H:i" }} - {{ booking.event.ends_at|date:"H:i" }}
+                            </small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if booking.subscription_used %}
+                                <span class="badge bg-success credit-badge">
+                                    <i class="fas fa-coins me-1"></i>{{ booking.credits_used }} crédito(s)
+                                </span>
+                            {% elif booking.is_paid %}
+                                <span class="badge bg-info credit-badge">
+                                    <i class="fas fa-euro-sign me-1"></i>{{ booking.payment_amount }}
+                                </span>
+                            {% endif %}
+                            <br>
+                            {% if booking.can_be_cancelled %}
+                                <button class="btn btn-outline-danger btn-sm mt-2" onclick="cancelBooking({{ booking.id }})">
+                                    <i class="fas fa-times me-1"></i>Cancelar
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Não tem aulas marcadas</h5>
+                    <p class="text-muted">Reserve a sua próxima aula no sistema de marcações</p>
+                    <a href="{% url 'core:gantt_view' %}" class="btn btn-primary">
+                        <i class="fas fa-calendar-plus me-1"></i>Marcar Aula
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Histórico Recente -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-history me-2"></i>Histórico Recente
+            </h5>
+            <a href="{% url 'core:credit_history' %}" class="btn btn-outline-primary btn-sm">
+                Ver Completo
+            </a>
+        </div>
+        <div class="card-body">
+            {% if recent_bookings %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Aula</th>
+                                <th>Data</th>
+                                <th>Estado</th>
+                                <th>Pagamento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in recent_bookings %}
+                            <tr>
+                                <td>
+                                    <strong>{{ booking.event.title }}</strong><br>
+                                    <small class="text-muted">{{ booking.event.resource.name }}</small>
+                                </td>
+                                <td>{{ booking.event.starts_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    {% if booking.status == 'confirmed' %}
+                                        <span class="badge bg-success">Confirmada</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Cancelada</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if booking.subscription_used %}
+                                        <span class="badge bg-primary">{{ booking.credits_used }} crédito(s)</span>
+                                    {% elif booking.is_paid %}
+                                        <span class="badge bg-success">€{{ booking.payment_amount }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-3">Ainda não tem histórico de aulas</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="col-lg-4">
+    <!-- Resumo de Créditos -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-wallet me-2"></i>Meus Créditos
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if credit_summary.active_subscriptions %}
+                {% for subscription in credit_summary.active_subscriptions %}
+                <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                    <div>
+                        <h6 class="mb-1">{{ subscription.payment_plan.name }}</h6>
+                        <small class="text-muted">
+                            {% if subscription.credits_expire_date %}
+                                Válido até {{ subscription.credits_expire_date|date:"d/m/Y" }}
+                            {% else %}
+                                Sem expiração
+                            {% endif %}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-success fs-6">{{ subscription.remaining_credits }}</span>
+                        <br><small class="text-muted">créditos</small>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-coins fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">Não tem planos de créditos ativos</p>
+                    <a href="{% url 'core:dashboard_router' %}" class="btn btn-primary btn-sm">
+                        Adquirir Créditos
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Planos Ativos -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-id-card me-2"></i>Planos Ativos
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if active_subscriptions %}
+                {% for subscription in active_subscriptions %}
+                <div class="border rounded p-3 mb-3">
+                    <h6 class="mb-1">{{ subscription.payment_plan.name }}</h6>
+                    <p class="text-muted mb-2">{{ subscription.payment_plan.get_plan_type_display }}</p>
+
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Início</small><br>
+                            <strong>{{ subscription.start_date|date:"d/m/Y" }}</strong>
+                        </div>
+                        {% if subscription.end_date %}
+                        <div class="col-6">
+                            <small class="text-muted">Fim</small><br>
+                            <strong>{{ subscription.end_date|date:"d/m/Y" }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if not subscription.is_paid %}
+                        <div class="alert alert-warning mt-2 py-2">
+                            <small><i class="fas fa-exclamation-triangle me-1"></i>Pagamento pendente</small>
+                        </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted text-center py-3">Não tem planos ativos</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function cancelBooking(bookingId) {
+    if (confirm('Tem a certeza que pretende cancelar esta reserva?')) {
+        fetch(`/api/bookings/${bookingId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao cancelar reserva: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Erro ao cancelar reserva');
+            console.error('Error:', error);
+        });
+    }
+}
+</script>
+{% endblock %}

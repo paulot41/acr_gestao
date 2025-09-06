@@ -17,7 +17,7 @@ class CustomLoginView(LoginView):
         next_url = self.request.GET.get('next')
         if next_url:
             return next_url
-        return reverse('dashboard')
+        return reverse('dashboard_router')
 
     def form_valid(self, form):
         """Processar login válido com informação da entidade."""
@@ -111,3 +111,31 @@ class UserRoleMiddleware:
 
         response = self.get_response(request)
         return response
+
+# Função de view para compatibilidade com URLs existentes
+def login_view(request):
+    """Vista de login como função para compatibilidade."""
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                messages.success(request, f'Bem-vindo, {user.first_name or user.username}!')
+                return redirect('dashboard_router')
+            else:
+                messages.error(request, 'Credenciais inválidas.')
+        else:
+            messages.error(request, 'Por favor, corrija os erros abaixo.')
+    else:
+        form = AuthenticationForm()
+
+    return render(request, 'registration/login.html', {'form': form})
+
+def logout_view(request):
+    """Vista de logout."""
+    logout(request)
+    messages.success(request, 'Logout realizado com sucesso.')
+    return redirect('login')

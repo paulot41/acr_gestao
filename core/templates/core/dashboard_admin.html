@@ -1,0 +1,318 @@
+{% extends 'core/dashboard_base.html' %}
+{% load static %}
+
+{% block stats_cards %}
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-primary mb-2">
+                <i class="fas fa-users"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.total_clients }}</h3>
+            <p class="text-muted mb-0">Clientes Ativos</p>
+        </div>
+    </div>
+</div>
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-success mb-2">
+                <i class="fas fa-chalkboard-teacher"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.total_instructors }}</h3>
+            <p class="text-muted mb-0">Instrutores Ativos</p>
+        </div>
+    </div>
+</div>
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-info mb-2">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <h3 class="fw-bold">{{ stats.todays_events }}</h3>
+            <p class="text-muted mb-0">Aulas Hoje</p>
+        </div>
+    </div>
+</div>
+<div class="col-md-3">
+    <div class="card text-center h-100">
+        <div class="card-body">
+            <div class="stat-icon text-warning mb-2">
+                <i class="fas fa-euro-sign"></i>
+            </div>
+            <h3 class="fw-bold">€{{ stats.weekly_revenue|floatformat:0 }}</h3>
+            <p class="text-muted mb-0">Receita Semanal</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="col-lg-6">
+    <!-- Próximos Eventos -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-calendar-alt me-2"></i>Próximos Eventos
+            </h5>
+            <a href="{% url 'core:event_create' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus me-1"></i>Novo Evento
+            </a>
+        </div>
+        <div class="card-body">
+            {% if upcoming_events %}
+                {% for event in upcoming_events %}
+                <div class="upcoming-event p-3 rounded mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="mb-1">{{ event.title }}</h6>
+                            <p class="text-muted mb-1">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ event.resource.name }}
+                                {% if event.instructor %}
+                                    • <i class="fas fa-user me-1"></i>{{ event.instructor.full_name }}
+                                {% endif %}
+                            </p>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ event.starts_at|date:"d/m H:i" }} - {{ event.ends_at|date:"H:i" }}
+                            </small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="badge bg-info mb-2">
+                                {{ event.bookings_count }}/{{ event.capacity }}
+                            </span>
+                            <br>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'core:event_edit' event.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-outline-danger" onclick="deleteEvent({{ event.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted text-center py-3">Não há eventos marcados para hoje e amanhã</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Subscrições a Expirar -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-exclamation-triangle me-2 text-warning"></i>Subscrições a Expirar
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if expiring_subscriptions %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Plano</th>
+                                <th>Expira em</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subscription in expiring_subscriptions %}
+                            <tr>
+                                <td>
+                                    <strong>{{ subscription.person.full_name }}</strong><br>
+                                    <small class="text-muted">{{ subscription.person.email }}</small>
+                                </td>
+                                <td>{{ subscription.payment_plan.name }}</td>
+                                <td>
+                                    <span class="badge bg-warning">
+                                        {{ subscription.end_date|timeuntil }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'core:client_detail' subscription.person.id %}" class="btn btn-outline-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button class="btn btn-outline-primary" onclick="renewSubscription({{ subscription.id }})">
+                                            <i class="fas fa-redo"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-3">Não há subscrições a expirar esta semana</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="col-lg-6">
+    <!-- Clientes com Créditos Baixos -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-coins me-2 text-warning"></i>Créditos Baixos
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if low_credit_clients %}
+                {% for subscription in low_credit_clients %}
+                <div class="d-flex justify-content-between align-items-center mb-3 p-2 border rounded">
+                    <div>
+                        <h6 class="mb-1">{{ subscription.person.full_name }}</h6>
+                        <small class="text-muted">{{ subscription.payment_plan.name }}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-warning">{{ subscription.remaining_credits }} créditos</span>
+                        <br>
+                        <small class="text-muted">
+                            <a href="{% url 'core:client_detail' subscription.person.id %}" class="text-decoration-none">
+                                Ver cliente <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        </small>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted text-center py-3">Todos os clientes têm créditos suficientes</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-bolt me-2"></i>Ações Rápidas
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6">
+                    <a href="{% url 'core:client_create' %}" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-user-plus d-block mb-1"></i>
+                        <small>Novo Cliente</small>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{% url 'core:instructor_create' %}" class="btn btn-outline-success w-100">
+                        <i class="fas fa-chalkboard-teacher d-block mb-1"></i>
+                        <small>Novo Instrutor</small>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{% url 'core:event_create' %}" class="btn btn-outline-info w-100">
+                        <i class="fas fa-calendar-plus d-block mb-1"></i>
+                        <small>Nova Aula</small>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{% url 'core:gantt_view' %}" class="btn btn-outline-warning w-100">
+                        <i class="fas fa-calendar d-block mb-1"></i>
+                        <small>Horários</small>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{% url 'core:modality_create' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-tag d-block mb-1"></i>
+                        <small>Nova Modalidade</small>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{% url 'core:settings' %}" class="btn btn-outline-dark w-100">
+                        <i class="fas fa-cog d-block mb-1"></i>
+                        <small>Configurações</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas Adicionais -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-bar me-2"></i>Resumo Operacional
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-4">
+                    <h4 class="text-primary">{{ stats.active_subscriptions }}</h4>
+                    <small class="text-muted">Subscrições Ativas</small>
+                </div>
+                <div class="col-4">
+                    <h4 class="text-success">{{ pending_alerts|length }}</h4>
+                    <small class="text-muted">Alertas Pendentes</small>
+                </div>
+                <div class="col-4">
+                    <h4 class="text-info">{{ stats.total_resources|default:0 }}</h4>
+                    <small class="text-muted">Espaços Disponíveis</small>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="row text-center">
+                <div class="col-6">
+                    <h5 class="text-warning">{{ stats.total_payment_plans|default:0 }}</h5>
+                    <small class="text-muted">Planos de Pagamento</small>
+                </div>
+                <div class="col-6">
+                    <h5 class="text-secondary">{{ stats.total_modalities|default:0 }}</h5>
+                    <small class="text-muted">Modalidades Ativas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function deleteEvent(eventId) {
+    if (confirm('Tem a certeza que pretende eliminar este evento?')) {
+        fetch(`/events/${eventId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                throw new Error('Erro ao eliminar evento');
+            }
+        })
+        .catch(error => {
+            alert('Erro ao eliminar evento');
+            console.error('Error:', error);
+        });
+    }
+}
+
+function renewSubscription(subscriptionId) {
+    if (confirm('Deseja renovar esta subscrição?')) {
+        // Implementar renovação de subscrição
+        alert('Funcionalidade de renovação será implementada em breve');
+    }
+}
+
+// Auto-refresh do dashboard a cada 5 minutos
+setInterval(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

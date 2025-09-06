@@ -1,0 +1,280 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Calendários dos Instrutores - {{ organization.name }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .instructor-card {
+        transition: transform 0.2s;
+    }
+    .instructor-card:hover {
+        transform: translateY(-2px);
+    }
+    .sync-status {
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1">👥 Calendários dos Instrutores</h1>
+                    <p class="text-muted">Configure e gerir calendários Google para cada instrutor</p>
+                </div>
+                <div>
+                    <a href="{% url 'core:google_calendar_setup' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Voltar à Configuração
+                    </a>
+                </div>
+            </div>
+
+            <!-- Estatísticas Rápidas -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <div class="display-6">{{ instructor_configs|length }}</div>
+                            <small>Total Instrutores</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <div class="display-6">
+                                {% for config in instructor_configs %}
+                                    {% if config.has_calendar %}{{ forloop.counter0|add:1 }}{% endif %}
+                                {% empty %}0{% endfor %}
+                            </div>
+                            <small>Com Calendário</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <div class="display-6">
+                                {% for config in instructor_configs %}
+                                    {% if config.sync_enabled %}{{ forloop.counter0|add:1 }}{% endif %}
+                                {% empty %}0{% endfor %}
+                            </div>
+                            <small>Sincronização Ativa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <div class="display-6">
+                                {% for config in instructor_configs %}
+                                    {% if not config.has_calendar %}{{ forloop.counter0|add:1 }}{% endif %}
+                                {% empty %}0{% endfor %}
+                            </div>
+                            <small>Pendentes</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Instrutores -->
+            <div class="row">
+                {% for config in instructor_configs %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card instructor-card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    {% if config.instructor.photo %}
+                                        <img src="{{ config.instructor.photo.url }}"
+                                             alt="{{ config.instructor.full_name }}"
+                                             class="rounded-circle me-2"
+                                             width="40" height="40"
+                                             style="object-fit: cover;">
+                                    {% else %}
+                                        <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-2"
+                                             style="width: 40px; height: 40px;">
+                                            <i class="bi bi-person text-white"></i>
+                                        </div>
+                                    {% endif %}
+                                    <div>
+                                        <h6 class="mb-0">{{ config.instructor.full_name }}</h6>
+                                        <small class="text-muted">{{ config.instructor.get_entity_affiliation_display }}</small>
+                                    </div>
+                                </div>
+
+                                <!-- Status Badges -->
+                                <div class="d-flex flex-column align-items-end">
+                                    {% if config.has_calendar %}
+                                        <span class="badge bg-success sync-status mb-1">
+                                            <i class="bi bi-calendar-check"></i> Calendário
+                                        </span>
+                                    {% endif %}
+
+                                    {% if config.sync_enabled %}
+                                        <span class="badge bg-info sync-status">
+                                            <i class="bi bi-arrow-repeat"></i> Sync On
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary sync-status">
+                                            <i class="bi bi-pause"></i> Sync Off
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                <!-- Informações do Instrutor -->
+                                <div class="mb-3">
+                                    {% if config.instructor.specialties %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-star"></i> {{ config.instructor.specialties|truncatechars:50 }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Estado do Calendário -->
+                                {% if config.google_config %}
+                                    <div class="mb-3">
+                                        <small class="text-muted">
+                                            <strong>Nome do Calendário:</strong><br>
+                                            {{ config.google_config.get_calendar_name }}
+                                        </small>
+
+                                        {% if config.last_sync %}
+                                            <br><small class="text-muted">
+                                                <strong>Última Sync:</strong> {{ config.last_sync|date:"d/m H:i" }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Configurações de Sincronização -->
+                                    <div class="row text-center mb-3">
+                                        <div class="col-6">
+                                            {% if config.google_config.sync_acr_events %}
+                                                <i class="bi bi-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="bi bi-x-circle text-muted"></i>
+                                            {% endif %}
+                                            <br><small>ACR</small>
+                                        </div>
+                                        <div class="col-6">
+                                            {% if config.google_config.sync_proform_events %}
+                                                <i class="bi bi-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="bi bi-x-circle text-muted"></i>
+                                            {% endif %}
+                                            <br><small>Proform</small>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="card-footer">
+                                <div class="d-grid gap-2">
+                                    {% if not config.has_calendar %}
+                                        <!-- Criar Calendário -->
+                                        <form method="post" action="{% url 'core:google_calendar_create_instructor_calendar' config.instructor.id %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                                <i class="bi bi-plus-circle"></i> Criar Calendário
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <!-- Ações do Calendário -->
+                                        <div class="btn-group w-100" role="group">
+                                            <!-- Sincronizar -->
+                                            <form method="post" action="{% url 'core:google_calendar_sync_instructor' config.instructor.id %}" class="flex-fill">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                                    <i class="bi bi-arrow-repeat"></i> Sync
+                                                </button>
+                                            </form>
+
+                                            <!-- Toggle Sync -->
+                                            <form method="post" action="{% url 'core:google_calendar_toggle_instructor_sync' config.instructor.id %}" class="flex-fill">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                                                    {% if config.sync_enabled %}
+                                                        <i class="bi bi-pause"></i> Parar
+                                                    {% else %}
+                                                        <i class="bi bi-play"></i> Ativar
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-info-circle fs-1 mb-3"></i>
+                            <h5>Nenhum instrutor encontrado</h5>
+                            <p>Adicione instrutores para configurar seus calendários Google.</p>
+                            <a href="{% url 'core:instructor_create' %}" class="btn btn-primary">
+                                <i class="bi bi-plus"></i> Adicionar Instrutor
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Ações em Massa -->
+            {% if instructor_configs %}
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Ações em Massa</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <button class="btn btn-outline-primary w-100" onclick="createAllCalendars()">
+                                            <i class="bi bi-calendar-plus"></i> Criar Todos os Calendários
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-outline-success w-100" onclick="syncAllInstructors()">
+                                            <i class="bi bi-arrow-repeat"></i> Sincronizar Todos
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <a href="{% url 'core:google_calendar_sync_logs' %}" class="btn btn-outline-info w-100">
+                                            <i class="bi bi-list-ul"></i> Ver Logs de Sincronização
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function createAllCalendars() {
+    if (confirm('Criar calendários Google para todos os instrutores que ainda não têm? Esta operação pode demorar alguns minutos.')) {
+        // Implementar ação em massa para criar calendários
+        window.location.href = "{% url 'core:google_calendar_instructors' %}?action=create_all";
+    }
+}
+
+function syncAllInstructors() {
+    if (confirm('Sincronizar eventos de todos os instrutores? Esta operação pode demorar alguns minutos.')) {
+        // Implementar ação em massa para sincronizar
+        window.location.href = "{% url 'core:google_calendar_instructors' %}?action=sync_all";
+    }
+}
+</script>
+{% endblock %}

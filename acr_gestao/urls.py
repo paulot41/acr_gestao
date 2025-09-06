@@ -1,7 +1,6 @@
 # Adds DRF router with org-scoped endpoints under /api/.
-# Keeps /health/ and /admin/ untouched.
+# Usa apenas o custom admin site, não o Django admin padrão.
 
-from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -14,7 +13,7 @@ urlpatterns = [
     # Health check (manter para monitorização)
     path('health/', health),
 
-    # Tudo através do core (inclui autenticação personalizada e todas as funcionalidades)
+    # Tudo através do core (inclui custom admin e todas as funcionalidades)
     path('', include('core.urls')),
 ]
 

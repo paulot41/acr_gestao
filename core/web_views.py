@@ -182,6 +182,29 @@ def client_edit(request, pk):
     })
 
 
+@login_required
+def client_add(request):
+    """Adicionar novo cliente."""
+    org = request.organization
+
+    if request.method == 'POST':
+        form = PersonForm(request.POST, request.FILES)
+        if form.is_valid():
+            client = form.save(commit=False)
+            client.organization = org
+            client.save()
+            messages.success(request, f'Cliente {client.full_name} criado com sucesso!')
+            return redirect('core:client_detail', pk=client.pk)
+    else:
+        form = PersonForm()
+
+    return render(request, 'core/client_form.html', {
+        'form': form,
+        'title': 'Adicionar Cliente',
+        'action': 'add'
+    })
+
+
 # INSTRUTORES VIEWS
 @login_required
 def instructor_list(request):
@@ -202,6 +225,32 @@ def instructor_list(request):
 
 
 @login_required
+def instructor_detail(request, pk):
+    """Detalhes de um instrutor específico."""
+    instructor = get_object_or_404(Instructor, pk=pk, organization=request.organization)
+
+    # Próximas aulas do instrutor (próximos 7 dias)
+    next_week = timezone.now() + timedelta(days=7)
+    upcoming_events = Event.objects.filter(
+        organization=request.organization,
+        instructor=instructor,
+        starts_at__gte=timezone.now(),
+        starts_at__lte=next_week
+    ).order_by('starts_at')[:10]
+
+    # Ganhos do mês (simulado por agora)
+    monthly_earnings = 500  # Seria calculado baseado nas comissões reais
+
+    context = {
+        'instructor': instructor,
+        'upcoming_events': upcoming_events,
+        'monthly_earnings': monthly_earnings,
+        'now': timezone.now(),
+    }
+    return render(request, 'core/instructor_detail.html', context)
+
+
+@login_required
 def instructor_create(request):
     """Criar novo instrutor."""
     if request.method == 'POST':
@@ -216,6 +265,50 @@ def instructor_create(request):
         form = InstructorForm()
 
     return render(request, 'core/instructor_form.html', {'form': form, 'title': 'Novo Instrutor'})
+
+
+@login_required
+def instructor_edit(request, pk):
+    """Editar instrutor existente."""
+    instructor = get_object_or_404(Instructor, pk=pk, organization=request.organization)
+
+    if request.method == 'POST':
+        form = InstructorForm(request.POST, request.FILES, instance=instructor)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Instrutor {instructor.full_name} atualizado com sucesso!')
+            return redirect('instructor_detail', pk=instructor.pk)
+    else:
+        form = InstructorForm(instance=instructor)
+
+    return render(request, 'core/instructor_form.html', {
+        'form': form,
+        'instructor': instructor,
+        'title': 'Editar Instrutor'
+    })
+
+
+@login_required
+def instructor_add(request):
+    """Adicionar novo instrutor."""
+    org = request.organization
+
+    if request.method == 'POST':
+        form = InstructorForm(request.POST, request.FILES)
+        if form.is_valid():
+            instructor = form.save(commit=False)
+            instructor.organization = org
+            instructor.save()
+            messages.success(request, f'Instrutor {instructor.full_name} criado com sucesso!')
+            return redirect('core:instructor_detail', pk=instructor.pk)
+    else:
+        form = InstructorForm()
+
+    return render(request, 'core/instructor_form.html', {
+        'form': form,
+        'title': 'Adicionar Instrutor',
+        'action': 'add'
+    })
 
 
 # MODALIDADES VIEWS
@@ -244,6 +337,50 @@ def modality_create(request):
         form = ModalityForm()
 
     return render(request, 'core/modality_form.html', {'form': form, 'title': 'Nova Modalidade'})
+
+
+@login_required
+def modality_edit(request, pk):
+    """Editar modalidade existente."""
+    modality = get_object_or_404(Modality, pk=pk, organization=request.organization)
+
+    if request.method == 'POST':
+        form = ModalityForm(request.POST, instance=modality)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Modalidade {modality.name} atualizada com sucesso!')
+            return redirect('modality_list')
+    else:
+        form = ModalityForm(instance=modality)
+
+    return render(request, 'core/modality_form.html', {
+        'form': form,
+        'modality': modality,
+        'title': 'Editar Modalidade'
+    })
+
+
+@login_required
+def modality_add(request):
+    """Adicionar nova modalidade."""
+    org = request.organization
+
+    if request.method == 'POST':
+        form = ModalityForm(request.POST)
+        if form.is_valid():
+            modality = form.save(commit=False)
+            modality.organization = org
+            modality.save()
+            messages.success(request, f'Modalidade {modality.name} criada com sucesso!')
+            return redirect('core:modality_list')
+    else:
+        form = ModalityForm()
+
+    return render(request, 'core/modality_form.html', {
+        'form': form,
+        'title': 'Adicionar Modalidade',
+        'action': 'add'
+    })
 
 
 # GANTT E EVENTOS
@@ -283,34 +420,90 @@ def gantt_view(request):
 
 @login_required
 def events_json(request):
-    """API endpoint para eventos do calendário/gantt."""
+    """API endpoint OTIMIZADA para eventos do calendário/gantt."""
     org = request.organization
     start = request.GET.get('start')
     end = request.GET.get('end')
 
-    events = Event.objects.filter(organization=org)
+    # Otimização: aplicar filtros diretamente no QuerySet com select_related
+    events = Event.objects.filter(organization=org).select_related(
+        'resource', 'modality', 'instructor'
+    )
 
+    # Otimização: filtros de data aplicados ao QuerySet, não em Python
     if start:
-        start_date = datetime.fromisoformat(start.replace('Z', '+00:00'))
-        events = events.filter(starts_at__gte=start_date)
+        try:
+            start_date = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            events = events.filter(starts_at__gte=start_date)
+        except ValueError:
+            pass
 
     if end:
-        end_date = datetime.fromisoformat(end.replace('Z', '+00:00'))
-        events = events.filter(ends_at__lte=end_date)
+        try:
+            end_date = datetime.fromisoformat(end.replace('Z', '+00:00'))
+            events = events.filter(ends_at__lte=end_date)
+        except ValueError:
+            pass
 
+    # OTIMIZAÇÃO ADICIONAL: Filtros por instrutor e modalidade
+    instructor_filter = request.GET.get('instructor')
+    if instructor_filter:
+        events = events.filter(instructor_id=instructor_filter)
+
+    modality_filter = request.GET.get('modality')
+    if modality_filter:
+        events = events.filter(modality_id=modality_filter)
+
+    # OTIMIZAÇÃO ADICIONAL: Filtro por recursos
+    resources_filter = request.GET.get('resources')
+    if resources_filter:
+        resource_ids = resources_filter.split(',')
+        events = events.filter(resource_id__in=resource_ids)
+
+    # Otimização: usar only() para carregar apenas campos necessários
+    events = events.only(
+        'id', 'title', 'starts_at', 'ends_at', 'capacity',
+        'resource__id', 'resource__name',
+        'modality__color', 'modality__name',
+        'instructor__first_name', 'instructor__last_name'
+    ).order_by('starts_at')
+
+    # OTIMIZAÇÃO: Limitar resultados para evitar sobrecarga
+    events = events[:1000]  # Máximo 1000 eventos por request
+
+    # Otimização: construir JSON de forma mais eficiente
     events_data = []
     for event in events:
+        # Determinar cor baseada na modalidade ou usar padrão
+        color = getattr(event.modality, 'color', '#0d6efd') if event.modality else '#0d6efd'
+
+        # Construir título mais informativo
+        title = event.title
+        if event.instructor:
+            title += f' - {event.instructor.first_name}'
+
         events_data.append({
             'id': event.id,
-            'title': event.title,
+            'title': title,
             'start': event.starts_at.isoformat(),
             'end': event.ends_at.isoformat(),
-            'resourceId': event.resource.id,
-            'backgroundColor': '#0d6efd',  # Por enquanto cor fixa
-            'borderColor': '#0d6efd',
+            'resourceId': str(event.resource_id),  # Usar FK diretamente
+            'backgroundColor': color,
+            'borderColor': color,
+            'textColor': '#ffffff' if color != '#ffffff' else '#000000',
+            'extendedProps': {
+                'capacity': event.capacity,
+                'instructorId': event.instructor_id,
+                'modalityId': event.modality_id,
+                'resourceName': getattr(event.resource, 'name', ''),
+            }
         })
 
-    return JsonResponse(events_data, safe=False)
+    # OTIMIZAÇÃO: Headers de cache para melhor performance
+    from django.http import JsonResponse
+    response = JsonResponse(events_data, safe=False)
+    response['Cache-Control'] = 'public, max-age=60'  # Cache por 1 minuto
+    return response
 
 
 @login_required
@@ -346,3 +539,169 @@ def event_list(request):
     context = {'events': events}
     return render(request, 'core/event_list.html', context)
 
+
+@login_required
+def event_edit(request, pk):
+    """Editar evento/aula existente."""
+    event = get_object_or_404(Event, pk=pk, organization=request.organization)
+
+    if request.method == 'POST':
+        form = EventForm(request.POST, instance=event)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Aula {event.title} atualizada com sucesso!')
+            return redirect('event_list')
+    else:
+        form = EventForm(instance=event)
+        # Filtrar recursos da organização
+        form.fields['resource'].queryset = Resource.objects.filter(organization=request.organization)
+
+    return render(request, 'core/event_form.html', {
+        'form': form,
+        'event': event,
+        'title': 'Editar Aula'
+    })
+
+
+@login_required
+def event_add(request):
+    """Adicionar novo evento."""
+    org = request.organization
+
+    if request.method == 'POST':
+        form = EventForm(request.POST, organization=org)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.organization = org
+            event.save()
+            messages.success(request, f'Evento {event.title} criado com sucesso!')
+            return redirect('core:schedule')
+    else:
+        form = EventForm(organization=org)
+
+    return render(request, 'core/event_form.html', {
+        'form': form,
+        'title': 'Adicionar Evento',
+        'action': 'add'
+    })
+
+
+@login_required
+def event_delete(request, pk):
+    """Eliminar evento."""
+    org = request.organization
+    event = get_object_or_404(Event, pk=pk, organization=org)
+
+    if request.method == 'POST':
+        title = event.title
+        event.delete()
+        messages.success(request, f'Evento "{title}" eliminado com sucesso!')
+        return redirect('core:schedule')
+
+    return render(request, 'core/event_confirm_delete.html', {
+        'event': event
+    })
+
+
+@login_required
+def organization_settings(request):
+    """Vista para configurações da organização."""
+    org = request.organization
+
+    if request.method == 'POST':
+        # Atualizar configurações básicas
+        org.gym_monthly_fee = request.POST.get('gym_monthly_fee', org.gym_monthly_fee)
+        org.wellness_monthly_fee = request.POST.get('wellness_monthly_fee', org.wellness_monthly_fee)
+        org.save()
+        messages.success(request, 'Configurações atualizadas com sucesso!')
+        return redirect('core:settings')
+
+    context = {
+        'organization': org,
+        'title': 'Configurações da Organização'
+    }
+
+    return render(request, 'core/settings.html', context)
+
+# Views adicionais para compatibilidade
+@login_required
+def client_list(request):
+    """Lista de clientes."""
+    org = request.organization
+    clients = Person.objects.filter(organization=org).order_by('first_name', 'last_name')
+
+    # Filtros
+    search = request.GET.get('search', '')
+    status = request.GET.get('status', '')
+    entity = request.GET.get('entity', '')
+
+    if search:
+        clients = clients.filter(
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(email__icontains=search) |
+            Q(phone__icontains=search)
+        )
+
+    if status:
+        clients = clients.filter(status=status)
+
+    if entity:
+        clients = clients.filter(entity_affiliation=entity)
+
+    paginator = Paginator(clients, 25)
+    page = request.GET.get('page')
+    clients = paginator.get_page(page)
+
+    return render(request, 'core/client_list.html', {
+        'clients': clients,
+        'search': search,
+        'status': status,
+        'entity': entity
+    })
+
+@login_required
+def instructor_list(request):
+    """Lista de instrutores."""
+    org = request.organization
+    instructors = Instructor.objects.filter(organization=org, is_active=True).order_by('first_name', 'last_name')
+
+    return render(request, 'core/instructor_list.html', {
+        'instructors': instructors
+    })
+
+@login_required
+def modality_list(request):
+    """Lista de modalidades."""
+    org = request.organization
+    modalities = Modality.objects.filter(organization=org, is_active=True).order_by('entity_type', 'name')
+
+    return render(request, 'core/modality_list.html', {
+        'modalities': modalities
+    })
+
+@login_required
+def schedule_view(request):
+    """Vista do horário/agenda."""
+    org = request.organization
+
+    # Data selecionada
+    selected_date = request.GET.get('date')
+    if selected_date:
+        try:
+            selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = timezone.now().date()
+    else:
+        selected_date = timezone.now().date()
+
+    # Eventos do dia
+    events = Event.objects.filter(
+        organization=org,
+        starts_at__date=selected_date
+    ).select_related('resource', 'modality', 'instructor').order_by('starts_at')
+
+    return render(request, 'core/schedule.html', {
+        'events': events,
+        'selected_date': selected_date
+    })

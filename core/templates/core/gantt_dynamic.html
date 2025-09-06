@@ -1,0 +1,949 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Gantt Dinâmico - Gestão de Horários{% endblock %}
+
+{% block extra_css %}
+<style>
+    .gantt-container {
+        display: flex;
+        height: calc(100vh - 200px);
+        overflow: hidden;
+    }
+
+    .gantt-sidebar {
+        width: 250px;
+        background: #f8f9fa;
+        border-right: 2px solid #dee2e6;
+        overflow-y: auto;
+    }
+
+    .gantt-main {
+        flex: 1;
+        overflow: auto;
+        position: relative;
+    }
+
+    .gantt-header {
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 100;
+        border-bottom: 2px solid #dee2e6;
+        display: flex;
+    }
+
+    .gantt-time-header {
+        display: flex;
+        height: 60px;
+        margin-left: 0;
+    }
+
+    .time-slot {
+        min-width: 80px;
+        border-right: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .gantt-grid {
+        position: relative;
+        min-height: 600px;
+    }
+
+    .resource-row {
+        height: 80px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        position: relative;
+    }
+
+    .resource-label {
+        width: 250px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-right: 2px solid #dee2e6;
+        position: sticky;
+        left: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+    }
+
+    .resource-info h6 {
+        margin: 0;
+        font-size: 14px;
+        color: #495057;
+    }
+
+    .resource-info small {
+        color: #6c757d;
+        font-size: 11px;
+    }
+
+    .time-grid {
+        display: flex;
+        flex: 1;
+        position: relative;
+    }
+
+    .time-cell {
+        min-width: 80px;
+        border-right: 1px solid #e9ecef;
+        position: relative;
+        cursor: crosshair;
+        transition: background-color 0.2s;
+    }
+
+    .time-cell:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+    }
+
+    .time-cell.selecting {
+        background-color: rgba(0, 123, 255, 0.3);
+    }
+
+    .event-block {
+        position: absolute;
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        transition: transform 0.2s, box-shadow 0.2s;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .event-block:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .event-block.individual {
+        background: linear-gradient(135deg, #fd7e14, #e83e8c);
+    }
+
+    .event-block.group_class {
+        background: linear-gradient(135deg, #6f42c1, #6610f2);
+    }
+
+    .current-time-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dc3545;
+        z-index: 200;
+        pointer-events: none;
+    }
+
+    .current-time-indicator {
+        position: absolute;
+        top: -10px;
+        left: -8px;
+        width: 18px;
+        height: 18px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+    }
+
+    .controls-bar {
+        background: white;
+        padding: 15px;
+        border-bottom: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .view-toggle {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .btn-view {
+        padding: 6px 12px;
+        font-size: 12px;
+        border-radius: 20px;
+        transition: all 0.3s;
+    }
+
+    .btn-view.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .modal-content {
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        transition: all 0.3s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+
+    .sidebar-header {
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .resource-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e9ecef;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .resource-item:hover {
+        background-color: #e3f2fd;
+    }
+
+    .resource-item.selected {
+        background-color: #bbdefb;
+        border-left: 4px solid #2196f3;
+    }
+
+    .entity-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: 5px;
+    }
+
+    .entity-acr {
+        background: #e8f5e8;
+        color: #2e7d32;
+    }
+
+    .entity-proform {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+
+    .entity-both {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    @media (max-width: 768px) {
+        .gantt-container {
+            flex-direction: column;
+            height: auto;
+        }
+
+        .gantt-sidebar {
+            width: 100%;
+            height: 200px;
+        }
+
+        .resource-label {
+            width: 100%;
+        }
+
+        .time-slot, .time-cell {
+            min-width: 60px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <!-- Barra de Controles -->
+    <div class="controls-bar">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="d-flex align-items-center gap-3">
+                    <h4 class="mb-0">
+                        <i class="fas fa-calendar-alt text-primary"></i>
+                        Gantt Dinâmico
+                    </h4>
+                    <input type="date" id="gantt-date" class="form-control" style="width: auto;" value="{{ request.GET.date|default:'' }}">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="view-toggle justify-content-end">
+                    <button class="btn btn-view active" data-view="standard" id="view-standard">
+                        06h - 22h
+                    </button>
+                    <button class="btn btn-view" data-view="extended" id="view-extended">
+                        24 Horas
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" id="refresh-gantt">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container Principal do Gantt -->
+    <div class="gantt-container">
+        <!-- Sidebar com Recursos -->
+        <div class="gantt-sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-map-marker-alt"></i>
+                Espaços Disponíveis
+            </div>
+            <div id="resources-list">
+                {% for resource in resources %}
+                <div class="resource-item" data-resource-id="{{ resource.id }}">
+                    <div class="resource-info">
+                        <h6>{{ resource.name }}</h6>
+                        <small>
+                            Cap: {{ resource.capacity }}
+                            <span class="entity-badge entity-{{ resource.entity_type }}">
+                                {{ resource.get_entity_type_display }}
+                            </span>
+                        </small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Área Principal do Gantt -->
+        <div class="gantt-main">
+            <!-- Cabeçalho com Horas -->
+            <div class="gantt-header">
+                <div class="gantt-time-header" id="time-header">
+                    <!-- Horas serão geradas dinamicamente via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Grid Principal -->
+            <div class="gantt-grid" id="gantt-grid">
+                <!-- Linhas dos recursos serão geradas dinamicamente -->
+            </div>
+
+            <!-- Linha de Tempo Atual -->
+            <div class="current-time-line" id="current-time-line" style="display: none;">
+                <div class="current-time-indicator"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Criar/Editar Evento -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventModalLabel">
+                    <i class="fas fa-calendar-plus"></i>
+                    <span id="modal-title-text">Criar Nova Aula</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="event-form">
+                    <input type="hidden" id="event-id" name="event_id">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="event-title" class="form-label">Título da Aula</label>
+                            <input type="text" class="form-control" id="event-title" name="title" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="event-type" class="form-label">Tipo de Aula</label>
+                            <select class="form-select" id="event-type" name="event_type">
+                                <option value="open_class">Aula Aberta</option>
+                                <option value="group_class">Aula de Turma</option>
+                                <option value="individual">Aula Individual</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="event-description" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="event-description" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="event-modality" class="form-label">Modalidade</label>
+                            <select class="form-select" id="event-modality" name="modality_id">
+                                <option value="">Selecionar modalidade...</option>
+                                {% for modality in modalities %}
+                                <option value="{{ modality.id }}" data-color="{{ modality.color }}">
+                                    {{ modality.name }} ({{ modality.get_entity_type_display }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="event-instructor" class="form-label">Instrutor</label>
+                            <select class="form-select" id="event-instructor" name="instructor_id">
+                                <option value="">Selecionar instrutor...</option>
+                                {% for instructor in instructors %}
+                                <option value="{{ instructor.id }}">
+                                    {{ instructor.full_name }} ({{ instructor.get_entity_affiliation_display }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Campos específicos por tipo -->
+                    <div id="group-class-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="event-class-group" class="form-label">Turma</label>
+                            <select class="form-select" id="event-class-group" name="class_group_id">
+                                <option value="">Selecionar turma...</option>
+                                {% for group in class_groups %}
+                                <option value="{{ group.id }}" data-max-students="{{ group.max_students }}">
+                                    {{ group.name }} - {{ group.modality.name }} (Máx: {{ group.max_students }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="individual-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="event-client" class="form-label">Cliente</label>
+                            <select class="form-select" id="event-client" name="individual_client_id">
+                                <option value="">Selecionar cliente...</option>
+                                {% for client in clients %}
+                                <option value="{{ client.id }}">
+                                    {{ client.full_name }} ({{ client.get_entity_affiliation_display }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="open-class-fields">
+                        <div class="mb-3">
+                            <label for="event-capacity" class="form-label">Capacidade Máxima</label>
+                            <input type="number" class="form-control" id="event-capacity" name="capacity" min="1" max="50">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Horário</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="selected-time" class="badge bg-info"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Espaço</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="selected-resource" class="badge bg-success"></span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="save-event">
+                    <i class="fas fa-save"></i> Guardar Aula
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+    <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">A carregar...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+class GanttDynamic {
+    constructor() {
+        this.selectedDate = new Date().toISOString().split('T')[0];
+        this.currentView = 'standard'; // standard (6-22h) ou extended (0-23h)
+        this.isSelecting = false;
+        this.selectionStart = null;
+        this.selectionEnd = null;
+        this.selectedResource = null;
+        this.events = [];
+        this.resources = [];
+
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadGanttData();
+        this.updateCurrentTimeLine();
+
+        // Atualizar linha de tempo a cada minuto
+        setInterval(() => this.updateCurrentTimeLine(), 60000);
+    }
+
+    setupEventListeners() {
+        // Data picker
+        document.getElementById('gantt-date').addEventListener('change', (e) => {
+            this.selectedDate = e.target.value;
+            this.loadGanttData();
+        });
+
+        // Botões de vista
+        document.querySelectorAll('.btn-view').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentView = e.target.dataset.view;
+                this.renderGantt();
+            });
+        });
+
+        // Refresh
+        document.getElementById('refresh-gantt').addEventListener('click', () => {
+            this.loadGanttData();
+        });
+
+        // Event type change
+        document.getElementById('event-type').addEventListener('change', (e) => {
+            this.toggleEventTypeFields(e.target.value);
+        });
+
+        // Save event
+        document.getElementById('save-event').addEventListener('click', () => {
+            this.saveEvent();
+        });
+    }
+
+    loadGanttData() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+
+        fetch(`/gantt/data/?date=${this.selectedDate}`)
+            .then(response => response.json())
+            .then(data => {
+                this.events = data.events;
+                this.resources = data.resources;
+                this.renderGantt();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar dados:', error);
+                this.showAlert('Erro ao carregar dados do Gantt', 'danger');
+            })
+            .finally(() => {
+                document.getElementById('loading-overlay').style.display = 'none';
+            });
+    }
+
+    renderGantt() {
+        this.renderTimeHeader();
+        this.renderResourceRows();
+        this.renderEvents();
+        this.updateCurrentTimeLine();
+    }
+
+    renderTimeHeader() {
+        const header = document.getElementById('time-header');
+        header.innerHTML = '';
+
+        const startHour = this.currentView === 'standard' ? 6 : 0;
+        const endHour = this.currentView === 'standard' ? 22 : 23;
+
+        for (let hour = startHour; hour <= endHour; hour++) {
+            const timeSlot = document.createElement('div');
+            timeSlot.className = 'time-slot';
+            timeSlot.textContent = `${hour.toString().padStart(2, '0')}:00`;
+            timeSlot.dataset.hour = hour;
+            header.appendChild(timeSlot);
+        }
+    }
+
+    renderResourceRows() {
+        const grid = document.getElementById('gantt-grid');
+        grid.innerHTML = '';
+
+        this.resources.forEach(resource => {
+            const row = document.createElement('div');
+            row.className = 'resource-row';
+            row.dataset.resourceId = resource.id;
+
+            // Label do recurso
+            const label = document.createElement('div');
+            label.className = 'resource-label';
+            label.innerHTML = `
+                <div class="resource-info">
+                    <h6>${resource.name}</h6>
+                    <small>
+                        Cap: ${resource.capacity}
+                        <span class="entity-badge entity-${resource.entity_type}">
+                            ${resource.entity_type.toUpperCase()}
+                        </span>
+                    </small>
+                </div>
+            `;
+
+            // Grid de tempo
+            const timeGrid = document.createElement('div');
+            timeGrid.className = 'time-grid';
+
+            const startHour = this.currentView === 'standard' ? 6 : 0;
+            const endHour = this.currentView === 'standard' ? 22 : 23;
+
+            for (let hour = startHour; hour <= endHour; hour++) {
+                const cell = document.createElement('div');
+                cell.className = 'time-cell';
+                cell.dataset.hour = hour;
+                cell.dataset.resourceId = resource.id;
+
+                // Event listeners para seleção
+                cell.addEventListener('mousedown', (e) => this.startSelection(e));
+                cell.addEventListener('mouseover', (e) => this.updateSelection(e));
+                cell.addEventListener('mouseup', (e) => this.endSelection(e));
+
+                timeGrid.appendChild(cell);
+            }
+
+            row.appendChild(label);
+            row.appendChild(timeGrid);
+            grid.appendChild(row);
+        });
+    }
+
+    renderEvents() {
+        this.events.forEach(event => {
+            const row = document.querySelector(`.resource-row[data-resource-id="${event.resource_id}"]`);
+            if (!row) return;
+
+            const timeGrid = row.querySelector('.time-grid');
+            const eventBlock = document.createElement('div');
+            eventBlock.className = `event-block ${event.event_type}`;
+            eventBlock.dataset.eventId = event.id;
+
+            // Calcular posição e tamanho
+            const startHour = this.currentView === 'standard' ? 6 : 0;
+            const left = (event.start_hour - startHour) * 80;
+            const width = (event.duration_minutes / 60) * 80;
+
+            eventBlock.style.left = `${left}px`;
+            eventBlock.style.width = `${width}px`;
+            eventBlock.style.top = '10px';
+            eventBlock.style.height = '60px';
+
+            if (event.modality && event.modality.color) {
+                eventBlock.style.background = `linear-gradient(135deg, ${event.modality.color}, ${this.darkenColor(event.modality.color, 20)})`;
+            }
+
+            eventBlock.innerHTML = `
+                <div style="font-weight: bold; font-size: 11px; margin-bottom: 2px;">
+                    ${event.title}
+                </div>
+                <div style="font-size: 10px; opacity: 0.9;">
+                    ${event.start_time} - ${event.end_time}
+                </div>
+                <div style="font-size: 9px; opacity: 0.8;">
+                    ${event.instructor.name}
+                </div>
+            `;
+
+            // Click para editar
+            eventBlock.addEventListener('click', () => this.editEvent(event.id));
+
+            timeGrid.appendChild(eventBlock);
+        });
+    }
+
+    startSelection(e) {
+        this.isSelecting = true;
+        this.selectedResource = e.target.dataset.resourceId;
+        this.selectionStart = parseInt(e.target.dataset.hour);
+        this.selectionEnd = this.selectionStart;
+
+        this.clearSelection();
+        e.target.classList.add('selecting');
+    }
+
+    updateSelection(e) {
+        if (!this.isSelecting) return;
+        if (e.target.dataset.resourceId !== this.selectedResource) return;
+
+        this.selectionEnd = parseInt(e.target.dataset.hour);
+        this.highlightSelection();
+    }
+
+    endSelection(e) {
+        if (!this.isSelecting) return;
+
+        this.isSelecting = false;
+
+        if (this.selectionStart !== null && this.selectionEnd !== null) {
+            const startHour = Math.min(this.selectionStart, this.selectionEnd);
+            const endHour = Math.max(this.selectionStart, this.selectionEnd) + 1;
+
+            this.openEventModal(this.selectedResource, startHour, endHour);
+        }
+
+        this.clearSelection();
+    }
+
+    highlightSelection() {
+        this.clearSelection();
+
+        const startHour = Math.min(this.selectionStart, this.selectionEnd);
+        const endHour = Math.max(this.selectionStart, this.selectionEnd);
+
+        for (let hour = startHour; hour <= endHour; hour++) {
+            const cell = document.querySelector(`.time-cell[data-hour="${hour}"][data-resource-id="${this.selectedResource}"]`);
+            if (cell) {
+                cell.classList.add('selecting');
+            }
+        }
+    }
+
+    clearSelection() {
+        document.querySelectorAll('.time-cell.selecting').forEach(cell => {
+            cell.classList.remove('selecting');
+        });
+    }
+
+    openEventModal(resourceId, startHour, endHour) {
+        const resource = this.resources.find(r => r.id == resourceId);
+        if (!resource) return;
+
+        // Reset form
+        document.getElementById('event-form').reset();
+        document.getElementById('event-id').value = '';
+        document.getElementById('modal-title-text').textContent = 'Criar Nova Aula';
+
+        // Set selected info
+        document.getElementById('selected-resource').textContent = resource.name;
+        document.getElementById('selected-time').textContent = `${startHour.toString().padStart(2, '0')}:00 - ${endHour.toString().padStart(2, '0')}:00`;
+
+        // Set capacity default
+        document.getElementById('event-capacity').value = resource.capacity;
+
+        // Store selection data
+        this.currentSelection = {
+            resourceId,
+            startHour,
+            endHour,
+            date: this.selectedDate
+        };
+
+        this.toggleEventTypeFields('open_class');
+
+        const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+        modal.show();
+    }
+
+    toggleEventTypeFields(eventType) {
+        document.getElementById('group-class-fields').style.display = eventType === 'group_class' ? 'block' : 'none';
+        document.getElementById('individual-fields').style.display = eventType === 'individual' ? 'block' : 'none';
+        document.getElementById('open-class-fields').style.display = eventType === 'open_class' ? 'block' : 'none';
+    }
+
+    saveEvent() {
+        const eventId = document.getElementById('event-id').value;
+        const isEdit = !!eventId;
+
+        if (isEdit) {
+            this.updateEvent();
+        } else {
+            this.createEvent();
+        }
+    }
+
+    createEvent() {
+        const formData = {
+            resource_id: this.currentSelection.resourceId,
+            start_time: `${this.currentSelection.startHour.toString().padStart(2, '0')}:00`,
+            end_time: `${this.currentSelection.endHour.toString().padStart(2, '0')}:00`,
+            date: this.currentSelection.date
+        };
+
+        fetch('/gantt/create-event/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update event details
+                this.updateEventWithFormData(data.event_id);
+            } else {
+                this.showAlert(data.error || 'Erro ao criar evento', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            this.showAlert('Erro ao criar evento', 'danger');
+        });
+    }
+
+    updateEventWithFormData(eventId) {
+        const formData = new FormData(document.getElementById('event-form'));
+        const data = {
+            event_id: eventId,
+            title: formData.get('title'),
+            description: formData.get('description'),
+            event_type: formData.get('event_type'),
+            modality_id: formData.get('modality_id') || null,
+            instructor_id: formData.get('instructor_id') || null,
+            capacity: parseInt(formData.get('capacity')) || null
+        };
+
+        // Add type-specific fields
+        if (data.event_type === 'group_class') {
+            data.class_group_id = formData.get('class_group_id') || null;
+        } else if (data.event_type === 'individual') {
+            data.individual_client_id = formData.get('individual_client_id') || null;
+        }
+
+        fetch('/gantt/update-event/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                this.showAlert('Evento criado com sucesso!', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                this.loadGanttData();
+            } else {
+                this.showAlert(result.error || 'Erro ao atualizar evento', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            this.showAlert('Erro ao atualizar evento', 'danger');
+        });
+    }
+
+    editEvent(eventId) {
+        fetch(`/gantt/event/${eventId}/details/`)
+            .then(response => response.json())
+            .then(data => {
+                // Populate form with event data
+                document.getElementById('event-id').value = data.id;
+                document.getElementById('event-title').value = data.title;
+                document.getElementById('event-description').value = data.description || '';
+                document.getElementById('event-type').value = data.event_type;
+                document.getElementById('event-modality').value = data.modality_id || '';
+                document.getElementById('event-instructor').value = data.instructor_id || '';
+                document.getElementById('event-capacity').value = data.capacity;
+
+                if (data.event_type === 'group_class') {
+                    document.getElementById('event-class-group').value = data.class_group_id || '';
+                } else if (data.event_type === 'individual') {
+                    document.getElementById('event-client').value = data.individual_client_id || '';
+                }
+
+                this.toggleEventTypeFields(data.event_type);
+
+                // Update modal title
+                document.getElementById('modal-title-text').textContent = 'Editar Aula';
+
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                this.showAlert('Erro ao carregar detalhes do evento', 'danger');
+            });
+    }
+
+    updateCurrentTimeLine() {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        const startHour = this.currentView === 'standard' ? 6 : 0;
+        const endHour = this.currentView === 'standard' ? 22 : 23;
+
+        const timeLine = document.getElementById('current-time-line');
+
+        if (currentHour >= startHour && currentHour <= endHour) {
+            const position = (currentHour - startHour) * 80 + (currentMinute / 60) * 80;
+            timeLine.style.left = `${position + 250}px`; // 250px para compensar sidebar
+            timeLine.style.display = 'block';
+        } else {
+            timeLine.style.display = 'none';
+        }
+    }
+
+    darkenColor(color, percent) {
+        const num = parseInt(color.replace("#", ""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) - amt;
+        const G = (num >> 8 & 0x00FF) - amt;
+        const B = (num & 0x0000FF) - amt;
+        return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+            (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+            (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+    }
+
+    getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    showAlert(message, type = 'info') {
+        // Create alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(alertDiv);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new GanttDynamic();
+});
+</script>
+{% endblock %}
