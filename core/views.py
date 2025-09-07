@@ -501,199 +501,163 @@ class OptimizedGanttAPI:
         })
 
     @staticmethod
+    @csrf_exempt
     @login_required
+    @require_http_methods(["POST"])
     def gantt_create_event(request):
-        """API otimizada para criação de eventos via drag & drop."""
-        if request.method != 'POST':
-            return JsonResponse({'error': 'Método não permitido'}, status=405)
-
-        try:
-            data = json.loads(request.body)
-            org = request.organization
-
-            # Validação básica
-            required_fields = ['resource_id', 'start_time', 'end_time', 'date']
-            for field in required_fields:
-                if not data.get(field):
-                    return JsonResponse({
-                        'error': f'Campo obrigatório: {field}'
-                    }, status=400)
-
-            # Validar recurso
-            try:
-                resource = Resource.objects.get(
-                    id=data['resource_id'],
-                    organization=org,
-                    is_available=True
-                )
-            except Resource.DoesNotExist:
-                return JsonResponse({
-                    'error': 'Recurso não encontrado'
-                }, status=404)
-
-            # Parsear horários
-            try:
-                event_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
-                start_hour, start_minute = map(int, data['start_time'].split(':'))
-                end_hour, end_minute = map(int, data['end_time'].split(':'))
-
-                starts_at = timezone.make_aware(
-                    datetime.combine(event_date, datetime.min.time().replace(
-                        hour=start_hour, minute=start_minute
-                    ))
-                )
-                ends_at = timezone.make_aware(
-                    datetime.combine(event_date, datetime.min.time().replace(
-                        hour=end_hour, minute=end_minute
-                    ))
-                )
-
-            except ValueError as e:
-                return JsonResponse({
-                    'error': f'Formato inválido: {str(e)}'
-                }, status=400)
-
-            # Validar duração
-            if ends_at <= starts_at:
-                return JsonResponse({
-                    'error': 'Hora de fim deve ser posterior'
-                }, status=400)
-
-            # Verificar conflitos
-            conflicting_events = Event.objects.filter(
-                organization=org,
-                resource=resource,
-                starts_at__lt=ends_at,
-                ends_at__gt=starts_at
-            ).exists()
-
-            if conflicting_events:
-                return JsonResponse({
-                    'error': 'Conflito de horário'
-                }, status=409)
-
-            # Criar evento
-            event = Event.objects.create(
-                organization=org,
-                resource=resource,
-                title=f"Nova Aula - {resource.name}",
-                starts_at=starts_at,
-                ends_at=ends_at,
-                capacity=resource.capacity,
-                event_type=Event.EventType.OPEN_CLASS
-            )
-
-            # Atribuir instrutor se aplicável
-            if not (request.user.is_staff or request.user.is_superuser):
-                try:
-                    instructor = Instructor.objects.get(
-                        organization=org,
-                        email=request.user.email,
-                        is_active=True
-                    )
-                    event.instructor = instructor
-                    event.save(update_fields=['instructor'])
-                except Instructor.DoesNotExist:
-                    pass
-
-            return JsonResponse({
-                'success': True,
-                'event_id': event.id,
-                'message': 'Evento criado com sucesso'
-            })
-
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'JSON inválido'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': f'Erro: {str(e)}'}, status=500)
+        """Criar evento otimizado via API."""
+        # Reutilizar lógica do create_event_from_gantt
+        return create_event_from_gantt(request)
 
 
-# APIs auxiliares
+# API para dados auxiliares do formulário
 @login_required
 def get_form_data(request):
-    """API para dados de formulários."""
+    """Obter dados para formulários (modalities, instructors, etc.)."""
     org = request.organization
 
-    data = {
-        'modalities': [{
-            'id': m.id,
-            'name': m.name,
-            'entity_type': m.entity_type,
-            'color': m.color
-        } for m in Modality.objects.filter(organization=org, is_active=True)],
+    modalities = Modality.objects.filter(organization=org, is_active=True).values('id', 'name', 'color', 'entity_type')
+    instructors = Instructor.objects.filter(organization=org, is_active=True).values('id', 'first_name', 'last_name', 'email')
+    class_groups = ClassGroup.objects.filter(organization=org, is_active=True).select_related('modality').values(
+        'id', 'name', 'max_students', 'modality__name', 'modality_id'
+    )
+    clients = Person.objects.filter(organization=org, status='active').values('id', 'first_name', 'last_name', 'email')
 
-        'instructors': [{
-            'id': i.id,
-            'name': i.full_name,
-            'entity_affiliation': i.entity_affiliation
-        } for i in Instructor.objects.filter(organization=org, is_active=True)],
-
-        'class_groups': [{
-            'id': g.id,
-            'name': g.name,
-            'modality_name': g.modality.name,
-            'max_students': g.max_students
-        } for g in ClassGroup.objects.filter(organization=org, is_active=True).select_related('modality')],
-
-        'clients': [{
-            'id': p.id,
-            'name': p.full_name,
-            'entity_affiliation': p.entity_affiliation
-        } for p in Person.objects.filter(organization=org, status='active')[:100]]
-    }
-
-    return JsonResponse(data)
+    return JsonResponse({
+        'modalities': list(modalities),
+        'instructors': [
+            {
+                'id': i['id'],
+                'full_name': f"{i['first_name']} {i['last_name']}",
+                'email': i['email']
+            } for i in instructors
+        ],
+        'class_groups': list(class_groups),
+        'clients': [
+            {
+                'id': c['id'],
+                'full_name': f"{c['first_name']} {c['last_name']}",
+                'email': c['email']
+            } for c in clients
+        ]
+    })
 
 
 @csrf_exempt
 @login_required
+@require_http_methods(["POST"])
 def validate_event_conflict(request):
-    """API para validar conflitos de eventos."""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Método não permitido'}, status=405)
-
+    """Validar conflitos de eventos antes da criação."""
     try:
         data = json.loads(request.body)
         org = request.organization
 
         resource_id = data.get('resource_id')
-        starts_at = datetime.fromisoformat(data.get('starts_at'))
-        ends_at = datetime.fromisoformat(data.get('ends_at'))
-        event_id = data.get('event_id')
+        starts_at_str = data.get('starts_at')
+        ends_at_str = data.get('ends_at')
+        exclude_event_id = data.get('exclude_event_id')  # Para edições
 
-        query = Event.objects.filter(
+        if not all([resource_id, starts_at_str, ends_at_str]):
+            return JsonResponse({'error': 'Dados obrigatórios em falta'}, status=400)
+
+        try:
+            starts_at = datetime.fromisoformat(starts_at_str.replace('Z', ''))
+            ends_at = datetime.fromisoformat(ends_at_str.replace('Z', ''))
+            starts_at = timezone.make_aware(starts_at) if timezone.is_naive(starts_at) else starts_at
+            ends_at = timezone.make_aware(ends_at) if timezone.is_naive(ends_at) else ends_at
+        except ValueError:
+            return JsonResponse({'error': 'Formato de data/hora inválido'}, status=400)
+
+        # Verificar conflitos
+        conflicts = Event.objects.filter(
             organization=org,
             resource_id=resource_id,
             starts_at__lt=ends_at,
             ends_at__gt=starts_at
         )
 
-        if event_id:
-            query = query.exclude(id=event_id)
+        if exclude_event_id:
+            conflicts = conflicts.exclude(id=exclude_event_id)
 
-        conflicts = query.select_related('instructor', 'modality').values(
-            'id', 'title', 'starts_at', 'ends_at',
-            'instructor__first_name', 'modality__name'
-        )
+        if conflicts.exists():
+            conflict_list = [
+                {
+                    'id': c.id,
+                    'title': c.title,
+                    'starts_at': c.starts_at.isoformat(),
+                    'ends_at': c.ends_at.isoformat()
+                } for c in conflicts
+            ]
+            return JsonResponse({
+                'has_conflict': True,
+                'conflicts': conflict_list
+            })
+
+        return JsonResponse({'has_conflict': False})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@login_required
+@require_http_methods(["POST"])
+def cancel_booking_api(request, booking_id):
+    """API para cancelar uma reserva de aula."""
+    try:
+        org = request.organization
+
+        # Verificar se a reserva existe e pertence à organização
+        try:
+            booking = Booking.objects.get(id=booking_id, organization=org)
+        except Booking.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Reserva não encontrada'
+            }, status=404)
+
+        # Verificar permissões - o cliente só pode cancelar as suas próprias reservas
+        if hasattr(request.user, 'profile') and hasattr(request.user.profile, 'person'):
+            person = request.user.profile.person
+            if booking.person != person and not (request.user.is_staff or request.user.is_superuser):
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Sem permissão para cancelar esta reserva'
+                }, status=403)
+
+        # Verificar se a reserva pode ser cancelada (ex: não está muito próxima)
+        if hasattr(booking, 'can_be_cancelled') and not booking.can_be_cancelled:
+            return JsonResponse({
+                'success': False,
+                'message': 'Esta reserva já não pode ser cancelada'
+            }, status=400)
+
+        # Verificar se já está cancelada
+        if booking.status == 'cancelled':
+            return JsonResponse({
+                'success': False,
+                'message': 'Esta reserva já está cancelada'
+            }, status=400)
+
+        # Cancelar a reserva
+        booking.status = 'cancelled'
+        booking.cancelled_at = timezone.now()
+        booking.save()
+
+        # Se a reserva usou créditos, devolver os créditos (lógica de negócio)
+        if hasattr(booking, 'credits_used') and booking.credits_used > 0:
+            # Implementar lógica para devolver créditos se necessário
+            pass
 
         return JsonResponse({
-            'has_conflicts': conflicts.exists(),
-            'conflicts': list(conflicts)
+            'success': True,
+            'message': 'Reserva cancelada com sucesso'
         })
 
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
-# Booking APIs (placeholder para futuras implementações)
-@login_required
-def book_event(request, event_id):
-    """API para reservar evento."""
-    return JsonResponse({'message': 'Booking API - em desenvolvimento'})
-
-
-@login_required
-def cancel_booking(request, booking_id):
-    """API para cancelar reserva."""
-    return JsonResponse({'message': 'Cancel booking API - em desenvolvimento'})
-
+        return JsonResponse({
+            'success': False,
+            'message': f'Erro ao cancelar reserva: {str(e)}'
+        }, status=500)

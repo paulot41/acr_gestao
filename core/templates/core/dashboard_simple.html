@@ -1,0 +1,309 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard - {{ request.organization.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                Dashboard
+                {% if dashboard_type == 'admin' %}
+                    - Administrador
+                {% elif dashboard_type == 'instructor' %}
+                    - Instrutor
+                {% elif dashboard_type == 'client' %}
+                    - Cliente
+                {% elif dashboard_type == 'staff' %}
+                    - Staff
+                {% endif %}
+            </h1>
+        </div>
+    </div>
+
+    <!-- Estatísticas Principais -->
+    <div class="row mb-4">
+        {% if dashboard_type == 'admin' %}
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5>Clientes Ativos</h5>
+                        <h2>{{ stats.total_clients }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5>Instrutores</h5>
+                        <h2>{{ stats.total_instructors }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5>Aulas Hoje</h5>
+                        <h2>{{ stats.todays_events }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5>Receita Semanal</h5>
+                        <h2>€{{ stats.weekly_revenue }}</h2>
+                    </div>
+                </div>
+            </div>
+        {% elif dashboard_type == 'instructor' %}
+            <div class="col-md-6">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5>Aulas Hoje</h5>
+                        <h2>{{ stats.todays_classes }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5>Próximas Aulas</h5>
+                        <h2>{{ stats.upcoming_classes }}</h2>
+                    </div>
+                </div>
+            </div>
+        {% elif dashboard_type == 'client' %}
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5>Próximas Reservas</h5>
+                        <h2>{{ stats.upcoming_bookings }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5>Créditos</h5>
+                        <h2>{{ stats.total_credits }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5>Planos Ativos</h5>
+                        <h2>{{ stats.active_plans }}</h2>
+                    </div>
+                </div>
+            </div>
+        {% elif dashboard_type == 'staff' %}
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5>Aulas Hoje</h5>
+                        <h2>{{ stats.todays_events }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5>Reservas Hoje</h5>
+                        <h2>{{ stats.todays_bookings }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5>Capacidade Total</h5>
+                        <h2>{{ stats.total_capacity_today }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5>Ocupação</h5>
+                        <h2>{{ stats.total_bookings_today }}</h2>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Acções Rápidas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Acções Rápidas</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'gantt' %}" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-calendar-alt"></i> Ver Horários / Marcar Aulas
+                    </a>
+                    {% if admin_url %}
+                        <a href="{{ admin_url }}" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-cog"></i> Administração (CRUD)
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Eventos/Aulas -->
+        {% if upcoming_events or todays_classes or upcoming_classes %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>
+                        {% if dashboard_type == 'admin' %}Eventos de Hoje
+                        {% elif dashboard_type == 'instructor' %}Minhas Aulas
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if upcoming_events %}
+                        {% for event in upcoming_events %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-start border-primary border-3">
+                            <div>
+                                <strong>{{ event.starts_at|date:"H:i" }}</strong> - {{ event.modality.name }}
+                                <br><small class="text-muted">{{ event.resource.name }} - {{ event.instructor.name }}</small>
+                            </div>
+                            <span class="badge bg-primary">{{ event.capacity }} lugares</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhum evento hoje.</p>
+                        {% endfor %}
+                    {% elif todays_classes %}
+                        {% for class in todays_classes %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-start border-success border-3">
+                            <div>
+                                <strong>{{ class.starts_at|date:"H:i" }}</strong> - {{ class.modality.name }}
+                                <br><small class="text-muted">{{ class.resource.name }}</small>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhuma aula hoje.</p>
+                        {% endfor %}
+                    {% elif upcoming_classes %}
+                        {% for class in upcoming_classes %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-start border-info border-3">
+                            <div>
+                                <strong>{{ class.starts_at|date:"d/m H:i" }}</strong> - {{ class.modality.name }}
+                                <br><small class="text-muted">{{ class.resource.name }}</small>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhuma aula próxima.</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Reservas/Subscrições -->
+        {% if upcoming_bookings or active_subscriptions %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>
+                        {% if dashboard_type == 'client' %}Minhas Reservas{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if upcoming_bookings %}
+                        {% for booking in upcoming_bookings %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-start border-success border-3">
+                            <div>
+                                <strong>{{ booking.event.starts_at|date:"d/m H:i" }}</strong> - {{ booking.event.modality.name }}
+                                <br><small class="text-muted">{{ booking.event.resource.name }}</small>
+                            </div>
+                            <span class="badge bg-success">{{ booking.status }}</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhuma reserva próxima.</p>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if active_subscriptions %}
+                        <hr>
+                        <h6>Subscrições Ativas</h6>
+                        {% for subscription in active_subscriptions %}
+                        <div class="mb-2 p-2 border-start border-warning border-3">
+                            <strong>{{ subscription.payment_plan.name }}</strong>
+                            <br><small class="text-muted">
+                                {% if subscription.payment_plan.plan_type == 'credits' %}
+                                    {{ subscription.remaining_credits }} créditos restantes
+                                {% else %}
+                                    Válido até {{ subscription.end_date|date:"d/m/Y" }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhuma subscrição ativa.</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Alertas -->
+        {% if alerts %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Alertas</h5>
+                </div>
+                <div class="card-body">
+                    {% for alert in alerts %}
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <strong>{{ alert.get_alert_type_display }}</strong>
+                        <br>{{ alert.message }}
+                        <div class="mt-2">
+                            <a href="{% url 'alert_mark_read' alert.id %}" class="btn btn-sm btn-outline-success">Marcar como lido</a>
+                            <a href="{% url 'alert_dismiss' alert.id %}" class="btn btn-sm btn-outline-secondary">Ignorar</a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">Nenhum alerta.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Atividade de Hoje (Staff) -->
+        {% if todays_events and dashboard_type == 'staff' %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Atividade de Hoje</h5>
+                </div>
+                <div class="card-body">
+                    {% for event in todays_events %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-start border-primary border-3">
+                        <div>
+                            <strong>{{ event.starts_at|date:"H:i" }}</strong> - {{ event.modality.name }}
+                            <br><small class="text-muted">{{ event.resource.name }} - {{ event.instructor.name }}</small>
+                        </div>
+                        <span class="badge bg-primary">{{ event.bookings.count }}/{{ event.capacity }}</span>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">Nenhuma atividade hoje.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

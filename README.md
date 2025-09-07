@@ -65,13 +65,24 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 
 ## 🚀 **Instalação Rápida**
 
-### Desenvolvimento Local:
+### Desenvolvimento Local (Docker):
 ```bash
 # Clonar repositório
 git clone https://github.com/paulot41/acr_gestao.git
 cd acr_gestao
 
-# Configurar ambiente
+# Deploy automático com Docker Desktop
+chmod +x deploy_prod_local.sh
+./deploy_prod_local.sh
+
+# Criar dados básicos automaticamente
+docker cp init_data.py acr_gestao-web-1:/app/init_data.py
+docker-compose -f docker-compose.prod.local.yml exec web python /app/init_data.py
+```
+
+### Desenvolvimento Manual:
+```bash
+# Configurar ambiente Python
 cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
@@ -94,7 +105,7 @@ python manage.py runserver
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-**Documentação completa:** [DEPLOY_DEBIAN.md](DEPLOY_DEBIAN.md)
+**Documentação completa:** [DEPLOY_DEBIAN.md](DEPLOY.md)
 
 ---
 
@@ -255,7 +266,7 @@ Este projeto está sob licença **MIT**. Ver [LICENSE](LICENSE) para detalhes.
 ## 📞 **Suporte**
 
 ### Documentação:
-- **Deploy:** [DEPLOY_DEBIAN.md](DEPLOY_DEBIAN.md)
+- **Deploy:** [DEPLOY_DEBIAN.md](DEPLOY.md)
 - **Modelos:** [CORE_MODELS_GUIDE.md](CORE_MODELS_GUIDE.md)
 - **Troubleshooting:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 

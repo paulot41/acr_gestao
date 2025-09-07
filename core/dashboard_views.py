@@ -1,207 +1,162 @@
 """
 Vistas específicas para dashboards personalizados por tipo de utilizador.
+Dashboard simplificado para consulta e marcação de aulas - operações CRUD no Django Admin.
 """
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Q, Count, Sum
-from datetime import timedelta, datetime
+from django.db.models import Sum
+from datetime import timedelta
 from .models import (
-    Person, Instructor, Event, Booking, ClientSubscription
+    Person, Instructor, Event, Booking, ClientSubscription,
+    SystemAlert, UserProfile
 )
-# Remove imports que não existem ainda
-# from .services.alerts import AlertService, CreditHistoryService
+from .services.alerts import AlertService, CreditHistoryService
 
 
 @login_required
 def dashboard_router(request):
-    """Router que direciona para o dashboard apropriado baseado no tipo de utilizador."""
-    try:
-        profile = request.user.profile
-
-        if profile.user_type == UserProfile.UserType.ADMIN:
-            return redirect('dashboard_admin')
-        elif profile.user_type == UserProfile.UserType.STAFF:
-            return redirect('dashboard_staff')
-        elif profile.user_type == UserProfile.UserType.INSTRUCTOR:
-            return redirect('dashboard_instructor')
-        elif profile.user_type == UserProfile.UserType.CLIENT:
-            return redirect('dashboard_client')
-        else:
-            return redirect('dashboard_admin')  # Fallback
-
-    except UserProfile.DoesNotExist:
-        # Se não tem perfil, assume admin
-        return redirect('dashboard_admin')
+    """Dashboard unificado: redireciona para o Gantt para consulta/marcação de aulas."""
+    return redirect('core:gantt')
 
 
 @login_required
 def dashboard_admin(request):
-    """Dashboard para administradores com visão completa."""
+    """Dashboard simplificado para administradores - consulta apenas."""
     org = request.organization
 
     # Executar verificações diárias de alertas
-    AlertService.run_daily_checks(org)
+    try:
+        AlertService.run_daily_checks(org)
+    except Exception:
+        pass  # Não bloquear dashboard se alertas falharem
 
-    # Estatísticas gerais
+    # Estatísticas básicas para hoje
     today = timezone.now().date()
     week_start = today - timedelta(days=today.weekday())
 
-    stats = {
-        'total_clients': Person.objects.filter(organization=org, status='active').count(),
-        'total_instructors': Instructor.objects.filter(organization=org, is_active=True).count(),
-        'active_subscriptions': ClientSubscription.objects.filter(
-            organization=org, status='active'
-        ).count(),
-        'todays_events': Event.objects.filter(
+    try:
+        stats = {
+            'total_clients': Person.objects.filter(organization=org, status='active').count(),
+            'total_instructors': Instructor.objects.filter(organization=org, is_active=True).count(),
+            'todays_events': Event.objects.filter(
+                organization=org,
+                starts_at__date=today
+            ).count(),
+            'weekly_revenue': ClientSubscription.objects.filter(
+                organization=org,
+                payment_date__gte=week_start,
+                is_paid=True
+            ).aggregate(Sum('payment_plan__price'))['payment_plan__price__sum'] or 0,
+        }
+
+        # Próximos eventos (hoje apenas)
+        upcoming_events = Event.objects.filter(
             organization=org,
             starts_at__date=today
-        ).count(),
-        'weekly_revenue': ClientSubscription.objects.filter(
+        ).select_related('resource', 'instructor', 'modality').order_by('starts_at')[:10]
+
+        # Alertas críticos apenas
+        critical_alerts = SystemAlert.objects.filter(
             organization=org,
-            payment_date__gte=week_start,
-            is_paid=True
-        ).aggregate(Sum('payment_plan__price'))['payment_plan__price__sum'] or 0,
-    }
+            status=SystemAlert.Status.PENDING,
+            alert_type__in=[
+                SystemAlert.AlertType.LOW_CREDITS,
+                SystemAlert.AlertType.SUBSCRIPTION_EXPIRING
+            ]
+        ).order_by('-created_at')[:5]
 
-    # Alertas pendentes
-    pending_alerts = SystemAlert.objects.filter(
-        organization=org,
-        status__in=[SystemAlert.Status.PENDING, SystemAlert.Status.SENT]
-    ).order_by('-created_at')[:10]
-
-    # Próximos eventos (hoje + amanhã)
-    upcoming_events = Event.objects.filter(
-        organization=org,
-        starts_at__date__in=[today, today + timedelta(days=1)]
-    ).select_related('resource', 'instructor', 'modality').order_by('starts_at')[:10]
-
-    # Subscrições a expirar esta semana
-    expiring_subscriptions = ClientSubscription.objects.filter(
-        organization=org,
-        status='active',
-        end_date__lte=today + timedelta(days=7),
-        end_date__gte=today
-    ).select_related('person', 'payment_plan')[:5]
-
-    # Clientes com créditos baixos
-    low_credit_clients = ClientSubscription.objects.filter(
-        organization=org,
-        status='active',
-        payment_plan__plan_type='credits',
-        remaining_credits__lte=3,
-        remaining_credits__gt=0
-    ).select_related('person', 'payment_plan')[:5]
+    except Exception as e:
+        messages.error(request, f"Erro ao carregar dados: {str(e)}")
+        stats = {'total_clients': 0, 'total_instructors': 0, 'todays_events': 0, 'weekly_revenue': 0}
+        upcoming_events = []
+        critical_alerts = []
 
     context = {
         'stats': stats,
-        'pending_alerts': pending_alerts,
         'upcoming_events': upcoming_events,
-        'expiring_subscriptions': expiring_subscriptions,
-        'low_credit_clients': low_credit_clients,
-        'dashboard_type': 'admin'
+        'alerts': critical_alerts,
+        'dashboard_type': 'admin',
+        'admin_url': '/admin/',  # Link para Django admin
     }
 
-    return render(request, 'core/dashboard_admin.html', context)
+    return render(request, 'core/dashboard_simple.html', context)
 
 
 @login_required
 def dashboard_instructor(request):
-    """Dashboard para instrutores com foco nas suas aulas."""
+    """Dashboard simplificado para instrutores - apenas suas aulas."""
     try:
         profile = request.user.profile
-        if not profile.instructor:
+        if not hasattr(profile, 'instructor') or not profile.instructor:
             messages.error(request, "Perfil de instrutor não encontrado.")
-            return redirect('dashboard_router')
+            return redirect('core:dashboard')
 
         instructor = profile.instructor
         org = request.organization
         today = timezone.now().date()
 
-        # Próximas aulas do instrutor (próximos 7 dias)
-        upcoming_classes = Event.objects.filter(
-            organization=org,
-            instructor=instructor,
-            starts_at__date__gte=today,
-            starts_at__date__lte=today + timedelta(days=7)
-        ).select_related('resource', 'modality').order_by('starts_at')
-
-        # Aulas de hoje
+        # Aulas de hoje do instrutor
         todays_classes = Event.objects.filter(
             organization=org,
             instructor=instructor,
             starts_at__date=today
         ).select_related('resource', 'modality').order_by('starts_at')
 
-        # Estatísticas do instrutor
-        this_month_start = today.replace(day=1)
+        # Próximas aulas (próximos 3 dias)
+        upcoming_classes = Event.objects.filter(
+            organization=org,
+            instructor=instructor,
+            starts_at__date__gt=today,
+            starts_at__date__lte=today + timedelta(days=3)
+        ).select_related('resource', 'modality').order_by('starts_at')[:5]
+
         stats = {
             'todays_classes': todays_classes.count(),
-            'weekly_classes': upcoming_classes.count(),
-            'monthly_classes': Event.objects.filter(
-                organization=org,
-                instructor=instructor,
-                starts_at__date__gte=this_month_start
-            ).count(),
-            'total_students_today': sum(
-                event.bookings.filter(status='confirmed').count()
-                for event in todays_classes
-            )
+            'upcoming_classes': upcoming_classes.count(),
         }
-
-        # Alertas para o instrutor
-        instructor_alerts = SystemAlert.objects.filter(
-            organization=org,
-            user=request.user,
-            status__in=[SystemAlert.Status.PENDING, SystemAlert.Status.SENT]
-        ).order_by('-created_at')[:5]
 
         context = {
             'instructor': instructor,
             'stats': stats,
             'todays_classes': todays_classes,
             'upcoming_classes': upcoming_classes,
-            'alerts': instructor_alerts,
             'dashboard_type': 'instructor'
         }
 
-        return render(request, 'core/dashboard_instructor.html', context)
+        return render(request, 'core/dashboard_simple.html', context)
 
     except Exception as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
-        return redirect('dashboard_router')
+        return redirect('core:dashboard')
 
 
 @login_required
 def dashboard_client(request):
-    """Dashboard para clientes com foco nas suas reservas e créditos."""
+    """Dashboard simplificado para clientes - consulta de reservas e marcação via Gantt."""
     try:
         profile = request.user.profile
-        if not profile.person:
+        if not hasattr(profile, 'person') or not profile.person:
             messages.error(request, "Perfil de cliente não encontrado.")
-            return redirect('dashboard_router')
+            return redirect('core:dashboard')
 
         person = profile.person
         org = request.organization
-        today = timezone.now().date()
 
-        # Próximas reservas
+        # Próximas reservas (máximo 5)
         upcoming_bookings = Booking.objects.filter(
             organization=org,
             person=person,
             status='confirmed',
             event__starts_at__gte=timezone.now()
-        ).select_related('event', 'event__resource', 'event__modality', 'event__instructor').order_by('event__starts_at')[:5]
+        ).select_related('event', 'event__resource', 'event__modality').order_by('event__starts_at')[:5]
 
-        # Histórico de reservas (últimas 10)
-        recent_bookings = Booking.objects.filter(
-            organization=org,
-            person=person
-        ).select_related('event', 'event__resource', 'event__modality').order_by('-created_at')[:10]
-
-        # Resumo de créditos
-        credit_summary = CreditHistoryService.get_client_credit_summary(person, org)
+        # Resumo básico de créditos
+        try:
+            credit_summary = CreditHistoryService.get_client_credit_summary(person, org)
+        except Exception:
+            credit_summary = {'total_credits': 0}
 
         # Subscrições ativas
         active_subscriptions = ClientSubscription.objects.filter(
@@ -210,24 +165,9 @@ def dashboard_client(request):
             status='active'
         ).select_related('payment_plan')
 
-        # Alertas pessoais
-        personal_alerts = SystemAlert.objects.filter(
-            organization=org,
-            person=person,
-            status__in=[SystemAlert.Status.PENDING, SystemAlert.Status.SENT]
-        ).order_by('-created_at')[:5]
-
-        # Estatísticas pessoais
-        this_month_start = today.replace(day=1)
         stats = {
             'upcoming_bookings': upcoming_bookings.count(),
-            'total_credits': credit_summary['total_credits'],
-            'monthly_bookings': Booking.objects.filter(
-                organization=org,
-                person=person,
-                event__starts_at__date__gte=this_month_start,
-                status='confirmed'
-            ).count(),
+            'total_credits': credit_summary.get('total_credits', 0),
             'active_plans': active_subscriptions.count()
         }
 
@@ -235,165 +175,160 @@ def dashboard_client(request):
             'person': person,
             'stats': stats,
             'upcoming_bookings': upcoming_bookings,
-            'recent_bookings': recent_bookings,
-            'credit_summary': credit_summary,
             'active_subscriptions': active_subscriptions,
-            'alerts': personal_alerts,
             'dashboard_type': 'client'
         }
 
-        return render(request, 'core/dashboard_client.html', context)
+        return render(request, 'core/dashboard_simple.html', context)
 
     except Exception as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
-        return redirect('dashboard_router')
+        return redirect('core:dashboard')
 
 
 @login_required
 def dashboard_staff(request):
-    """Dashboard para staff com foco em operações diárias."""
+    """Dashboard simplificado para staff - eventos de hoje apenas."""
     org = request.organization
     today = timezone.now().date()
 
-    # Eventos de hoje
-    todays_events = Event.objects.filter(
-        organization=org,
-        starts_at__date=today
-    ).select_related('resource', 'instructor', 'modality').order_by('starts_at')
+    try:
+        # Eventos de hoje
+        todays_events = Event.objects.filter(
+            organization=org,
+            starts_at__date=today
+        ).select_related('resource', 'instructor', 'modality').order_by('starts_at')
 
-    # Reservas pendentes ou recentes
-    recent_bookings = Booking.objects.filter(
-        organization=org,
-        created_at__date=today
-    ).select_related('person', 'event', 'event__resource').order_by('-created_at')[:10]
+        # Reservas de hoje
+        todays_bookings = Booking.objects.filter(
+            organization=org,
+            created_at__date=today
+        ).select_related('person', 'event').order_by('-created_at')[:10]
 
-    # Pagamentos pendentes
-    pending_payments = ClientSubscription.objects.filter(
-        organization=org,
-        is_paid=False,
-        status='active'
-    ).select_related('person', 'payment_plan')[:10]
+        stats = {
+            'todays_events': todays_events.count(),
+            'todays_bookings': todays_bookings.count(),
+            'total_capacity_today': sum(event.capacity for event in todays_events),
+            'total_bookings_today': sum(
+                event.bookings.filter(status='confirmed').count()
+                for event in todays_events
+            )
+        }
 
-    # Alertas operacionais
-    operational_alerts = SystemAlert.objects.filter(
-        organization=org,
-        alert_type__in=[
-            SystemAlert.AlertType.LOW_CREDITS,
-            SystemAlert.AlertType.SUBSCRIPTION_EXPIRING,
-            SystemAlert.AlertType.PAYMENT_OVERDUE
-        ],
-        status__in=[SystemAlert.Status.PENDING, SystemAlert.Status.SENT]
-    ).order_by('-created_at')[:10]
+        context = {
+            'stats': {'todays_events': todays_events.count()},
+            'todays_events': todays_events,
+            'dashboard_type': 'staff'
+        }
 
-    # Estatísticas do dia
-    stats = {
-        'todays_events': todays_events.count(),
-        'todays_bookings': recent_bookings.count(),
-        'pending_payments': pending_payments.count(),
-        'active_alerts': operational_alerts.count(),
-        'total_capacity_today': sum(event.capacity for event in todays_events),
-        'total_bookings_today': sum(
-            event.bookings.filter(status='confirmed').count()
-            for event in todays_events
-        )
-    }
+        return render(request, 'core/dashboard_simple.html', context)
 
-    context = {
-        'stats': stats,
-        'todays_events': todays_events,
-        'recent_bookings': recent_bookings,
-        'pending_payments': pending_payments,
-        'alerts': operational_alerts,
-        'dashboard_type': 'staff'
-    }
-
-    return render(request, 'core/dashboard_staff.html', context)
+    except Exception as e:
+        messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
+        return redirect('core:dashboard')
 
 
 @login_required
 def credit_history_view(request):
-    """Vista para histórico detalhado de créditos (clientes)."""
+    """Vista para mostrar o histórico de créditos do cliente."""
     try:
         profile = request.user.profile
-        if profile.user_type != UserProfile.UserType.CLIENT or not profile.person:
-            messages.error(request, "Acesso negado.")
-            return redirect('dashboard_router')
+        if not hasattr(profile, 'person') or not profile.person:
+            messages.error(request, "Perfil de cliente não encontrado.")
+            return redirect('core:dashboard')
 
         person = profile.person
         org = request.organization
 
-        credit_history = CreditHistory.objects.filter(
+        # Histórico de reservas e pagamentos
+        bookings_history = Booking.objects.filter(
             organization=org,
             person=person
-        ).select_related('subscription', 'booking', 'booking__event').order_by('-created_at')
+        ).select_related(
+            'event', 'event__resource', 'event__modality', 'event__instructor'
+        ).order_by('-event__starts_at')
 
-        # Paginação simples
-        page_size = 20
-        page = int(request.GET.get('page', 1))
-        start = (page - 1) * page_size
-        end = start + page_size
+        # Subscrições históricas
+        subscriptions_history = ClientSubscription.objects.filter(
+            organization=org,
+            person=person
+        ).select_related('payment_plan').order_by('-created_at')
 
-        history_page = credit_history[start:end]
-        has_next = credit_history.count() > end
-        has_prev = page > 1
+        # Resumo de créditos atual
+        try:
+            credit_summary = CreditHistoryService.get_client_credit_summary(person, org)
+        except Exception:
+            credit_summary = {'total_credits': 0, 'active_subscriptions': []}
 
         context = {
-            'credit_history': history_page,
-            'page': page,
-            'has_next': has_next,
-            'has_prev': has_prev,
-            'prev_page': page - 1 if has_prev else None,
-            'next_page': page + 1 if has_next else None
+            'person': person,
+            'bookings_history': bookings_history,
+            'subscriptions_history': subscriptions_history,
+            'credit_summary': credit_summary,
         }
 
         return render(request, 'core/credit_history.html', context)
 
     except Exception as e:
         messages.error(request, f"Erro ao carregar histórico: {str(e)}")
-        return redirect('dashboard_client')
+        return redirect('core:dashboard')
 
 
 @login_required
 def alert_mark_read(request, alert_id):
     """Marca um alerta como lido."""
-    alert = get_object_or_404(SystemAlert, id=alert_id, organization=request.organization)
+    try:
+        alert = get_object_or_404(SystemAlert, id=alert_id, organization=request.organization)
 
-    # Verificar permissões
-    can_access = False
-    if hasattr(request.user, 'profile'):
-        profile = request.user.profile
-        if (profile.user_type in [UserProfile.UserType.ADMIN, UserProfile.UserType.STAFF] or
-            (alert.person and alert.person == profile.person) or
-            (alert.user and alert.user == request.user)):
-            can_access = True
+        # Verificar permissões básicas
+        can_access = False
+        if hasattr(request.user, 'profile'):
+            profile = request.user.profile
+            if (hasattr(profile, 'user_type') and
+                profile.user_type in [UserProfile.UserType.ADMIN, UserProfile.UserType.STAFF]):
+                can_access = True
+            elif alert.person and hasattr(profile, 'person') and alert.person == profile.person:
+                can_access = True
+            elif alert.user and alert.user == request.user:
+                can_access = True
 
-    if can_access:
-        alert.mark_as_read()
-        messages.success(request, "Alerta marcado como lido.")
-    else:
-        messages.error(request, "Sem permissão para aceder a este alerta.")
+        if can_access and hasattr(alert, 'mark_as_read'):
+            alert.mark_as_read()
+            messages.success(request, "Alerta marcado como lido.")
+        else:
+            messages.error(request, "Sem permissão para aceder a este alerta.")
 
-    return redirect(request.META.get('HTTP_REFERER', 'dashboard_router'))
+    except Exception as e:
+        messages.error(request, f"Erro ao processar alerta: {str(e)}")
+
+    return redirect(request.META.get('HTTP_REFERER', 'core:dashboard'))
 
 
 @login_required
 def alert_dismiss(request, alert_id):
     """Ignora um alerta."""
-    alert = get_object_or_404(SystemAlert, id=alert_id, organization=request.organization)
+    try:
+        alert = get_object_or_404(SystemAlert, id=alert_id, organization=request.organization)
 
-    # Verificar permissões (mesmo que mark_read)
-    can_access = False
-    if hasattr(request.user, 'profile'):
-        profile = request.user.profile
-        if (profile.user_type in [UserProfile.UserType.ADMIN, UserProfile.UserType.STAFF] or
-            (alert.person and alert.person == profile.person) or
-            (alert.user and alert.user == request.user)):
-            can_access = True
+        # Verificar permissões básicas (mesmo que mark_read)
+        can_access = False
+        if hasattr(request.user, 'profile'):
+            profile = request.user.profile
+            if (hasattr(profile, 'user_type') and
+                profile.user_type in [UserProfile.UserType.ADMIN, UserProfile.UserType.STAFF]):
+                can_access = True
+            elif alert.person and hasattr(profile, 'person') and alert.person == profile.person:
+                can_access = True
+            elif alert.user and alert.user == request.user:
+                can_access = True
 
-    if can_access:
-        alert.dismiss()
-        messages.success(request, "Alerta ignorado.")
-    else:
-        messages.error(request, "Sem permissão para aceder a este alerta.")
+        if can_access and hasattr(alert, 'dismiss'):
+            alert.dismiss()
+            messages.success(request, "Alerta ignorado.")
+        else:
+            messages.error(request, "Sem permissão para aceder a este alerta.")
 
-    return redirect(request.META.get('HTTP_REFERER', 'dashboard_router'))
+    except Exception as e:
+        messages.error(request, f"Erro ao processar alerta: {str(e)}")
+
+    return redirect(request.META.get('HTTP_REFERER', 'core:dashboard'))

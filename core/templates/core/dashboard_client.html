@@ -56,7 +56,7 @@
             <h5 class="mb-0">
                 <i class="fas fa-calendar-alt me-2"></i>Próximas Aulas
             </h5>
-            <a href="{% url 'core:gantt_view' %}" class="btn btn-primary btn-sm">
+            <a href="{% url 'core:gantt' %}" class="btn btn-primary btn-sm">
                 <i class="fas fa-plus me-1"></i>Nova Reserva
             </a>
         </div>
@@ -103,7 +103,7 @@
                     <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
                     <h5 class="text-muted">Não tem aulas marcadas</h5>
                     <p class="text-muted">Reserve a sua próxima aula no sistema de marcações</p>
-                    <a href="{% url 'core:gantt_view' %}" class="btn btn-primary">
+                    <a href="{% url 'core:gantt' %}" class="btn btn-primary">
                         <i class="fas fa-calendar-plus me-1"></i>Marcar Aula
                     </a>
                 </div>
@@ -201,7 +201,7 @@
                 <div class="text-center py-3">
                     <i class="fas fa-coins fa-2x text-muted mb-2"></i>
                     <p class="text-muted">Não tem planos de créditos ativos</p>
-                    <a href="{% url 'core:dashboard_router' %}" class="btn btn-primary btn-sm">
+                    <a href="{% url 'core:dashboard' %}" class="btn btn-outline-primary btn-sm">
                         Adquirir Créditos
                     </a>
                 </div>

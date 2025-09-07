@@ -2,6 +2,9 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import path
 from django.http import JsonResponse
+from django.db.models import Count, Q  # Importar funções de agregação corretas
+from django.utils import timezone
+from datetime import timedelta
 from . import models
 
 
@@ -33,20 +36,51 @@ class ACRAdminSite(admin.AdminSite):
         return custom_urls + urls
 
     def index(self, request, extra_context=None):
-        """Override da página inicial do admin com dashboard integrado."""
+        """Override da página inicial do admin com dashboard integrado e métricas modernas."""
         extra_context = extra_context or {}
 
         org = getattr(request, 'organization', None)
         if org:
-            # Estatísticas básicas
+            today = timezone.now().date()
+            week_start = today - timedelta(days=today.weekday())
+            month_start = today.replace(day=1)
+
+            # Estatísticas gerais e breakdown por entidade
             stats = {
                 'total_clients': models.Person.objects.filter(organization=org, status='active').count(),
+                'acr_clients': models.Person.objects.filter(organization=org, status='active', entity_affiliation__in=['acr_only', 'both']).count(),
+                'proform_clients': models.Person.objects.filter(organization=org, status='active', entity_affiliation__in=['proform_only', 'both']).count(),
+
                 'total_instructors': models.Instructor.objects.filter(organization=org, is_active=True).count(),
+                'acr_instructors': models.Instructor.objects.filter(organization=org, is_active=True, entity_affiliation__in=['acr_only', 'both']).count(),
+                'proform_instructors': models.Instructor.objects.filter(organization=org, is_active=True, entity_affiliation__in=['proform_only', 'both']).count(),
+
                 'total_modalities': models.Modality.objects.filter(organization=org, is_active=True).count(),
-                'total_resources': models.Resource.objects.filter(organization=org, is_available=True).count(),
-                'total_payment_plans': models.PaymentPlan.objects.filter(organization=org, is_active=True).count(),
-                'total_class_groups': models.ClassGroup.objects.filter(organization=org, is_active=True).count(),
+                'acr_modalities': models.Modality.objects.filter(organization=org, is_active=True, entity_type__in=['acr', 'both']).count(),
+                'proform_modalities': models.Modality.objects.filter(organization=org, is_active=True, entity_type__in=['proform', 'both']).count(),
             }
+
+            # Receita mensal
+            monthly_payments = models.Payment.objects.filter(organization=org, status='completed', paid_date__gte=month_start)
+            stats['monthly_revenue'] = sum(p.amount for p in monthly_payments)
+
+            # Próximos eventos (24h)
+            upcoming_events = models.Event.objects.filter(
+                organization=org,
+                starts_at__gte=timezone.now(),
+                starts_at__lte=timezone.now() + timedelta(days=1)
+            ).select_related('resource', 'modality', 'instructor').annotate(
+                bookings_count=Count('bookings', filter=Q(bookings__status='confirmed'))
+            ).order_by('starts_at')[:8]
+            stats['upcoming_events'] = upcoming_events
+
+            # Clientes recentes (7 dias)
+            recent_clients = models.Person.objects.filter(
+                organization=org,
+                created_at__gte=timezone.now() - timedelta(days=7)
+            ).order_by('-created_at')[:6]
+            stats['recent_clients'] = recent_clients
+
             extra_context['stats'] = stats
 
         return super().index(request, extra_context)
@@ -67,17 +101,23 @@ class ACRAdminSite(admin.AdminSite):
         }
         return JsonResponse(stats)
 
-# Criar instância do custom admin site
-admin_site = ACRAdminSite(name='acr_admin')
+# Criar instância do custom admin site com namespace 'admin'
+admin_site = ACRAdminSite(name='admin')
 
 
 # Definir Admin Classes
+@admin.register(models.Organization)
 class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ("name", "domain", "org_type", "gym_monthly_fee", "wellness_monthly_fee")
-    list_filter = ("org_type",)
-    search_fields = ("name", "domain")
+    list_display = ("name","domain","org_type")
+    search_fields = ("name","domain")
+    fieldsets = (
+        ("Identificação", {"fields": ("name","domain","org_type")}),
+        ("Branding", {"fields": ("primary_color","secondary_color","logo_svg")}),
+        ("Configuração", {"fields": ("settings_json","gym_monthly_fee","wellness_monthly_fee")}),
+    )
 
 
+@admin.register(models.Person)
 class PersonAdmin(OrgScopedAdmin):
     list_display = ['full_name', 'email', 'phone', 'entity_affiliation', 'status', 'created_at']
     list_filter = ['status', 'entity_affiliation', 'created_at']
@@ -96,8 +136,10 @@ class PersonAdmin(OrgScopedAdmin):
     )
 
 
+@admin.register(models.Instructor)
 class InstructorAdmin(OrgScopedAdmin):
-    list_display = ['full_name', 'email', 'phone', 'entity_affiliation', 'is_active']
+    list_display = ['full_name', 'email', 'phone', 'entity_affiliation', 'is_active'
+    ]
     list_filter = ['entity_affiliation', 'is_active', 'created_at']
     search_fields = ['first_name', 'last_name', 'email', 'phone']
     fieldsets = (
@@ -210,7 +252,7 @@ class EventAdmin(OrgScopedAdmin):
         return super().get_queryset(request).select_related(
             'resource', 'modality', 'instructor', 'class_group', 'individual_client'
         ).annotate(
-            bookings_count_annotated=models.Count('bookings', filter=models.Q(bookings__status='confirmed'))
+            bookings_count_annotated=Count('bookings', filter=Q(bookings__status='confirmed'))
         )
 
 
@@ -219,6 +261,20 @@ class PaymentPlanAdmin(OrgScopedAdmin):
     list_filter = ['plan_type', 'entity_type', 'is_active']
     search_fields = ['name', 'description']
     filter_horizontal = ['modalities']
+
+
+@admin.register(models.Campaign)
+class CampaignAdmin(admin.ModelAdmin):
+    list_display = ("name", "channel", "organization", "scheduled_at", "sent_at")
+    list_filter = ("channel", "scheduled_at")
+    search_fields = ("name", "content")
+
+
+@admin.register(models.MessageLog)
+class MessageLogAdmin(admin.ModelAdmin):
+    list_display = ("campaign", "person", "channel", "status", "created_at")
+    list_filter = ("channel", "status", "created_at")
+    search_fields = ("person__first_name", "person__last_name", "campaign__name")
 
 
 # Registar todos os modelos no custom admin site

@@ -1,7 +1,0 @@
-services:
-  web:
-    env_file:
-      - .env.prod
-  caddy:
-    env_file:
-      - .env.prod

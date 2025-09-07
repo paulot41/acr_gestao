@@ -7,6 +7,10 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 
+# PostgreSQL search functionality
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField, SearchVector
+
 # Import validations (safe: service uses lazy model getters; no circular import)
 from .services.scheduling import ensure_no_conflict, ensure_capacity
 
@@ -22,6 +26,11 @@ class Organization(models.Model):
     domain = models.CharField(max_length=255, unique=True, help_text="Tenant domain (e.g., acr.local)")
     org_type = models.CharField("Tipo de Organização", max_length=20, choices=Type.choices, default=Type.BOTH)
     settings_json = models.JSONField(default=dict, blank=True)
+
+    # Branding por tenant (conforme patch)
+    primary_color = models.CharField(max_length=7, default="#0d6efd")
+    secondary_color = models.CharField(max_length=7, default="#6c757d")
+    logo_svg = models.TextField(blank=True, help_text="Conteúdo SVG para branding no admin e dashboard.")
 
     # Configurações financeiras
     gym_monthly_fee = models.DecimalField("Mensalidade Ginásio (ACR)", max_digits=10, decimal_places=2, default=30.00)
@@ -46,7 +55,7 @@ class Person(models.Model):
         PROFORM_ONLY = "proform_only", "Apenas Proform (Pilates)"
         BOTH = "both", "ACR + Proform"
 
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="people")
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120, blank=True)
     email = models.EmailField(blank=True)
@@ -54,11 +63,30 @@ class Person(models.Model):
     phone = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
 
+    # CRM: preferências e estado de ciclo de vida (conforme patch)
+    lifecycle_stage = models.CharField(max_length=32, default="subscriber",
+                                       help_text="subscriber|lead|member|churn_risk|churned")
+    marketing_optin_email = models.BooleanField(default=False)
+    marketing_optin_sms = models.BooleanField(default=False)
+
+    # RGPD consentimentos (conforme patch)
+    consent_terms = models.BooleanField(default=False)
+    consent_privacy = models.BooleanField(default=False)
+    consent_marketing = models.BooleanField(default=False)
+    consent_timestamp = models.DateTimeField(null=True, blank=True)
+
+    # Busca full-text (Postgres) (conforme patch)
+    search = SearchVectorField(null=True, editable=False)
+
     # Novos campos existentes
     date_of_birth = models.DateField("Data de Nascimento", null=True, blank=True)
     address = models.TextField("Morada", blank=True)
     emergency_contact = models.CharField("Contacto de Emergência", max_length=100, blank=True)
-    photo = models.ImageField("Foto", upload_to='clients/', null=True, blank=True)
+
+    def _person_upload_to(instance, filename):
+        return f"clients/org_{instance.organization_id}/{filename}"
+
+    photo = models.ImageField("Foto", upload_to=_person_upload_to, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField("Criado em", auto_now_add=True)
     last_activity = models.DateTimeField("Última Atividade", null=True, blank=True)
@@ -72,10 +100,23 @@ class Person(models.Model):
     class Meta:
         unique_together = [("organization", "email"), ("organization", "nif")]
         ordering = ["first_name", "last_name"]
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            GinIndex(fields=["search"]),
+        ]
 
     def __str__(self) -> str:
         n = f"{self.first_name} {self.last_name}".strip()
         return f"{n} ({self.get_entity_affiliation_display()})"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Atualiza SearchVector (método simples; ideal usar trigger no Postgres)
+        try:
+            type(self).objects.filter(pk=self.pk).update(
+                search=SearchVector("first_name", "last_name", "email", "nif", config="portuguese"))
+        except Exception:
+            pass
 
     @property
     def full_name(self) -> str:
@@ -128,6 +169,9 @@ class Instructor(models.Model):
     class Meta:
         unique_together = [("organization", "email")]
         ordering = ["first_name", "last_name"]
+        indexes = [
+            models.Index(fields=["organization", "is_active"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.full_name} ({self.get_entity_affiliation_display()})"
@@ -333,7 +377,7 @@ class Event(models.Model):
         INDIVIDUAL = "individual", "Aula Individual"
         OPEN_CLASS = "open_class", "Aula Aberta"
 
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="events")
     resource = models.ForeignKey(Resource, on_delete=models.PROTECT, related_name="events")
     modality = models.ForeignKey(Modality, on_delete=models.PROTECT, related_name="events", null=True, blank=True)
     instructor = models.ForeignKey(Instructor, on_delete=models.SET_NULL, related_name="events", null=True, blank=True)
@@ -349,6 +393,10 @@ class Event(models.Model):
     description = models.TextField("Descrição", blank=True)
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
+
+    # Campos do patch
+    waitlist_enabled = models.BooleanField(default=True)
+    max_capacity = models.PositiveIntegerField(default=10)
     capacity = models.PositiveIntegerField(default=0)
 
     # Campos para integração Google Calendar (FASE 2)
@@ -397,7 +445,7 @@ class Event(models.Model):
     @property
     def bookings_count(self) -> int:
         """Count non-cancelled bookings."""
-        return self.bookings.exclude(status=Booking.Status.CANCELLED).count()
+        return self.bookings.exclude(status="cancelled").count()
 
     @property
     def is_full(self) -> bool:
@@ -416,15 +464,13 @@ class Event(models.Model):
 
 
 class Booking(models.Model):
-    """Person reserves a seat in an event (enforces capacity)."""
-    class Status(models.TextChoices):
-        CONFIRMED = "confirmed", "Confirmed"
-        CANCELLED = "cancelled", "Cancelled"
-
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    """Reservas com lista de espera e auto-check-in por QR."""
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="bookings")
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="bookings")
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="bookings")
-    status = models.CharField(max_length=12, choices=Status.choices, default=Status.CONFIRMED)
+    status = models.CharField(max_length=16, default="confirmed")  # confirmed|waitlist|cancelled|no_show|checked_in
+    created_at = models.DateTimeField(auto_now_add=True)
+    checkin_code = models.CharField(max_length=16, blank=True)
 
     # Novos campos para gestão de créditos
     subscription_used = models.ForeignKey(
@@ -434,52 +480,32 @@ class Booking(models.Model):
     credits_used = models.PositiveIntegerField("Créditos Utilizados", default=1)
     is_paid = models.BooleanField("Pago", default=False, help_text="Se foi pago fora do sistema de créditos")
     payment_amount = models.DecimalField("Valor Pago", max_digits=10, decimal_places=2, default=0.00)
-
-    created_at = models.DateTimeField(auto_now_add=True)
     cancelled_at = models.DateTimeField("Cancelado em", null=True, blank=True)
 
     class Meta:
-        unique_together = [("event", "person")]  # one booking per person/event
+        unique_together = [("event","person")]
+        indexes = [
+            models.Index(fields=["organization","created_at"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.person} => {self.event} ({self.status})"
 
-    def clean(self) -> None:
-        """Enforce event capacity and credit validation."""
+    def clean(self):
+        ensure_no_conflict(self)
         ensure_capacity(self)
-
         # Validar créditos se usar subscrição
-        if self.subscription_used and self.status == self.Status.CONFIRMED:
+        if self.subscription_used and self.status == "confirmed":
             if not self.subscription_used.has_credits():
                 raise ValidationError("Subscrição não tem créditos suficientes.")
 
-    def save(self, *args, **kwargs):
-        """Auto-consume credits on booking confirmation."""
-        is_new = self.pk is None
-        old_status = None
-
-        if not is_new:
-            old_booking = Booking.objects.get(pk=self.pk)
-            old_status = old_booking.status
-
-        super().save(*args, **kwargs)
-
-        # Consumir créditos ao confirmar reserva
-        if self.status == self.Status.CONFIRMED and (is_new or old_status != self.Status.CONFIRMED):
-            if self.subscription_used:
-                for _ in range(self.credits_used):
-                    self.subscription_used.use_credit()
-
-        # Devolver créditos ao cancelar
-        elif self.status == self.Status.CANCELLED and old_status == self.Status.CONFIRMED:
-            if self.subscription_used:
-                self.subscription_used.remaining_credits += self.credits_used
-                self.subscription_used.save(update_fields=['remaining_credits'])
-                self.cancelled_at = timezone.now()
+    def mark_checked_in(self):
+        self.status = "checked_in"
+        self.save(update_fields=["status"])
 
     def can_be_cancelled(self) -> bool:
         """Verifica se a reserva pode ser cancelada (ex: até 2h antes)."""
-        if self.status == self.Status.CANCELLED:
+        if self.status == "cancelled":
             return False
 
         # Permitir cancelamento até 2 horas antes do evento
@@ -959,3 +985,44 @@ class SystemAlert(models.Model):
         """Ignora o alerta."""
         self.status = self.Status.DISMISSED
         self.save(update_fields=['status'])
+
+
+# Novos modelos CRM e Marketing (conforme patch)
+class Campaign(models.Model):
+    """Marketing: campanhas de email/SMS segmentadas por tenant."""
+    CHANNELS = (("email","Email"),("sms","SMS"))
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="campaigns")
+    name = models.CharField(max_length=150)
+    channel = models.CharField(max_length=16, choices=CHANNELS)
+    segment_query = models.JSONField(default=dict, help_text="Ex: {status:'active', lifecycle_stage:'lead'}")
+    subject = models.CharField(max_length=200, blank=True)
+    content = models.TextField(help_text="Template Jinja/Django para envio.")
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_channel_display()}) - {self.organization.name}"
+
+
+class MessageLog(models.Model):
+    """Histórico de envios (auditoria/RGPD)."""
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="logs")
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="message_logs")
+    channel = models.CharField(max_length=16)
+    status = models.CharField(max_length=32, default="queued")  # queued|sent|failed|opened|clicked|unsubscribed
+    provider_message_id = models.CharField(max_length=128, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    clicked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.campaign.name} -> {self.person.full_name} ({self.status})"
+

@@ -6,7 +6,7 @@
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:dashboard' %}">Dashboard</a></li>
         <li class="breadcrumb-item active">Clientes</li>
     </ol>
 </nav>
@@ -19,7 +19,7 @@
         <p class="text-muted">Gestão de clientes do ginásio</p>
     </div>
     <div class="col-md-4 text-end">
-        <a href="{% url 'client_create' %}" class="btn btn-primary">
+        <a href="{% url 'core:client_create' %}" class="btn btn-primary">
             <i class="bi bi-person-plus me-1"></i>Novo Cliente
         </a>
     </div>
@@ -49,7 +49,7 @@
                 <button type="submit" class="btn btn-outline-primary me-2">
                     <i class="bi bi-search"></i>
                 </button>
-                <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">
+                <a href="{% url 'core:client_list' %}" class="btn btn-outline-secondary">
                     <i class="bi bi-x-circle"></i>
                 </a>
             </div>
@@ -134,11 +134,11 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'client_detail' client.pk %}"
+                                    <a href="{% url 'core:client_detail' client.pk %}"
                                        class="btn btn-outline-primary btn-sm" title="Ver detalhes">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <a href="{% url 'client_edit' client.pk %}"
+                                    <a href="{% url 'core:client_edit' client.pk %}"
                                        class="btn btn-outline-secondary btn-sm" title="Editar">
                                         <i class="bi bi-pencil"></i>
                                     </a>
@@ -170,8 +170,8 @@
                                 <p class="card-text small text-muted">{{ client.email }}</p>
                             {% endif %}
                             <div class="d-flex justify-content-center gap-1">
-                                <a href="{% url 'client_detail' client.pk %}" class="btn btn-sm btn-primary">Ver</a>
-                                <a href="{% url 'client_edit' client.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                                <a href="{% url 'core:client_detail' client.pk %}" class="btn btn-sm btn-primary">Ver</a>
+                                <a href="{% url 'core:client_edit' client.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
                             </div>
                         </div>
                     </div>
@@ -189,7 +189,7 @@
                         Comece por adicionar o seu primeiro cliente.
                     {% endif %}
                 </p>
-                <a href="{% url 'client_create' %}" class="btn btn-primary">
+                <a href="{% url 'core:client_create' %}" class="btn btn-primary">
                     <i class="bi bi-person-plus me-1"></i>Novo Cliente
                 </a>
             </div>

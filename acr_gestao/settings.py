@@ -25,6 +25,15 @@ for host in ALLOWED_HOSTS:
         scheme = "https" if not DEBUG else "http"
         CSRF_TRUSTED_ORIGINS.append(f"{scheme}://{host}")
 
+# Adicionar explicitamente localhost:8080 para desenvolvimento Docker
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS.extend([
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost",
+        "http://127.0.0.1"
+    ])
+
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 

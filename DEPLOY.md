@@ -130,7 +130,29 @@ docker-compose -f docker-compose.base-nginx.yml logs -f
 
 ### 📊 **Configuração Inicial Local**
 
-#### 1. Criar dados básicos de desenvolvimento
+#### **Método Recomendado - Script Automático**
+```bash
+# 1. Copiar script de dados iniciais para o container
+docker cp init_data.py acr_gestao-web-1:/app/init_data.py
+
+# 2. Executar script de inicialização automática
+docker-compose -f docker-compose.prod.local.yml exec web python /app/init_data.py
+
+# O script init_data.py cria automaticamente:
+# ✅ Organização "ACR Gestão - Desenvolvimento Local"
+# ✅ 3 Modalidades: Musculação, Cardio, Pilates (com cores e durações)
+# ✅ 3 Recursos: Sala de Musculação, Sala Cardio, Estúdio Pilates
+```
+
+**Ficheiro `init_data.py` incluído no projeto:**
+- Configura automaticamente Django
+- Cria organização localhost
+- Adiciona modalidades básicas com cores personalizadas
+- Configura recursos/espaços para cada modalidade
+- Pronto para usar imediatamente após o deploy
+
+#### **Método Manual (Alternativo)**
+Se preferir criar dados manualmente:
 ```bash
 # Executar dentro do container Django
 docker-compose -f docker-compose.base-nginx.yml exec web python manage.py shell << 'EOF'
