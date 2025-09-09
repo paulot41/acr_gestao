@@ -70,3 +70,5 @@ htmlcov/
 # Testing
 .pytest_cache/
 .tox/
+__pycache__/
+*.pyc
