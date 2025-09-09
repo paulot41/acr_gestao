@@ -1,0 +1,24 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Sem Organização{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                    <h4>Organização Não Encontrada</h4>
+                    <p class="text-muted">
+                        O seu utilizador não está associado a nenhuma organização ou a organização não foi encontrada.
+                    </p>
+                    <a href="/admin/" class="btn btn-primary">
+                        <i class="fas fa-cogs"></i> Ir para Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

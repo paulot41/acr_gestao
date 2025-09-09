@@ -1,0 +1,71 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Instrutores - {{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-chalkboard-teacher"></i> Instrutores - {{ organization.name }}</h1>
+        <div>
+            <a href="{% url 'core:admin_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+            </a>
+            <a href="/admin/core/instructor/add/" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Adicionar Instrutor
+            </a>
+        </div>
+    </div>
+
+    <!-- Lista de Instrutores -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-list"></i> Lista de Instrutores</h5>
+        </div>
+        <div class="card-body">
+            {% if instructors %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th>Telefone</th>
+                            <th>Status</th>
+                            <th>Afiliação</th>
+                            <th>Eventos Total</th>
+                            <th>Eventos Este Mês</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for instructor in instructors %}
+                        <tr>
+                            <td>{{ instructor.full_name }}</td>
+                            <td>{{ instructor.email|default:"-" }}</td>
+                            <td>{{ instructor.phone|default:"-" }}</td>
+                            <td>
+                                <span class="badge badge-{{ instructor.is_active|yesno:'success,warning' }}">
+                                    {{ instructor.is_active|yesno:'Ativo,Inativo' }}
+                                </span>
+                            </td>
+                            <td>{{ instructor.get_entity_affiliation_display|default:"-" }}</td>
+                            <td>{{ instructor.total_events }}</td>
+                            <td>{{ instructor.events_this_month }}</td>
+                            <td>
+                                <a href="/admin/core/instructor/{{ instructor.pk }}/change/" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum instrutor encontrado.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

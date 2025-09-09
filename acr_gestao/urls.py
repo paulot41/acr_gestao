@@ -1,5 +1,5 @@
 # Adds DRF router with org-scoped endpoints under /api/.
-# Usa apenas o custom admin site, não o Django admin padrão.
+# Dashboard como página inicial com navegação completa.
 
 from django.contrib import admin
 from django.urls import path, include
@@ -14,10 +14,10 @@ urlpatterns = [
     # Health check (manter para monitorização)
     path('health/', health),
 
-    # Django Admin padrão (necessário para resolver namespace 'admin')
-    path('django-admin/', admin.site.urls),
+    # Django Admin padrão
+    path('admin/', admin.site.urls),
 
-    # Tudo através do core (inclui custom admin e todas as funcionalidades)
+    # Dashboard como página inicial e todas as funcionalidades através do core
     path('', include('core.urls')),
 ]
 

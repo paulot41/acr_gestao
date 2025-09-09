@@ -6,11 +6,11 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Sum
+from django.db.models import Sum, Count, Q
 from datetime import timedelta
 from .models import (
     Person, Instructor, Event, Booking, ClientSubscription,
-    SystemAlert, UserProfile
+    SystemAlert, UserProfile, Modality, Resource, Payment, InstructorCommission
 )
 from .services.alerts import AlertService, CreditHistoryService
 
@@ -19,6 +19,102 @@ from .services.alerts import AlertService, CreditHistoryService
 def dashboard_router(request):
     """Dashboard unificado: redireciona para o Gantt para consulta/marcação de aulas."""
     return redirect('core:gantt')
+
+
+@login_required
+def admin_dashboard(request):
+    """Dashboard de leitura amigável dos dados do admin"""
+    org = getattr(request, 'organization', None)
+
+    if not org:
+        return render(request, 'core/dashboard/no_org.html')
+
+    today = timezone.now().date()
+
+    # Estatísticas gerais - usando campos corretos
+    stats = {
+        'total_clients': Person.objects.filter(organization=org).count(),
+        'active_clients': Person.objects.filter(organization=org, status='active').count(),
+        'total_instructors': Instructor.objects.filter(organization=org).count(),
+        'active_instructors': Instructor.objects.filter(organization=org, is_active=True).count(),
+        'total_modalities': Modality.objects.filter(organization=org).count(),
+        'active_modalities': Modality.objects.filter(organization=org, is_active=True).count(),
+    }
+
+    # Eventos de hoje e próximos - usando campos corretos
+    events_today = Event.objects.filter(
+        organization=org,
+        starts_at__date=today
+    ).select_related('instructor', 'modality').order_by('starts_at')
+
+    upcoming_events = Event.objects.filter(
+        organization=org,
+        starts_at__date__gt=today,
+        starts_at__date__lte=today + timedelta(days=7)
+    ).select_related('instructor', 'modality').order_by('starts_at')[:10]
+
+    # Reservas recentes - usando relacionamento correto
+    recent_bookings = Booking.objects.filter(
+        event__organization=org
+    ).select_related('event', 'person').order_by('-created_at')[:10]
+
+    # Clientes com poucos créditos - usando relacionamento 'subscriptions'
+    low_credits = Person.objects.filter(
+        organization=org,
+        status='active'
+    ).annotate(
+        total_credits=Sum('subscriptions__remaining_credits')
+    ).filter(total_credits__lt=5).order_by('total_credits')[:10]
+
+    context = {
+        'organization': org,
+        'stats': stats,
+        'events_today': events_today,
+        'upcoming_events': upcoming_events,
+        'recent_bookings': recent_bookings,
+        'low_credits': low_credits,
+    }
+
+    return render(request, 'core/dashboard/admin_dashboard.html', context)
+
+
+@login_required
+def clients_overview(request):
+    """Vista de leitura dos clientes"""
+    org = getattr(request, 'organization', None)
+    if not org:
+        return render(request, 'core/dashboard/no_org.html')
+
+    clients = Person.objects.filter(organization=org).order_by('first_name', 'last_name')
+
+    context = {
+        'organization': org,
+        'clients': clients,
+        'total_clients': clients.count(),
+        'active_clients': clients.filter(status='active').count(),
+    }
+
+    return render(request, 'core/dashboard/clients_overview.html', context)
+
+
+@login_required
+def instructors_overview(request):
+    """Vista de leitura dos instrutores"""
+    org = getattr(request, 'organization', None)
+    if not org:
+        return render(request, 'core/dashboard/no_org.html')
+
+    instructors = Instructor.objects.filter(organization=org).annotate(
+        total_events=Count('event'),
+        events_this_month=Count('event', filter=Q(event__starts_at__month=timezone.now().month))
+    ).order_by('first_name', 'last_name')
+
+    context = {
+        'organization': org,
+        'instructors': instructors,
+    }
+
+    return render(request, 'core/dashboard/instructors_overview.html', context)
 
 
 @login_required

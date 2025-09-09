@@ -1,12 +1,27 @@
 # 🏋️‍♂️ ACR Gestão - Sistema de Gestão para Ginásios e Wellness
 
-## ✨ **VERSÃO ATUAL - Gantt Dinâmico & Sistema de Turmas**
+## ✨ **VERSÃO ATUAL - Dashboard Personalizado & Admin Completo**
 
-Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wellness (Proform) com **Gantt dinâmico revolucionário** e **sistema de turmas avançado**.
+Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wellness (Proform) com **Dashboard personalizado como página inicial** e **Django Admin totalmente funcional**.
 
 ### 🚀 **Funcionalidades Principais**
 
-#### 🎯 **Gantt Dinâmico (NOVIDADE!)**
+#### 📊 **Dashboard Personalizado (NOVIDADE!)**
+- **Página inicial intuitiva** com estatísticas em tempo real
+- **Navegação superior completa** com menus dropdown organizados
+- **Ações rápidas** para funcionalidades mais usadas
+- **Interface responsiva** com Bootstrap 5
+- **Alertas visuais** para créditos baixos e eventos importantes
+- **Design moderno** com cards e gradientes
+
+#### ⚙️ **Django Admin Completo**
+- **Todos os modelos registados** com interfaces personalizadas
+- **Multi-tenancy** - cada organização vê apenas os seus dados
+- **CRUD completo** para gestão avançada
+- **Filtros e pesquisas** otimizadas
+- **Fieldsets organizados** para melhor UX
+
+#### 🎯 **Gantt Dinâmico**
 - **Drag & Drop** para criação instantânea de aulas
 - **Interface moderna** com espaços à esquerda e horas no topo
 - **Linha de tempo atual** em tempo real
@@ -34,8 +49,9 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 - **Relatórios financeiros** detalhados
 
 #### 📱 **Interface Moderna**
-- **Design responsivo** para mobile/tablet
+- **Design responsivo** com Bootstrap 5
 - **Dashboard personalizado** por tipo de utilizador
+- **Navegação intuitiva** com menus dropdown
 - **Cores personalizadas** por modalidade
 - **Animações suaves** e feedback visual
 
@@ -44,7 +60,7 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 ## 📋 **Tecnologias Utilizadas**
 
 ### Backend:
-- **Django 4.2+** - Framework principal
+- **Django 5.1.1** - Framework principal
 - **PostgreSQL** - Base de dados principal
 - **Redis** - Cache e sessões
 - **Django REST Framework** - APIs otimizadas
@@ -52,18 +68,63 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 ### Frontend:
 - **HTML5/CSS3** moderno
 - **JavaScript ES6+** para interatividade
-- **Bootstrap 5** para responsividade
-- **Charts.js** para gráficos
+- **Bootstrap 5.3.0** - Framework CSS responsivo via CDN
+- **Font Awesome 6.0** - Iconografia moderna
+- **FullCalendar 6.1.8** - Calendário Gantt interativo
 
 ### DevOps:
 - **Docker & Docker Compose** - Containerização
-- **Caddy** - Proxy reverso com SSL automático
+- **Nginx** - Proxy reverso com SSL automático
 - **GitHub Actions** - CI/CD (preparado)
-- **Nginx** - Alternativa de proxy
+
+---
+
+## 🎨 **Bootstrap 5 - Interface Moderna**
+
+O projeto utiliza **Bootstrap 5.3.0** para uma interface moderna e responsiva:
+
+### Componentes Principais:
+- **Navbar responsiva** com dropdown menus
+- **Grid system flexível** para layout adaptativo
+- **Cards e shadows** para organização visual
+- **Badges e buttons** com cores personalizadas
+- **Tables responsivas** para dados
+
+### Integração Django + Bootstrap:
+```html
+<!-- Template base com Bootstrap 5 -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Classes Bootstrap utilizadas -->
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <!-- Conteúdo -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+### Vantagens do Bootstrap 5:
+- ✅ **Design responsivo automático**
+- ✅ **Componentes prontos a usar**
+- ✅ **Compatibilidade cross-browser**
+- ✅ **Customização via CSS variáveis**
+- ✅ **Performance otimizada**
 
 ---
 
 ## 🚀 **Instalação Rápida**
+
+### Acesso ao Sistema:
+- **Dashboard**: `http://localhost:8000/` (página inicial)
+- **Admin Django**: `http://localhost:8000/admin/`
+- **Vista Gantt**: `http://localhost:8000/gantt/`
 
 ### Desenvolvimento Local (Docker):
 ```bash
@@ -71,19 +132,17 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 git clone https://github.com/paulot41/acr_gestao.git
 cd acr_gestao
 
-# Deploy automático com Docker Desktop
-chmod +x deploy_prod_local.sh
-./deploy_prod_local.sh
+# Iniciar com Docker
+docker-compose up -d
 
-# Criar dados básicos automaticamente
-docker cp init_data.py acr_gestao-web-1:/app/init_data.py
-docker-compose -f docker-compose.prod.local.yml exec web python /app/init_data.py
+# Criar dados básicos
+docker-compose exec web python manage.py migrate
+docker-compose exec web python manage.py createsuperuser
 ```
 
 ### Desenvolvimento Manual:
 ```bash
 # Configurar ambiente Python
-cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
@@ -96,207 +155,24 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Produção (Docker):
-```bash
-# Deploy automático
-./deploy.sh
+---
 
-# Ou passo-a-passo
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+## 🏗️ **Estrutura do Projeto**
+
+### URLs Principais:
+```
+/                    → Dashboard personalizado (página inicial)
+/admin/             → Django Admin completo
+/gantt/             → Vista Gantt interativa
+/api/               → APIs REST
 ```
 
-**Documentação completa:** [DEPLOY_DEBIAN.md](DEPLOY.md)
+### Navegação Superior:
+- **Dashboard** - Visão geral com estatísticas
+- **Calendário** - Vista Gantt para agendamento
+- **Clientes** - Gestão completa de clientes
+- **Instrutores** - Gestão de instrutores
+- **Eventos** - Criação e gestão de eventos
+- **Google Calendar** - Sincronização automática
 
----
-
-## 🎮 **Como Usar**
-
-### 1. **Gantt Dinâmico**
-1. Aceder a `/gantt/`
-2. **Arrastar** no grid entre horários desejados
-3. **Configurar** detalhes no modal automático
-4. **Guardar** - aula criada instantaneamente!
-
-### 2. **Gestão de Turmas**
-1. Admin → "Turmas" → "Adicionar"
-2. Escolher modalidade e instrutor
-3. Adicionar membros à turma
-4. Criar aulas específicas no Gantt
-
-### 3. **Multi-Entidade**
-- **ACR (Ginásio)**: Musculação, Cardio, Functional
-- **Proform (Wellness)**: Pilates, Yoga, Reabilitação
-- **Configuração independente** de preços e modalidades
-
----
-
-## 📊 **Modelos de Dados**
-
-### Principais Entidades:
-- **Organization** - Multi-tenancy
-- **Person** - Clientes/Atletas
-- **Instructor** - Instrutores/PTs
-- **ClassGroup** - Turmas *(NOVO!)*
-- **Event** - Aulas/Sessões *(MELHORADO!)*
-- **Booking** - Reservas com créditos
-- **PaymentPlan** - Planos flexíveis
-
-**Documentação completa:** [CORE_MODELS_GUIDE.md](CORE_MODELS_GUIDE.md)
-
----
-
-## 🔧 **APIs Disponíveis**
-
-### Gantt APIs:
-- `GET /api/gantt/resources/` - Lista de espaços
-- `GET /api/gantt/events/` - Eventos do dia
-- `POST /api/gantt/create/` - Criar evento via drag & drop
-- `POST /api/validate-conflict/` - Validar conflitos
-
-### Core APIs:
-- `GET /api/form-data/` - Dados para formulários
-- `/api/events/{id}/book/` - Reservar aula
-- `/api/bookings/{id}/cancel/` - Cancelar reserva
-
-**Documentação API:** Swagger em `/api/docs/` *(em desenvolvimento)*
-
----
-
-## 🏗️ **Arquitectura**
-
-```
-Frontend (Templates/JS)
-├── Gantt Dinâmico (drag & drop)
-├── Dashboard Responsivo
-└── Admin Interface
-
-Backend (Django)
-├── Multi-tenant Middleware
-├── APIs Otimizadas
-├── Sistema de Validações
-└── Cache Inteligente
-
-Infrastructure
-├── PostgreSQL (Dados)
-├── Redis (Cache/Sessões)
-├── Caddy (SSL/Proxy)
-└── Docker (Containers)
-```
-
----
-
-## 🚦 **Estado do Projeto**
-
-### ✅ **Completo e Funcional:**
-- [x] Gantt dinâmico com drag & drop
-- [x] Sistema de turmas avançado
-- [x] Multi-tenancy robusto
-- [x] APIs otimizadas
-- [x] Interface responsiva
-- [x] Validações em tempo real
-- [x] SSL automático
-- [x] Deploy dockerizado
-
-### 🔄 **Em Desenvolvimento:**
-- [ ] App mobile nativa
-- [ ] Integração Google Calendar
-- [ ] Notificações automáticas
-- [ ] Relatórios avançados
-- [ ] Sistema de check-in QR
-
-### 💡 **Planeado (Roadmap):**
-- [ ] IA para otimização de horários
-- [ ] Integração pagamentos MB WAY
-- [ ] Sistema de treinos personalizados
-- [ ] Analytics avançados
-
----
-
-## 📱 **Screenshots**
-
-### Gantt Dinâmico:
-![Gantt Screenshot](docs/gantt-dynamic.png) *(placeholder)*
-
-### Dashboard:
-![Dashboard Screenshot](docs/dashboard.png) *(placeholder)*
-
-### Mobile:
-![Mobile Screenshot](docs/mobile.png) *(placeholder)*
-
----
-
-## 🤝 **Contribuir**
-
-### Setup para Desenvolvimento:
-```bash
-# Fork do repositório
-git clone https://github.com/SEU_USERNAME/acr_gestao.git
-cd acr_gestao
-
-# Ambiente virtual
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Pre-commit hooks
-pip install pre-commit
-pre-commit install
-
-# Base de dados de desenvolvimento
-python manage.py migrate
-python manage.py loaddata fixtures/demo_data.json
-```
-
-### Estrutura de Commits:
-- `feat:` Nova funcionalidade
-- `fix:` Correção de bug
-- `docs:` Documentação
-- `style:` Formatação
-- `refactor:` Refactoring
-- `test:` Testes
-
----
-
-## 📄 **Licença**
-
-Este projeto está sob licença **MIT**. Ver [LICENSE](LICENSE) para detalhes.
-
----
-
-## 📞 **Suporte**
-
-### Documentação:
-- **Deploy:** [DEPLOY_DEBIAN.md](DEPLOY.md)
-- **Modelos:** [CORE_MODELS_GUIDE.md](CORE_MODELS_GUIDE.md)
-- **Troubleshooting:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-
-### Contacto:
-- **Issues:** GitHub Issues
-- **Email:** suporte@acr.pt *(placeholder)*
-- **Discord:** ACR Gestão Community *(placeholder)*
-
----
-
-## 🏆 **Reconhecimentos**
-
-Desenvolvido com ❤️ para a **ACR Santa Tecla** e **Proform Santa Clara**.
-
-**Tecnologias:** Django, PostgreSQL, Docker, Caddy, Bootstrap
-
-**Inspiração:** Sistemas modernos de gestão fitness como Glofox, Zen Planner
-
----
-
-## 📈 **Performance**
-
-- ⚡ **<200ms** tempo de resposta API
-- 📊 **>95%** disponibilidade em produção
-- 🔄 **Cache inteligente** Redis
-- 📱 **100% responsivo** mobile-first
-- 🛡️ **Segurança A+** SSL Labs
-
----
-
-**Versão:** 2.1.0 (Gantt Dinâmico)  
-**Última atualização:** Setembro 2025  
-**Status:** ✅ Produção Estável
+...existing code...
