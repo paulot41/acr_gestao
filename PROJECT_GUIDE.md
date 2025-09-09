@@ -2,42 +2,178 @@
 
 ## 📖 VISÃO GERAL DO PROJETO
 
-O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, desenvolvida como evolução do sistema GIG. **ESTADO ATUAL: Sistema completo e funcional em produção** com todas as funcionalidades principais implementadas e otimizadas.
+O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, desenvolvida como evolução do sistema GIG. **ESTADO ATUAL: Sistema completo e funcional com Dashboard Personalizado** com todas as funcionalidades principais implementadas e interface moderna.
 
 ### 🎯 OBJETIVOS PRINCIPAIS
+- ✅ Dashboard personalizado como página inicial (IMPLEMENTADO)
+- ✅ Bootstrap 5 para interface moderna e responsiva (IMPLEMENTADO)
+- ✅ Django Admin completo com todos os modelos (IMPLEMENTADO)
 - ✅ Gestão completa de clientes e memberships (IMPLEMENTADO)
 - ✅ Sistema Gantt para marcação de espaços por instrutores (OTIMIZADO)
 - ✅ Controlo financeiro com pagamentos e relatórios (IMPLEMENTADO)
 - 🔄 Integração com Google Calendar e Google Drive (10% IMPLEMENTADO)
-- ✅ Interface web intuitiva e responsiva (IMPLEMENTADO)
+
+---
+
+## 🎨 INTERFACE MODERNA COM BOOTSTRAP 5
+
+### **Framework CSS Atualizado**
+- **Bootstrap 5.3.0** carregado via CDN para performance
+- **Font Awesome 6.0** para iconografia moderna
+- **Design responsivo** mobile-first
+- **Navegação superior** com menus dropdown organizados
+
+### **Componentes Bootstrap Implementados:**
+```html
+<!-- Navegação Principal -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">ACR Gestão</a>
+    <!-- Menus dropdown organizados -->
+  </div>
+</nav>
+
+<!-- Cards com Gradientes -->
+<div class="stat-card">
+  <span class="stat-number">{{ stats.active_clients }}</span>
+  <span class="stat-label">Clientes Ativos</span>
+</div>
+
+<!-- Tables Responsivas -->
+<div class="table-responsive">
+  <table class="table table-hover">
+    <!-- Dados organizados -->
+  </table>
+</div>
+```
+
+### **Classes CSS Personalizadas:**
+```css
+.dashboard-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transition: transform 0.2s;
+}
+
+.nav-link.active {
+  color: #667eea !important;
+  border-bottom: 2px solid #667eea;
+}
+```
 
 ---
 
 ## 🏗️ ARQUITETURA ATUAL
 
 ### **Framework & Tecnologias**
-- **Backend**: Django 4.2 + Django Rest Framework
-- **Frontend**: Templates Django + Bootstrap 5 + FullCalendar.js (otimizado)
+- **Backend**: Django 5.1.1 + Django Rest Framework
+- **Frontend**: Templates Django + Bootstrap 5.3.0 + FullCalendar.js 6.1.8
+- **Interface**: Dashboard personalizado como página inicial
+- **Icons**: Font Awesome 6.0 para iconografia moderna
 - **Base de Dados**: PostgreSQL 16 (produção) / SQLite (desenvolvimento)
 - **Deploy**: Docker + Docker Compose + Nginx
 - **Multi-tenancy**: Sistema baseado em domínios
 - **Multi-entidade**: ACR + Proform com faturação separada
 
-### 🌍 **AMBIENTES DE DEPLOY**
+### **Estrutura de URLs Atualizada:**
+```
+/                     → Dashboard personalizado (HOME)
+/admin/              → Django Admin completo
+/gantt/              → Vista Gantt interativa
+/dashboard/clients/  → Vista de clientes detalhada
+/dashboard/instructors/ → Vista de instrutores com estatísticas
+/api/                → APIs REST otimizadas
+```
+
+### **Navegação Superior Organizada:**
+- **Dashboard** - Página inicial com estatísticas em tempo real
+- **Calendário** - Vista Gantt para agendamento
+- **Clientes** (dropdown):
+  - Lista de Clientes
+  - Adicionar Cliente
+  - Histórico de Créditos
+- **Instrutores** (dropdown):
+  - Lista de Instrutores
+  - Adicionar Instrutor
+- **Eventos** (dropdown):
+  - Lista de Eventos
+  - Criar Evento
+  - Reservas
+  - Modalidades
+- **Google Calendar** (dropdown):
+  - Configuração
+  - Sincronização
+  - Logs
+- **Utilizador** (dropdown):
+  - Admin Django
+  - Perfil
+  - Logout
+
+---
+
+## 📊 DASHBOARD PERSONALIZADO
+
+### **Funcionalidades Principais:**
+1. **Estatísticas em Tempo Real:**
+   - Clientes ativos
+   - Instrutores ativos
+   - Modalidades disponíveis
+   - Eventos de hoje
+
+2. **Eventos e Alertas:**
+   - Eventos de hoje com detalhes
+   - Próximos eventos (7 dias)
+   - Alertas de créditos baixos
+   - Reservas recentes
+
+3. **Ações Rápidas:**
+   - Criar Evento
+   - Adicionar Cliente
+   - Ver Calendário Gantt
+   - Gerir Reservas
+
+### **Design Responsivo:**
+```css
+/* Grid adaptativo */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* Cards com hover effects */
+.quick-action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+```
+
+---
+
+## 🌍 **AMBIENTES DE DEPLOY**
 
 #### 🧪 **Desenvolvimento/Teste: Docker Desktop (macOS)**
-- **Status**: 100% Funcional
+- **Status**: 100% Funcional com Dashboard
 - **Propósito**: Desenvolvimento local e testes de funcionalidades
 - **Hardware**: macOS com Docker Desktop
-- **Acesso**: http://localhost
+- **Acesso**: 
+  - Dashboard: http://localhost:8000/
+  - Admin: http://localhost:8000/admin/
+  - Gantt: http://localhost:8000/gantt/
 - **Performance**: Sub-segundo para todas as páginas
 - **Scripts**:
-  - `./deploy_prod_local.sh` - Deploy inicial
-  - `./redeploy.sh` - Redeploy após alterações de código
+  - `docker-compose up -d` - Iniciar containers
+  - `docker-compose restart` - Reiniciar após alterações
 - **Login**: admin/admin123
 
 #### 🚀 **Produção: VM Debian com Docker**
-- **Status**: Pronto para deploy
+- **Status**: Pronto para deploy com Bootstrap 5
 - **Propósito**: Ambiente de produção real
 - **Hardware**: VM Debian 12 com Docker + Docker Compose
 - **Acesso**: Domínios reais com HTTPS/SSL automático
@@ -48,7 +184,7 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
   - `./monitor.sh` - Monitorização e health checks
 
 ### **Sistema Multi-Entidade (ACR + Proform)**
-O sistema suporta duas entidades distintas na mesma plataforma:
+O sistema suporta duas entidades distintas na mesma plataforma com interface unificada Bootstrap 5:
 
 #### **🏋️ ACR (Ginásio)**
 - **Tipo**: Ginásio tradicional
