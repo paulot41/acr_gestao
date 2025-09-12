@@ -39,6 +39,14 @@ urlpatterns = [
     path('instructors/', web_views.instructor_list, name='instructor_list'),
     path('instructors/add/', web_views.instructor_add, name='instructor_add'),
 
+    # Eventos
+    path('events/', web_views.event_list, name='event_list'),
+    path('events/add/', web_views.event_add, name='event_add'),
+
+    # Reservas
+    path('bookings/', web_views.booking_list, name='booking_list'),
+    path('bookings/add/', web_views.booking_add, name='booking_add'),
+
     # Gantt
     path('gantt/', views.gantt_view, name='gantt'),
     path('gantt/data/', views.gantt_data, name='gantt_data'),

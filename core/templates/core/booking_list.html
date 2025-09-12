@@ -1,0 +1,48 @@
+{% extends 'core/base.html' %}
+{% block title %}Reservas - ACR Gestão{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>Reservas</h1>
+  <a href="{% url 'core:booking_add' %}" class="btn btn-primary">Nova Reserva</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Evento</th>
+      <th>Cliente</th>
+      <th>Estado</th>
+      <th>Criada em</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for booking in bookings %}
+    <tr>
+      <td>{{ booking.event.title }} - {{ booking.event.starts_at|date:'d/m/Y H:i' }}</td>
+      <td>{{ booking.person.full_name }}</td>
+      <td>{{ booking.status }}</td>
+      <td>{{ booking.created_at|date:'d/m/Y H:i' }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="4" class="text-center">Nenhuma reserva encontrada.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<nav>
+  <ul class="pagination">
+    {% if bookings.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ bookings.previous_page_number }}">Anterior</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Página {{ bookings.number }} de {{ bookings.paginator.num_pages }}</span></li>
+    {% if bookings.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ bookings.next_page_number }}">Próxima</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endblock %}

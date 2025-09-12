@@ -1,0 +1,23 @@
+{% extends 'core/base.html' %}
+{% block title %}Nova Reserva - ACR Gestão{% endblock %}
+
+{% block content %}
+<h1>Nova Reserva</h1>
+<form method="post">
+  {% csrf_token %}
+  <div class="mb-3">
+    {{ form.event.label_tag }}
+    {{ form.event }}
+  </div>
+  <div class="mb-3">
+    {{ form.person.label_tag }}
+    {{ form.person }}
+  </div>
+  <div class="mb-3">
+    {{ form.status.label_tag }}
+    {{ form.status }}
+  </div>
+  <button type="submit" class="btn btn-primary">Salvar</button>
+  <a href="{% url 'core:booking_list' %}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

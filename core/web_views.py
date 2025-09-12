@@ -7,8 +7,8 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 
-from .models import Person, Instructor, Modality, Event, Resource, Payment
-from .forms import PersonForm, InstructorForm, ModalityForm, EventForm
+from .models import Person, Instructor, Modality, Event, Resource, Payment, Booking
+from .forms import PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm
 
 
 @role_required(["admin", "staff"])
@@ -601,6 +601,38 @@ def event_delete(request, pk):
     return render(request, 'core/event_confirm_delete.html', {
         'event': event
     })
+
+
+@role_required(["admin", "staff"])
+def booking_list(request):
+    """Listagem de reservas."""
+    org = request.organization
+    bookings = Booking.objects.filter(organization=org).select_related("event", "person").order_by('-created_at')
+
+    paginator = Paginator(bookings, 20)
+    page_number = request.GET.get('page')
+    bookings = paginator.get_page(page_number)
+
+    return render(request, 'core/booking_list.html', {'bookings': bookings})
+
+
+@role_required(["admin", "staff"])
+def booking_add(request):
+    """Adicionar nova reserva."""
+    org = request.organization
+
+    if request.method == 'POST':
+        form = BookingForm(request.POST, organization=org)
+        if form.is_valid():
+            booking = form.save(commit=False)
+            booking.organization = org
+            booking.save()
+            messages.success(request, 'Reserva criada com sucesso!')
+            return redirect('core:booking_list')
+    else:
+        form = BookingForm(organization=org)
+
+    return render(request, 'core/booking_form.html', {'form': form, 'title': 'Nova Reserva'})
 
 
 @role_required(["admin", "staff"])
