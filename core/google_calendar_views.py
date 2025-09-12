@@ -6,7 +6,7 @@ Configura OAuth2, sincronização e gestão de calendários.
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from .auth_views import role_required
 from django.http import JsonResponse, Http404
 from django.urls import reverse
 from django.utils import timezone
@@ -22,7 +22,7 @@ from .middleware import get_current_organization
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_setup(request):
     """Página de configuração inicial do Google Calendar."""
     try:
@@ -47,7 +47,7 @@ def google_calendar_setup(request):
     return render(request, 'core/google_calendar/setup.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def google_calendar_save_credentials(request):
     """Guardar credenciais OAuth2 do Google."""
@@ -79,7 +79,7 @@ def google_calendar_save_credentials(request):
     return redirect('core:google_calendar_setup')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_oauth_start(request):
     """Iniciar fluxo OAuth2 para autorização Google."""
     try:
@@ -107,7 +107,7 @@ def google_calendar_oauth_start(request):
         return redirect('core:google_calendar_setup')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_oauth_callback(request):
     """Callback OAuth2 - processar autorização do Google."""
     try:
@@ -153,7 +153,7 @@ def google_calendar_oauth_callback(request):
     return redirect('core:google_calendar_setup')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_instructors(request):
     """Página de gestão de calendários dos instrutores."""
     try:
@@ -198,7 +198,7 @@ def google_calendar_instructors(request):
     return render(request, 'core/google_calendar/instructors.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def google_calendar_create_instructor_calendar(request, instructor_id):
     """Criar calendário Google para um instrutor específico."""
@@ -222,7 +222,7 @@ def google_calendar_create_instructor_calendar(request, instructor_id):
     return redirect('core:google_calendar_instructors')
 
 
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def google_calendar_sync_instructor(request, instructor_id):
     """Sincronizar todos os eventos de um instrutor."""
@@ -251,7 +251,7 @@ def google_calendar_sync_instructor(request, instructor_id):
     return redirect('core:google_calendar_instructors')
 
 
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def google_calendar_toggle_instructor_sync(request, instructor_id):
     """Ativar/desativar sincronização para um instrutor."""
@@ -281,7 +281,7 @@ def google_calendar_toggle_instructor_sync(request, instructor_id):
     return redirect('core:google_calendar_instructors')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_sync_logs(request):
     """Página de logs de sincronização."""
     try:
@@ -323,7 +323,7 @@ def google_calendar_sync_logs(request):
     return render(request, 'core/google_calendar/sync_logs.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_api_sync_event(request, event_id):
     """API endpoint para sincronizar evento específico."""
     if request.method != 'POST':
@@ -358,7 +358,7 @@ def google_calendar_api_sync_event(request, event_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def google_calendar_settings(request):
     """Página de configurações avançadas do Google Calendar."""
     try:

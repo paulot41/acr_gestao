@@ -101,6 +101,7 @@
                             <i class="fas fa-calendar-alt"></i> Calendário
                         </a>
                     </li>
+                    {% if request.user_role == 'admin' or request.user_role == 'staff' %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="clientsDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-users"></i> Clientes
@@ -143,6 +144,7 @@
                             <li><a class="dropdown-item" href="{% url 'core:google_calendar_sync_logs' %}"><i class="fas fa-history"></i> Logs de Sync</a></li>
                         </ul>
                     </li>
+                    {% endif %}
                 </ul>
 
                 <ul class="navbar-nav">
@@ -152,8 +154,10 @@
                             <i class="fas fa-user-circle"></i> {{ user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            {% if request.user_role == 'admin' or request.user_role == 'staff' %}
                             <li><a class="dropdown-item" href="/admin/"><i class="fas fa-cogs"></i> Admin</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="{% url 'core:logout' %}"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
                         </ul>
                     </li>

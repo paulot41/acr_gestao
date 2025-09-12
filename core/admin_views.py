@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from .auth_views import role_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
@@ -22,7 +22,7 @@ from .forms import PersonForm, InstructorForm, ModalityForm, EventForm
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def admin_dashboard(request):
     """Interface admin integrada - página principal."""
     org = request.organization
@@ -232,7 +232,7 @@ def _get_settings_data(org):
 
 
 # APIs para operações AJAX
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def admin_create_client(request):
     """Criar cliente via AJAX no admin integrado."""
@@ -267,7 +267,7 @@ def admin_create_client(request):
         }, status=400)
 
 
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def admin_create_instructor(request):
     """Criar instrutor via AJAX no admin integrado."""
@@ -303,7 +303,7 @@ def admin_create_instructor(request):
         }, status=400)
 
 
-@login_required
+@role_required(["admin", "staff"])
 @require_http_methods(["POST"])
 def admin_create_modality(request):
     """Criar modalidade via AJAX no admin integrado."""
@@ -338,13 +338,13 @@ def admin_create_modality(request):
         }, status=400)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def admin_sync_dashboard(request):
     """Redirecionar para dashboard com indicador de sincronização."""
     return redirect('/dashboard/?synced=true')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def admin_bulk_action(request):
     """Ações em lote no admin (eliminar, atualizar status, etc.)."""
     if request.method == 'POST':
@@ -394,7 +394,7 @@ def admin_bulk_action(request):
     return redirect(request.META.get('HTTP_REFERER', '/admin/'))
 
 
-@login_required
+@role_required(["admin", "staff"])
 def admin_events_json(request):
     """API endpoint para eventos do calendário/gantt no admin."""
     org = request.organization

@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from .auth_views import role_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -11,7 +11,7 @@ from .models import Person, Instructor, Modality, Event, Resource, Payment
 from .forms import PersonForm, InstructorForm, ModalityForm, EventForm
 
 
-@login_required
+@role_required(["admin", "staff"])
 def dashboard(request):
     """Dashboard principal moderno com KPIs e gráficos interativos."""
     org = request.organization
@@ -95,7 +95,7 @@ def dashboard(request):
 
 
 # CLIENTES VIEWS
-@login_required
+@role_required(["admin", "staff"])
 def client_list(request):
     """Listagem de clientes com filtros e paginação."""
     org = request.organization
@@ -129,7 +129,7 @@ def client_list(request):
     return render(request, 'core/client_list.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def client_detail(request, pk):
     """Detalhes de um cliente específico."""
     client = get_object_or_404(Person, pk=pk, organization=request.organization)
@@ -144,7 +144,7 @@ def client_detail(request, pk):
     return render(request, 'core/client_detail.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def client_create(request):
     """Criar novo cliente."""
     if request.method == 'POST':
@@ -161,7 +161,7 @@ def client_create(request):
     return render(request, 'core/client_form.html', {'form': form, 'title': 'Novo Cliente'})
 
 
-@login_required
+@role_required(["admin", "staff"])
 def client_edit(request, pk):
     """Editar cliente existente."""
     client = get_object_or_404(Person, pk=pk, organization=request.organization)
@@ -182,7 +182,7 @@ def client_edit(request, pk):
     })
 
 
-@login_required
+@role_required(["admin", "staff"])
 def client_add(request):
     """Adicionar novo cliente."""
     org = request.organization
@@ -206,7 +206,7 @@ def client_add(request):
 
 
 # INSTRUTORES VIEWS
-@login_required
+@role_required(["admin", "staff"])
 def instructor_list(request):
     """Listagem de instrutores."""
     org = request.organization
@@ -224,7 +224,7 @@ def instructor_list(request):
     return render(request, 'core/instructor_list.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def instructor_detail(request, pk):
     """Detalhes de um instrutor específico."""
     instructor = get_object_or_404(Instructor, pk=pk, organization=request.organization)
@@ -250,7 +250,7 @@ def instructor_detail(request, pk):
     return render(request, 'core/instructor_detail.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def instructor_create(request):
     """Criar novo instrutor."""
     if request.method == 'POST':
@@ -267,7 +267,7 @@ def instructor_create(request):
     return render(request, 'core/instructor_form.html', {'form': form, 'title': 'Novo Instrutor'})
 
 
-@login_required
+@role_required(["admin", "staff"])
 def instructor_edit(request, pk):
     """Editar instrutor existente."""
     instructor = get_object_or_404(Instructor, pk=pk, organization=request.organization)
@@ -288,7 +288,7 @@ def instructor_edit(request, pk):
     })
 
 
-@login_required
+@role_required(["admin", "staff"])
 def instructor_add(request):
     """Adicionar novo instrutor."""
     org = request.organization
@@ -312,7 +312,7 @@ def instructor_add(request):
 
 
 # MODALIDADES VIEWS
-@login_required
+@role_required(["admin", "staff"])
 def modality_list(request):
     """Listagem de modalidades."""
     org = request.organization
@@ -322,7 +322,7 @@ def modality_list(request):
     return render(request, 'core/modality_list.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def modality_create(request):
     """Criar nova modalidade."""
     if request.method == 'POST':
@@ -339,7 +339,7 @@ def modality_create(request):
     return render(request, 'core/modality_form.html', {'form': form, 'title': 'Nova Modalidade'})
 
 
-@login_required
+@role_required(["admin", "staff"])
 def modality_edit(request, pk):
     """Editar modalidade existente."""
     modality = get_object_or_404(Modality, pk=pk, organization=request.organization)
@@ -360,7 +360,7 @@ def modality_edit(request, pk):
     })
 
 
-@login_required
+@role_required(["admin", "staff"])
 def modality_add(request):
     """Adicionar nova modalidade."""
     org = request.organization
@@ -384,7 +384,7 @@ def modality_add(request):
 
 
 # GANTT E EVENTOS
-@login_required
+@role_required(["admin", "staff"])
 def gantt_system(request):
     """Vista do Sistema Gantt completo para gestão de espaços."""
     org = request.organization
@@ -412,13 +412,13 @@ def gantt_system(request):
     return render(request, 'core/gantt_system.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def gantt_view(request):
     """Manter compatibilidade com URL antiga, redirecionar para o novo Sistema Gantt."""
     return redirect('gantt_system')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def events_json(request):
     """API endpoint OTIMIZADA para eventos do calendário/gantt."""
     org = request.organization
@@ -506,7 +506,7 @@ def events_json(request):
     return response
 
 
-@login_required
+@role_required(["admin", "staff"])
 def event_create(request):
     """Criar novo evento/aula."""
     if request.method == 'POST':
@@ -525,7 +525,7 @@ def event_create(request):
     return render(request, 'core/event_form.html', {'form': form, 'title': 'Nova Aula'})
 
 
-@login_required
+@role_required(["admin", "staff"])
 def event_list(request):
     """Listagem de eventos/aulas."""
     org = request.organization
@@ -540,7 +540,7 @@ def event_list(request):
     return render(request, 'core/event_list.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def event_edit(request, pk):
     """Editar evento/aula existente."""
     event = get_object_or_404(Event, pk=pk, organization=request.organization)
@@ -563,7 +563,7 @@ def event_edit(request, pk):
     })
 
 
-@login_required
+@role_required(["admin", "staff"])
 def event_add(request):
     """Adicionar novo evento."""
     org = request.organization
@@ -586,7 +586,7 @@ def event_add(request):
     })
 
 
-@login_required
+@role_required(["admin", "staff"])
 def event_delete(request, pk):
     """Eliminar evento."""
     org = request.organization
@@ -603,7 +603,7 @@ def event_delete(request, pk):
     })
 
 
-@login_required
+@role_required(["admin", "staff"])
 def organization_settings(request):
     """Vista para configurações da organização."""
     org = request.organization
@@ -624,7 +624,7 @@ def organization_settings(request):
     return render(request, 'core/settings.html', context)
 
 # Views adicionais para compatibilidade
-@login_required
+@role_required(["admin", "staff"])
 def client_list(request):
     """Lista de clientes."""
     org = request.organization
@@ -660,7 +660,7 @@ def client_list(request):
         'entity': entity
     })
 
-@login_required
+@role_required(["admin", "staff"])
 def instructor_list(request):
     """Lista de instrutores."""
     org = request.organization
@@ -670,7 +670,7 @@ def instructor_list(request):
         'instructors': instructors
     })
 
-@login_required
+@role_required(["admin", "staff"])
 def modality_list(request):
     """Lista de modalidades."""
     org = request.organization
@@ -680,7 +680,7 @@ def modality_list(request):
         'modalities': modalities
     })
 
-@login_required
+@role_required(["admin", "staff"])
 def schedule_view(request):
     """Vista do horário/agenda."""
     org = request.organization
