@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 # Core Django imports (models/validators/timezone)
-from django.db import models
+from django.db import models, DatabaseError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+import logging
 
 # PostgreSQL search functionality
 from django.contrib.postgres.indexes import GinIndex
@@ -13,6 +14,8 @@ from django.contrib.postgres.search import SearchVectorField, SearchVector
 
 # Import validations (safe: service uses lazy model getters; no circular import)
 from .services.scheduling import ensure_no_conflict, ensure_capacity
+
+logger = logging.getLogger(__name__)
 
 
 class Organization(models.Model):
@@ -115,8 +118,8 @@ class Person(models.Model):
         try:
             type(self).objects.filter(pk=self.pk).update(
                 search=SearchVector("first_name", "last_name", "email", "nif", config="portuguese"))
-        except Exception:
-            pass
+        except DatabaseError as e:
+            logger.warning("Falha ao atualizar SearchVector para Person %s: %s", self.pk, e)
 
     @property
     def full_name(self) -> str:

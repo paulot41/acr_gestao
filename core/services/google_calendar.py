@@ -17,6 +17,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.auth.exceptions import RefreshError
 
 from ..models import (
     Organization, Event, Instructor, GoogleCalendarConfig,
@@ -140,7 +141,7 @@ class GoogleCalendarService:
                 self.config.save()
 
                 logger.info(f"Token renovado para {self.organization.name}")
-            except Exception as e:
+            except RefreshError as e:
                 logger.error(f"Erro ao renovar token para {self.organization.name}: {e}")
                 return None
 
@@ -371,7 +372,7 @@ class GoogleCalendarService:
             logger.info(f"Evento eliminado do Google Calendar: {event.title}")
             return True
 
-        except Exception as e:
+        except HttpError as e:
             error_msg = f"Erro ao eliminar evento {event.title}: {e}"
             logger.error(error_msg)
 
@@ -399,7 +400,7 @@ class GoogleCalendarService:
         # Garantir que o calendário existe
         try:
             self.create_instructor_calendar(instructor)
-        except Exception as e:
+        except (ValidationError, HttpError) as e:
             logger.error(f"Erro ao criar calendário para {instructor.full_name}: {e}")
             return stats
 
@@ -418,7 +419,7 @@ class GoogleCalendarService:
                     stats['success'] += 1
                 else:
                     stats['skipped'] += 1
-            except Exception as e:
+            except HttpError as e:
                 logger.error(f"Erro ao sincronizar evento {event.title}: {e}")
                 stats['errors'] += 1
 

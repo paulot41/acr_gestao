@@ -14,12 +14,17 @@ from django.db.models import Q, Count, Prefetch
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
+import logging
+from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 
 from .models import (
     Event, Resource, Modality, Instructor, Person,
     ClassGroup, Booking, Organization
 )
 from .serializers import EventSerializer, ResourceSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class OptimizedGanttAPI:
@@ -267,7 +272,8 @@ class OptimizedGanttAPI:
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
-        except Exception as e:
+        except (ValidationError, IntegrityError) as e:
+            logger.error("Erro ao criar evento: %s", e)
             return JsonResponse({
                 'error': f'Erro interno: {str(e)}'
             }, status=500)

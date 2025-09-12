@@ -12,6 +12,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from googleapiclient.errors import HttpError
 
 from .models import Organization, Instructor, Event, GoogleCalendarConfig, InstructorGoogleCalendar, GoogleCalendarSyncLog
 from .services.google_calendar import get_google_calendar_service
@@ -64,7 +66,7 @@ def google_calendar_save_credentials(request):
         messages.success(request, "Credenciais Google guardadas com sucesso!")
         logger.info(f"Credenciais Google guardadas para {organization.name}")
 
-    except Exception as e:
+    except (ValidationError, IntegrityError) as e:
         messages.error(request, f"Erro ao guardar credenciais: {e}")
         logger.error(f"Erro ao guardar credenciais Google para {organization.name}: {e}")
 
@@ -90,8 +92,8 @@ def google_calendar_oauth_start(request):
     except ValidationError as e:
         messages.error(request, f"Erro na configuração OAuth: {e}")
         return redirect('core:google_calendar_setup')
-    except Exception as e:
-        messages.error(request, f"Erro inesperado: {e}")
+    except HttpError as e:
+        messages.error(request, f"Erro na comunicação com Google: {e}")
         logger.error(f"Erro ao iniciar OAuth para {organization.name}: {e}")
         return redirect('core:google_calendar_setup')
 
@@ -132,7 +134,7 @@ def google_calendar_oauth_callback(request):
         messages.success(request, "Autorização Google Calendar configurada com sucesso!")
         logger.info(f"OAuth Google configurado para {organization.name}")
 
-    except Exception as e:
+    except (ValidationError, HttpError) as e:
         messages.error(request, f"Erro ao completar autorização: {e}")
         logger.error(f"Erro no callback OAuth para {organization.name}: {e}")
 
@@ -195,7 +197,7 @@ def google_calendar_create_instructor_calendar(request, instructor_id):
         messages.success(request, f"Calendário criado para {instructor.full_name}!")
         logger.info(f"Calendário criado para {instructor.full_name}: {calendar_id}")
 
-    except Exception as e:
+    except (ValidationError, HttpError) as e:
         messages.error(request, f"Erro ao criar calendário para {instructor.full_name}: {e}")
         logger.error(f"Erro ao criar calendário para {instructor.full_name}: {e}")
 
@@ -221,7 +223,7 @@ def google_calendar_sync_instructor(request, instructor_id):
         )
         logger.info(f"Sincronização manual completa para {instructor.full_name}: {stats}")
 
-    except Exception as e:
+    except HttpError as e:
         messages.error(request, f"Erro na sincronização para {instructor.full_name}: {e}")
         logger.error(f"Erro na sincronização para {instructor.full_name}: {e}")
 
@@ -248,7 +250,7 @@ def google_calendar_toggle_instructor_sync(request, instructor_id):
         status = "ativada" if config.sync_enabled else "desativada"
         messages.success(request, f"Sincronização {status} para {instructor.full_name}.")
 
-    except Exception as e:
+    except (ValidationError, IntegrityError) as e:
         messages.error(request, f"Erro ao alterar sincronização: {e}")
         logger.error(f"Erro ao alterar sincronização para {instructor.full_name}: {e}")
 
@@ -321,7 +323,7 @@ def google_calendar_api_sync_event(request, event_id):
 
     except Event.DoesNotExist:
         return JsonResponse({'error': 'Evento não encontrado'}, status=404)
-    except Exception as e:
+    except (ValidationError, HttpError) as e:
         logger.error(f"Erro na API de sincronização para evento {event_id}: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 

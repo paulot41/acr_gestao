@@ -8,11 +8,16 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from datetime import timedelta
+import logging
+from django.db import DatabaseError
+from django.core.exceptions import ObjectDoesNotExist
 from .models import (
     Person, Instructor, Event, Booking, ClientSubscription,
     SystemAlert, UserProfile, Modality, Resource, Payment, InstructorCommission
 )
 from .services.alerts import AlertService, CreditHistoryService
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -125,8 +130,8 @@ def dashboard_admin(request):
     # Executar verificações diárias de alertas
     try:
         AlertService.run_daily_checks(org)
-    except Exception:
-        pass  # Não bloquear dashboard se alertas falharem
+    except DatabaseError as e:
+        logger.error("Erro nos checks diários: %s", e)
 
     # Estatísticas básicas para hoje
     today = timezone.now().date()
@@ -163,8 +168,9 @@ def dashboard_admin(request):
             ]
         ).order_by('-created_at')[:5]
 
-    except Exception as e:
+    except DatabaseError as e:
         messages.error(request, f"Erro ao carregar dados: {str(e)}")
+        logger.error("Erro ao carregar dados do dashboard admin: %s", e)
         stats = {'total_clients': 0, 'total_instructors': 0, 'todays_events': 0, 'weekly_revenue': 0}
         upcoming_events = []
         critical_alerts = []
@@ -223,8 +229,9 @@ def dashboard_instructor(request):
 
         return render(request, 'core/dashboard_simple.html', context)
 
-    except Exception as e:
+    except (ObjectDoesNotExist, DatabaseError) as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
+        logger.error("Erro no dashboard do instrutor: %s", e)
         return redirect('core:dashboard')
 
 
@@ -251,7 +258,8 @@ def dashboard_client(request):
         # Resumo básico de créditos
         try:
             credit_summary = CreditHistoryService.get_client_credit_summary(person, org)
-        except Exception:
+        except DatabaseError as e:
+            logger.error("Erro ao obter resumo de créditos: %s", e)
             credit_summary = {'total_credits': 0}
 
         # Subscrições ativas
@@ -277,8 +285,9 @@ def dashboard_client(request):
 
         return render(request, 'core/dashboard_simple.html', context)
 
-    except Exception as e:
+    except (ObjectDoesNotExist, DatabaseError) as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
+        logger.error("Erro no dashboard do cliente: %s", e)
         return redirect('core:dashboard')
 
 
@@ -319,8 +328,9 @@ def dashboard_staff(request):
 
         return render(request, 'core/dashboard_simple.html', context)
 
-    except Exception as e:
+    except DatabaseError as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
+        logger.error("Erro no dashboard do staff: %s", e)
         return redirect('core:dashboard')
 
 
@@ -353,7 +363,8 @@ def credit_history_view(request):
         # Resumo de créditos atual
         try:
             credit_summary = CreditHistoryService.get_client_credit_summary(person, org)
-        except Exception:
+        except DatabaseError as e:
+            logger.error("Erro ao obter resumo de créditos: %s", e)
             credit_summary = {'total_credits': 0, 'active_subscriptions': []}
 
         context = {
@@ -365,8 +376,9 @@ def credit_history_view(request):
 
         return render(request, 'core/credit_history.html', context)
 
-    except Exception as e:
+    except (ObjectDoesNotExist, DatabaseError) as e:
         messages.error(request, f"Erro ao carregar histórico: {str(e)}")
+        logger.error("Erro ao carregar histórico de créditos: %s", e)
         return redirect('core:dashboard')
 
 
@@ -394,8 +406,9 @@ def alert_mark_read(request, alert_id):
         else:
             messages.error(request, "Sem permissão para aceder a este alerta.")
 
-    except Exception as e:
+    except DatabaseError as e:
         messages.error(request, f"Erro ao processar alerta: {str(e)}")
+        logger.error("Erro ao processar alerta: %s", e)
 
     return redirect(request.META.get('HTTP_REFERER', 'core:dashboard'))
 
@@ -424,7 +437,8 @@ def alert_dismiss(request, alert_id):
         else:
             messages.error(request, "Sem permissão para aceder a este alerta.")
 
-    except Exception as e:
+    except DatabaseError as e:
         messages.error(request, f"Erro ao processar alerta: {str(e)}")
+        logger.error("Erro ao processar alerta: %s", e)
 
     return redirect(request.META.get('HTTP_REFERER', 'core:dashboard'))

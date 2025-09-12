@@ -10,11 +10,16 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
+import logging
+from django.db import IntegrityError, DatabaseError
+from django.core.exceptions import ValidationError
 from .models import Person, Membership, Product, Event, Booking, Resource, Modality, Instructor, ClassGroup
 from .serializers import (
     PersonSerializer, MembershipSerializer,
     ProductSerializer, EventSerializer, BookingSerializer
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizationMixin:
@@ -255,7 +260,8 @@ def create_event_from_gantt(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
-    except Exception as e:
+    except (ValidationError, IntegrityError) as e:
+        logger.error("Erro ao criar evento: %s", e)
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
 
@@ -342,7 +348,8 @@ def update_event_details(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
-    except Exception as e:
+    except (ValidationError, IntegrityError) as e:
+        logger.error("Erro ao atualizar evento: %s", e)
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
 
@@ -372,7 +379,8 @@ def get_event_details(request, event_id):
 
     except Event.DoesNotExist:
         return JsonResponse({'error': 'Evento não encontrado'}, status=404)
-    except Exception as e:
+    except DatabaseError as e:
+        logger.error("Erro ao obter detalhes do evento: %s", e)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -597,7 +605,8 @@ def validate_event_conflict(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
-    except Exception as e:
+    except DatabaseError as e:
+        logger.error("Erro ao verificar conflitos de evento: %s", e)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -656,7 +665,8 @@ def cancel_booking_api(request, booking_id):
             'message': 'Reserva cancelada com sucesso'
         })
 
-    except Exception as e:
+    except DatabaseError as e:
+        logger.error("Erro ao cancelar reserva: %s", e)
         return JsonResponse({
             'success': False,
             'message': f'Erro ao cancelar reserva: {str(e)}'
