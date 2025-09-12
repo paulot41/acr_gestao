@@ -5,6 +5,7 @@ Implementa OAuth2, sincronização de eventos e gestão de calendários.
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -17,6 +18,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaFileUpload
 from google.auth.exceptions import RefreshError
 
 from ..models import (
@@ -26,10 +28,11 @@ from ..models import (
 
 logger = logging.getLogger(__name__)
 
-# Scopes necessários para Google Calendar
+# Scopes necessários para Google Calendar e Google Drive
 GOOGLE_CALENDAR_SCOPES = [
     'https://www.googleapis.com/auth/calendar',
-    'https://www.googleapis.com/auth/calendar.events'
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/drive.file'
 ]
 
 class GoogleCalendarService:
@@ -158,6 +161,21 @@ class GoogleCalendarService:
 
         self.service = build('calendar', 'v3', credentials=credentials)
         return self.service
+
+    def _parse_datetime(self, data: Dict) -> Optional[datetime]:
+        """Converter informação de data do Google para objeto datetime."""
+        if not data:
+            return None
+        dt_str = data.get('dateTime') or data.get('date')
+        if not dt_str:
+            return None
+        # Google usa 'Z' para UTC; converter para formato ISO reconhecido
+        if dt_str.endswith('Z'):
+            dt_str = dt_str.replace('Z', '+00:00')
+        try:
+            return datetime.fromisoformat(dt_str)
+        except ValueError:
+            return None
 
     def create_instructor_calendar(self, instructor: Instructor) -> str:
         """
@@ -388,23 +406,85 @@ class GoogleCalendarService:
 
             return False
 
+    def sync_events_from_google(self, instructor: Instructor) -> Dict[str, int]:
+        """Importar eventos do Google Calendar para o sistema local."""
+        stats = {'imported': 0, 'errors': 0, 'skipped': 0}
+
+        try:
+            instructor_config = instructor.google_calendar
+        except InstructorGoogleCalendar.DoesNotExist:
+            return stats
+
+        if not instructor_config.google_calendar_id or not instructor_config.sync_enabled:
+            return stats
+
+        service = self._get_service()
+        time_min = timezone.now()
+        time_max = time_min + timedelta(days=30)
+
+        try:
+            events = service.events().list(
+                calendarId=instructor_config.google_calendar_id,
+                timeMin=time_min.isoformat(),
+                timeMax=time_max.isoformat(),
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+        except HttpError as e:
+            logger.error(f"Erro ao obter eventos do Google para {instructor.full_name}: {e}")
+            stats['errors'] += 1
+            return stats
+
+        for item in events.get('items', []):
+            google_event_id = item.get('id')
+            if not google_event_id:
+                stats['skipped'] += 1
+                continue
+
+            local_event = Event.objects.filter(
+                organization=self.organization,
+                instructor=instructor,
+                google_calendar_id=google_event_id
+            ).first()
+
+            if not local_event:
+                stats['skipped'] += 1
+                continue
+
+            try:
+                local_event.title = item.get('summary', local_event.title)
+                start_dt = self._parse_datetime(item.get('start', {}))
+                end_dt = self._parse_datetime(item.get('end', {}))
+                if start_dt and end_dt:
+                    local_event.starts_at = start_dt
+                    local_event.ends_at = end_dt
+                local_event.last_google_sync = timezone.now()
+                local_event.save(update_fields=['title', 'starts_at', 'ends_at', 'last_google_sync'])
+                stats['imported'] += 1
+            except Exception as e:
+                logger.error(f"Erro ao atualizar evento {google_event_id}: {e}")
+                stats['errors'] += 1
+
+        return stats
+
     def sync_all_instructor_events(self, instructor: Instructor) -> Dict[str, int]:
-        """
-        Sincronizar todos os eventos de um instrutor.
+        """Sincronizar eventos entre o sistema e o Google Calendar."""
 
-        Returns:
-            Dict[str, int]: Estatísticas da sincronização
-        """
-        stats = {'success': 0, 'errors': 0, 'skipped': 0}
+        stats = {'success': 0, 'errors': 0, 'skipped': 0, 'imported': 0}
 
-        # Garantir que o calendário existe
+        import_stats = self.sync_events_from_google(instructor)
+        stats['imported'] += import_stats['imported']
+        stats['errors'] += import_stats['errors']
+        stats['skipped'] += import_stats['skipped']
+
+        # Garantir que o calendário existe antes de exportar
         try:
             self.create_instructor_calendar(instructor)
         except (ValidationError, HttpError) as e:
             logger.error(f"Erro ao criar calendário para {instructor.full_name}: {e}")
             return stats
 
-        # Sincronizar eventos futuros (próximos 30 dias)
+        # Sincronizar eventos futuros (próximos 30 dias) para o Google
         future_events = Event.objects.filter(
             instructor=instructor,
             organization=self.organization,
@@ -425,6 +505,30 @@ class GoogleCalendarService:
 
         logger.info(f"Sincronização completa para {instructor.full_name}: {stats}")
         return stats
+
+    def upload_backup_to_drive(self, file_path: str, folder_id: Optional[str] = None) -> str:
+        """Enviar ficheiro de backup para o Google Drive."""
+        if not os.path.exists(file_path):
+            raise ValidationError("Ficheiro de backup não encontrado")
+
+        credentials = self._get_credentials()
+        if not credentials:
+            raise ValidationError("Credenciais Google Calendar não configuradas ou inválidas")
+
+        drive_service = build('drive', 'v3', credentials=credentials)
+
+        metadata = {'name': os.path.basename(file_path)}
+        if folder_id:
+            metadata['parents'] = [folder_id]
+
+        media = MediaFileUpload(file_path, resumable=False)
+        uploaded = drive_service.files().create(
+            body=metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
+
+        return uploaded.get('id')
 
     def _format_event_description(self, event: Event) -> str:
         """Formatar descrição do evento para Google Calendar."""
