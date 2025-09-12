@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+from decimal import Decimal
 import logging
 
 # PostgreSQL search functionality
@@ -125,15 +126,18 @@ class Person(models.Model):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
 
-    def get_monthly_fee(self) -> float:
+    def get_monthly_fee(self) -> Decimal:
         """Calcular mensalidade baseada na afiliação."""
         if self.entity_affiliation == self.EntityAffiliation.ACR_ONLY:
-            return float(self.organization.gym_monthly_fee)
+            return Decimal(self.organization.gym_monthly_fee)
         elif self.entity_affiliation == self.EntityAffiliation.PROFORM_ONLY:
-            return float(self.organization.wellness_monthly_fee)
+            return Decimal(self.organization.wellness_monthly_fee)
         elif self.entity_affiliation == self.EntityAffiliation.BOTH:
-            return float(self.organization.gym_monthly_fee + self.organization.wellness_monthly_fee)
-        return 0.0
+            return (
+                Decimal(self.organization.gym_monthly_fee)
+                + Decimal(self.organization.wellness_monthly_fee)
+            )
+        return Decimal("0.0")
 
 
 class Instructor(models.Model):
