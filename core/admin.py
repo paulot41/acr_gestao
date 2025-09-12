@@ -104,6 +104,26 @@ class PaymentAdmin(OrgScopedAdmin):
     autocomplete_fields = ['person']
 
 
+
+class PriceInline(admin.TabularInline):
+    model = models.Price
+    extra = 1
+    fields = ['amount', 'currency', 'valid_from', 'valid_to']
+
+class ProductAdmin(OrgScopedAdmin):
+    readonly_fields = ['price']
+    inlines = [PriceInline]
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for obj in instances:
+            if isinstance(obj, models.Price) and not obj.organization_id:
+                obj.organization = form.instance.organization
+            obj.save()
+        for obj in formset.deleted_objects:
+            obj.delete()
+        formset.save_m2m()
+
 # Registar modelos no site de administração
 admin_site.register(models.Person, PersonAdmin)
 admin_site.register(models.Instructor, InstructorAdmin)
@@ -121,8 +141,7 @@ admin_site.register(models.ClassGroup)
 admin_site.register(models.InstructorCommission)
 admin_site.register(models.CreditHistory)
 admin_site.register(models.UserProfile)
-admin_site.register(models.Product)
-admin_site.register(models.Price)
+admin_site.register(models.Product, ProductAdmin)
 admin_site.register(models.Membership)
 admin_site.register(models.ClassTemplate)
 admin_site.register(models.GoogleCalendarConfig)
