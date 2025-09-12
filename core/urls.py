@@ -57,6 +57,7 @@ urlpatterns = [
     path('gantt/event/<int:event_id>/details/', views.get_event_details, name='get_event_details'),
 
     # Google Calendar
+    path('google-calendar/', LoginRequiredRedirectView.as_view(pattern_name='core:google_calendar_setup'), name='google_calendar_home'),
     path('google-calendar/setup/', google_calendar_views.google_calendar_setup, name='google_calendar_setup'),
     path('google-calendar/instructors/', google_calendar_views.google_calendar_instructors, name='google_calendar_instructors'),
     path('google-calendar/sync-logs/', google_calendar_views.google_calendar_sync_logs, name='google_calendar_sync_logs'),
