@@ -46,6 +46,9 @@ urlpatterns = [
     # Eventos
     path('events/', web_views.event_list, name='event_list'),
     path('events/add/', web_views.event_add, name='event_add'),
+    path('events/create/', web_views.event_create, name='event_create'),
+    path('events/<int:pk>/edit/', web_views.event_edit, name='event_edit'),
+    path('events/<int:pk>/delete/', web_views.event_delete, name='event_delete'),
 
     # Reservas
     path('bookings/', web_views.booking_list, name='booking_list'),

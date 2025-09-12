@@ -62,7 +62,7 @@
 
         <!-- Botão para acesso ao admin -->
         <div class="mb-3">
-            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-primary me-2">
+            <a href="{% url 'core:admin_dashboard' %}" class="btn btn-outline-primary me-2">
                 <i class="bi bi-gear me-1"></i>Admin Completo
             </a>
             <button onclick="refreshData()" class="btn btn-outline-secondary">
@@ -191,7 +191,7 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Próximas Aulas (24h)</h5>
-                <a href="{% url 'gantt_view' %}" class="btn btn-sm btn-outline-primary">
+                <a href="{% url 'core:gantt' %}" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-calendar-week me-1"></i>Ver Gantt
                 </a>
             </div>
@@ -249,7 +249,7 @@
                     <div class="text-center py-4">
                         <i class="bi bi-calendar-x fs-1 text-muted"></i>
                         <p class="text-muted mt-2">Nenhuma aula agendada para as próximas 24 horas</p>
-                        <a href="{% url 'event_create' %}" class="btn btn-primary">
+                        <a href="{% url 'core:event_add' %}" class="btn btn-primary">
                             <i class="bi bi-plus-circle me-1"></i>Agendar Aula
                         </a>
                     </div>
@@ -266,16 +266,16 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="{% url 'client_create' %}" class="btn btn-outline-primary">
+                    <a href="{% url 'core:client_add' %}" class="btn btn-outline-primary">
                         <i class="bi bi-person-plus me-2"></i>Novo Cliente
                     </a>
-                    <a href="{% url 'event_create' %}" class="btn btn-outline-success">
+                    <a href="{% url 'core:event_add' %}" class="btn btn-outline-success">
                         <i class="bi bi-calendar-plus me-2"></i>Nova Aula
                     </a>
-                    <a href="{% url 'instructor_create' %}" class="btn btn-outline-info">
+                    <a href="{% url 'core:instructor_add' %}" class="btn btn-outline-info">
                         <i class="bi bi-person-badge me-2"></i>Novo Instrutor
                     </a>
-                    <a href="{% url 'modality_create' %}" class="btn btn-outline-warning">
+                    <a href="{% url 'core:modality_add' %}" class="btn btn-outline-warning">
                         <i class="bi bi-star me-2"></i>Nova Modalidade
                     </a>
                 </div>

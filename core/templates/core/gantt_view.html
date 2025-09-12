@@ -55,7 +55,7 @@
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
         <li class="breadcrumb-item active">Vista Gantt</li>
     </ol>
 </nav>
@@ -68,7 +68,7 @@
         <p class="text-muted">Gestão visual dos espaços e aulas</p>
     </div>
     <div class="col-md-4 text-end">
-        <a href="{% url 'event_create' %}" class="btn btn-primary">
+        <a href="{% url 'core:event_create' %}" class="btn btn-primary">
             <i class="bi bi-calendar-plus me-1"></i>Nova Aula
         </a>
     </div>
@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Por agora, redirecionar para o formulário completo
         const params = new URLSearchParams(formData);
-        window.location.href = '{% url "event_create" %}?' + params.toString();
+        window.location.href = '{% url "core:event_create" %}?' + params.toString();
     }
 
     function updateEvent(event) {

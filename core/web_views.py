@@ -529,14 +529,78 @@ def event_create(request):
 def event_list(request):
     """Listagem de eventos/aulas."""
     org = request.organization
-    events = Event.objects.filter(organization=org).order_by('-starts_at')
+
+    # Base queryset
+    events_qs = Event.objects.filter(organization=org).select_related('resource', 'modality', 'instructor').order_by('-starts_at')
+
+    # Filtros (opcional)
+    search = request.GET.get('search') or ''
+    modality_filter = request.GET.get('modality') or ''
+    instructor_filter = request.GET.get('instructor') or ''
+    resource_filter = request.GET.get('resource') or ''
+    period_filter = request.GET.get('period') or 'all'
+
+    if search:
+        events_qs = events_qs.filter(title__icontains=search)
+    if modality_filter:
+        events_qs = events_qs.filter(modality_id=modality_filter)
+    if instructor_filter:
+        events_qs = events_qs.filter(instructor_id=instructor_filter)
+    if resource_filter:
+        events_qs = events_qs.filter(resource_id=resource_filter)
+    if period_filter == 'today':
+        events_qs = events_qs.filter(starts_at__date=timezone.now().date())
+    elif period_filter == 'week':
+        start = timezone.now().date()
+        end = start + timedelta(days=7)
+        events_qs = events_qs.filter(starts_at__date__gte=start, starts_at__date__lte=end)
+    elif period_filter == 'month':
+        start = timezone.now().date().replace(day=1)
+        events_qs = events_qs.filter(starts_at__date__gte=start)
+    elif period_filter == 'upcoming':
+        events_qs = events_qs.filter(starts_at__gte=timezone.now())
 
     # Paginação
-    paginator = Paginator(events, 20)
+    paginator = Paginator(events_qs, 20)
     page_number = request.GET.get('page')
     events = paginator.get_page(page_number)
 
-    context = {'events': events}
+    # Enriquecer eventos com classes de ocupação para o template
+    for ev in events:
+        try:
+            booked = ev.bookings_count if hasattr(ev, 'bookings_count') else ev.bookings.exclude(status="cancelled").count()
+        except Exception:
+            booked = ev.bookings.count()
+        capacity = ev.capacity or 0
+        ratio = (booked / capacity) if capacity else 0
+        if ratio >= 1:
+            ev.occupancy_class = 'bg-danger'
+        elif ratio >= 0.8:
+            ev.occupancy_class = 'bg-warning'
+        else:
+            ev.occupancy_class = 'bg-success'
+
+    # Dados auxiliares para filtros e métricas rápidas
+    modalities = Modality.objects.filter(organization=org).order_by('name')
+    instructors = Instructor.objects.filter(organization=org, is_active=True).order_by('first_name', 'last_name')
+    resources = Resource.objects.filter(organization=org).order_by('name')
+
+    context = {
+        'events': events,
+        'modalities': modalities,
+        'instructors': instructors,
+        'resources': resources,
+        'search': search,
+        'modality_filter': str(modality_filter),
+        'instructor_filter': str(instructor_filter),
+        'resource_filter': str(resource_filter),
+        'period_filter': period_filter,
+        'now': timezone.now(),
+        'total_events': Event.objects.filter(organization=org).count(),
+        'today_events': Event.objects.filter(organization=org, starts_at__date=timezone.now().date()).count(),
+        'upcoming_events_count': Event.objects.filter(organization=org, starts_at__gte=timezone.now()).count(),
+    }
+
     return render(request, 'core/event_list.html', context)
 
 
