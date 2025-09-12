@@ -40,7 +40,10 @@ def test_person_save_updates_search_vector():
     person = Person(organization=org, first_name="John", last_name="Doe", email="john@example.com")
 
     mock_qs = MagicMock()
-    with patch("core.models.SearchVector") as mock_sv, patch.object(Person.objects, "filter", return_value=mock_qs) as mock_filter:
+    with patch("core.models.SearchVector") as mock_sv, \
+         patch("django.db.connection") as mock_conn, \
+         patch.object(Person.objects, "filter", return_value=mock_qs) as mock_filter:
+        mock_conn.vendor = "postgresql"
         person.save()
         mock_sv.assert_called_once_with("first_name", "last_name", "email", "nif", config="portuguese")
         mock_filter.assert_called_once_with(pk=person.pk)
