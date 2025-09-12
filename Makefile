@@ -1,7 +1,7 @@
 # ACR Gestão - Makefile para Docker Desktop
 # Comandos simplificados para desenvolvimento
 
-.PHONY: help validate quick-start deploy status logs clean
+.PHONY: help validate quick-start deploy status logs clean test
 
 # Configurações
 COMPOSE_FILE = docker-compose.base-nginx.yml
@@ -91,3 +91,6 @@ down: ## Parar e remover containers
 	@docker-compose -f $(COMPOSE_FILE) down
 
 reset: clean quick-start ## Reset completo: limpar + deploy inicial
+
+test: ## Executar testes
+	@pytest
