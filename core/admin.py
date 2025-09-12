@@ -87,18 +87,21 @@ class ClientSubscriptionAdmin(OrgScopedAdmin):
     list_display = ['person', 'payment_plan', 'status', 'remaining_credits', 'start_date', 'end_date']
     list_filter = ['status', 'payment_plan__plan_type', 'is_paid']
     search_fields = ['person__first_name', 'person__last_name']
+    autocomplete_fields = ['person', 'payment_plan']
 
 
 class BookingAdmin(OrgScopedAdmin):
     list_display = ['person', 'event', 'status', 'credits_used', 'is_paid', 'created_at']
     list_filter = ['status', 'is_paid']
     search_fields = ['person__first_name', 'person__last_name']
+    autocomplete_fields = ['person', 'event']
 
 
 class PaymentAdmin(OrgScopedAdmin):
     list_display = ['person', 'amount', 'method', 'status', 'due_date', 'paid_date']
     list_filter = ['method', 'status', 'due_date']
     search_fields = ['person__first_name', 'person__last_name']
+    autocomplete_fields = ['person']
 
 
 # Registar modelos no site de administração
