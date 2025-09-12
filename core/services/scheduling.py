@@ -4,10 +4,7 @@ Estes utilitários são usados pelos modelos (Event.clean e Booking.clean).
 """
 from __future__ import annotations
 
-from datetime import timedelta
 from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django.db.models import Q
 
 # Import lazy to avoid circulars in import time; used only at runtime
 from .. import models as app_models
