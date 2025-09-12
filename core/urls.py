@@ -27,7 +27,6 @@ urlpatterns = [
 
     # Rotas antigas que redirecionam para o Gantt
     path('schedule/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='schedule'),
-    path('instructors/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='instructors'),
 
     # Clientes
     path('clients/', web_views.client_list, name='client_list'),
@@ -35,6 +34,10 @@ urlpatterns = [
     path('modalities/', LoginRequiredRedirectView.as_view(url='/admin/core/modality/'), name='modality_list'),
     path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
     path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
+
+    # Instrutores
+    path('instructors/', web_views.instructor_list, name='instructor_list'),
+    path('instructors/add/', web_views.instructor_add, name='instructor_add'),
 
     # Gantt
     path('gantt/', views.gantt_view, name='gantt'),

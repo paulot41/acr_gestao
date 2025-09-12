@@ -118,8 +118,8 @@
                             <i class="fas fa-chalkboard-teacher"></i> Instrutores
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="/admin/core/instructor/"><i class="fas fa-list"></i> Lista de Instrutores</a></li>
-                            <li><a class="dropdown-item" href="/admin/core/instructor/add/"><i class="fas fa-plus"></i> Adicionar Instrutor</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:instructor_list' %}"><i class="fas fa-list"></i> Lista de Instrutores</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:instructor_add' %}"><i class="fas fa-plus"></i> Adicionar Instrutor</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
