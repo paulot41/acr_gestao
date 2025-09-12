@@ -18,10 +18,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('reports/', include('reports.urls')),
-    # Dashboard como página inicial e todas as funcionalidades através do core
-    # Incluir URLs do core com e sem namespace para compatibilidade
+    # Dashboard como página inicial e todas as funcionalidades através do core (namespaced)
     path('', include('core.urls', namespace='core')),
-    path('', include('core.urls')),
 ]
 
 # Servir ficheiros estáticos e media em desenvolvimento

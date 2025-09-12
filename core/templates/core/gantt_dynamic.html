@@ -277,6 +277,8 @@
 
 {% block content %}
 <div class="container-fluid p-0">
+    <!-- Hidden CSRF token for AJAX requests -->
+    <form style="display:none;">{% csrf_token %}</form>
     <!-- Barra de Controles -->
     <div class="controls-bar">
         <div class="row align-items-center">
@@ -621,6 +623,7 @@ class GanttDynamic {
 
                 // Event listeners para seleção
                 cell.addEventListener('mousedown', (e) => this.startSelection(e));
+                cell.addEventListener('mousemove', (e) => this.updateSelection(e));
                 cell.addEventListener('mouseover', (e) => this.updateSelection(e));
                 cell.addEventListener('mouseup', (e) => this.endSelection(e));
 
@@ -643,9 +646,11 @@ class GanttDynamic {
             eventBlock.className = `event-block ${event.event_type}`;
             eventBlock.dataset.eventId = event.id;
 
-            // Calcular posição e tamanho
+            // Calcular posição e tamanho com precisão de minutos
             const startHour = this.currentView === 'standard' ? 6 : 0;
-            const left = (event.start_hour - startHour) * 80;
+            const hm = (event.start_time || '00:00').split(':');
+            const startMinutes = ((parseInt(hm[0], 10) - startHour) * 60) + parseInt(hm[1] || '0', 10);
+            const left = (startMinutes / 60) * 80;
             const width = (event.duration_minutes / 60) * 80;
 
             eventBlock.style.left = `${left}px`;
@@ -672,15 +677,99 @@ class GanttDynamic {
             // Click para editar
             eventBlock.addEventListener('click', () => this.editEvent(event.id));
 
+            // Drag horizontal para ajustar horário
+            eventBlock.addEventListener('mousedown', (ev) => this.beginDrag(ev, event, eventBlock));
+
             timeGrid.appendChild(eventBlock);
+        });
+    }
+
+    beginDrag(ev, event, eventBlock) {
+        // Permitir apenas botão esquerdo
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        this.dragging = {
+            id: event.id,
+            startClientX: ev.clientX,
+            origLeft: parseFloat(eventBlock.style.left) || 0,
+            width: parseFloat(eventBlock.style.width) || 80,
+            resourceId: event.resource_id
+        };
+        eventBlock.classList.add('dragging');
+        this._dragMove = (e) => this.onDragMove(e, eventBlock);
+        this._dragEnd = (e) => this.onDragEnd(e, event, eventBlock);
+        document.addEventListener('mousemove', this._dragMove);
+        document.addEventListener('mouseup', this._dragEnd, { once: true });
+    }
+
+    onDragMove(e, eventBlock) {
+        if (!this.dragging) return;
+        const delta = e.clientX - this.dragging.startClientX;
+        const newLeft = Math.max(0, this.dragging.origLeft + delta);
+        eventBlock.style.left = `${newLeft}px`;
+    }
+
+    onDragEnd(e, event, eventBlock) {
+        document.removeEventListener('mousemove', this._dragMove);
+        this._dragMove = null;
+        const startHourView = this.currentView === 'standard' ? 6 : 0;
+        const left = parseFloat(eventBlock.style.left) || 0;
+        // Converter left -> minutos desde o início da vista
+        let minutesFromView = Math.round((left / 80) * 60);
+        // Arredondar aos 5 minutos
+        minutesFromView = Math.round(minutesFromView / 5) * 5;
+        const startHour = startHourView + Math.floor(minutesFromView / 60);
+        const startMinute = minutesFromView % 60;
+        const endMinutesFromView = minutesFromView + (event.duration_minutes || Math.round(parseFloat(eventBlock.style.width) / 80 * 60));
+        const endHour = startHourView + Math.floor(endMinutesFromView / 60);
+        const endMinute = endMinutesFromView % 60;
+
+        // Chamar API para atualizar horários
+        const payload = {
+            event_id: event.id,
+            date: this.selectedDate,
+            start_time: `${startHour.toString().padStart(2,'0')}:${startMinute.toString().padStart(2,'0')}`,
+            end_time: `${endHour.toString().padStart(2,'0')}:${endMinute.toString().padStart(2,'0')}`,
+            resource_id: this.dragging.resourceId
+        };
+
+        fetch('/gantt/update-event/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res && res.success) {
+                this.showAlert('Evento atualizado', 'success');
+                this.loadGanttData();
+            } else {
+                this.showAlert(res.error || 'Falha ao atualizar evento', 'danger');
+                this.loadGanttData();
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            this.showAlert('Erro ao atualizar evento', 'danger');
+            this.loadGanttData();
+        })
+        .finally(() => {
+            eventBlock.classList.remove('dragging');
+            this.dragging = null;
         });
     }
 
     startSelection(e) {
         this.isSelecting = true;
         this.selectedResource = e.target.dataset.resourceId;
-        this.selectionStart = parseInt(e.target.dataset.hour);
-        this.selectionEnd = this.selectionStart;
+        const cell = e.target;
+        const hour = parseInt(cell.dataset.hour);
+        const minutes = this.minuteFromOffset(e, cell);
+        this.selectionStart = { hour, minutes };
+        this.selectionEnd = { hour, minutes };
 
         this.clearSelection();
         e.target.classList.add('selecting');
@@ -690,7 +779,10 @@ class GanttDynamic {
         if (!this.isSelecting) return;
         if (e.target.dataset.resourceId !== this.selectedResource) return;
 
-        this.selectionEnd = parseInt(e.target.dataset.hour);
+        const cell = e.target;
+        const hour = parseInt(cell.dataset.hour);
+        const minutes = this.minuteFromOffset(e, cell);
+        this.selectionEnd = { hour, minutes };
         this.highlightSelection();
     }
 
@@ -699,11 +791,19 @@ class GanttDynamic {
 
         this.isSelecting = false;
 
-        if (this.selectionStart !== null && this.selectionEnd !== null) {
-            const startHour = Math.min(this.selectionStart, this.selectionEnd);
-            const endHour = Math.max(this.selectionStart, this.selectionEnd) + 1;
+        if (this.selectionStart && this.selectionEnd) {
+            const startTotal = this.selectionStart.hour * 60 + this.selectionStart.minutes;
+            const endTotal = this.selectionEnd.hour * 60 + this.selectionEnd.minutes;
+            let start = Math.min(startTotal, endTotal);
+            let end = Math.max(startTotal, endTotal);
+            if (end === start) end += 30; // mínimo 30 min
 
-            this.openEventModal(this.selectedResource, startHour, endHour);
+            const startHour = Math.floor(start / 60);
+            const startMinute = start % 60;
+            const endHour = Math.floor(end / 60);
+            const endMinute = end % 60;
+
+            this.openEventModal(this.selectedResource, startHour, endHour, startMinute, endMinute);
         }
 
         this.clearSelection();
@@ -712,14 +812,14 @@ class GanttDynamic {
     highlightSelection() {
         this.clearSelection();
 
-        const startHour = Math.min(this.selectionStart, this.selectionEnd);
-        const endHour = Math.max(this.selectionStart, this.selectionEnd);
+        const s = this.selectionStart;
+        const e = this.selectionEnd;
+        const startHour = Math.min(s.hour, e.hour);
+        const endHour = Math.max(s.hour, e.hour);
 
         for (let hour = startHour; hour <= endHour; hour++) {
             const cell = document.querySelector(`.time-cell[data-hour="${hour}"][data-resource-id="${this.selectedResource}"]`);
-            if (cell) {
-                cell.classList.add('selecting');
-            }
+            if (cell) cell.classList.add('selecting');
         }
     }
 
@@ -729,7 +829,7 @@ class GanttDynamic {
         });
     }
 
-    openEventModal(resourceId, startHour, endHour) {
+    openEventModal(resourceId, startHour, endHour, startMinute=0, endMinute=0) {
         const resource = this.resources.find(r => r.id == resourceId);
         if (!resource) return;
 
@@ -740,18 +840,13 @@ class GanttDynamic {
 
         // Set selected info
         document.getElementById('selected-resource').textContent = resource.name;
-        document.getElementById('selected-time').textContent = `${startHour.toString().padStart(2, '0')}:00 - ${endHour.toString().padStart(2, '0')}:00`;
+        document.getElementById('selected-time').textContent = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')} - ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
 
         // Set capacity default
         document.getElementById('event-capacity').value = resource.capacity;
 
         // Store selection data
-        this.currentSelection = {
-            resourceId,
-            startHour,
-            endHour,
-            date: this.selectedDate
-        };
+        this.currentSelection = { resourceId, startHour, startMinute, endHour, endMinute, date: this.selectedDate };
 
         this.toggleEventTypeFields('open_class');
 
@@ -779,8 +874,8 @@ class GanttDynamic {
     createEvent() {
         const formData = {
             resource_id: this.currentSelection.resourceId,
-            start_time: `${this.currentSelection.startHour.toString().padStart(2, '0')}:00`,
-            end_time: `${this.currentSelection.endHour.toString().padStart(2, '0')}:00`,
+            start_time: `${this.currentSelection.startHour.toString().padStart(2, '0')}:${this.currentSelection.startMinute.toString().padStart(2, '0')}`,
+            end_time: `${this.currentSelection.endHour.toString().padStart(2, '0')}:${this.currentSelection.endMinute.toString().padStart(2, '0')}`,
             date: this.currentSelection.date
         };
 
@@ -915,7 +1010,20 @@ class GanttDynamic {
     }
 
     getCSRFToken() {
-        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        return input ? input.value : '';
+    }
+
+    // Converter deslocamento dentro da célula em minutos (arredonda a 5 em 5)
+    minuteFromOffset(e, cell) {
+        const rect = cell.getBoundingClientRect();
+        const x = (e.clientX - rect.left);
+        const width = rect.width || 80;
+        let minutes = Math.round((x / width) * 60);
+        minutes = Math.max(0, Math.min(59, minutes));
+        minutes = Math.round(minutes / 5) * 5;
+        if (minutes === 60) minutes = 55;
+        return minutes;
     }
 
     showAlert(message, type = 'info') {

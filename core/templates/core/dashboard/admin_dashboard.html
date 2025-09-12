@@ -282,13 +282,13 @@
                     Ações Rápidas
                 </h5>
                 <div class="quick-actions">
-                    <a href="/admin/core/event/add/" class="quick-action-card">
+                    <a href="{% url 'core:event_add' %}" class="quick-action-card">
                         <div class="quick-action-icon">
                             <i class="fas fa-plus-circle"></i>
                         </div>
                         <strong>Criar Evento</strong>
                     </a>
-                    <a href="/admin/core/person/add/" class="quick-action-card">
+                    <a href="{% url 'core:client_add' %}" class="quick-action-card">
                         <div class="quick-action-icon">
                             <i class="fas fa-user-plus"></i>
                         </div>
@@ -300,7 +300,7 @@
                         </div>
                         <strong>Ver Calendário</strong>
                     </a>
-                    <a href="/admin/core/booking/" class="quick-action-card">
+                    <a href="{% url 'core:booking_list' %}" class="quick-action-card">
                         <div class="quick-action-icon">
                             <i class="fas fa-ticket-alt"></i>
                         </div>

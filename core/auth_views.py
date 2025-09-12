@@ -21,7 +21,7 @@ class CustomLoginView(LoginView):
         next_url = self.request.GET.get('next')
         if next_url:
             return next_url
-        return reverse('dashboard_router')
+        return reverse('core:dashboard_router')
 
     def form_valid(self, form):
         """Processar login válido com informação da entidade."""

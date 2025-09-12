@@ -334,6 +334,72 @@ def update_event_details(request):
                 if 'capacity' in data:
                     event.capacity = min(int(data['capacity']), event.resource.capacity)
 
+        # Atualização opcional de horários e recurso (suporta drag no Gantt)
+        # Aceita: 'date' (YYYY-MM-DD), 'start_time' (HH:MM), 'end_time' (HH:MM), 'resource_id'
+        date_str = data.get('date')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        resource_id = data.get('resource_id')
+
+        if any([date_str, start_time, end_time, resource_id]):
+            # Usar valores atuais como defaults
+            event_date = event.starts_at.date()
+            if date_str:
+                try:
+                    event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    return JsonResponse({'error': 'Data inválida'}, status=400)
+
+            # Parse horas
+            start_hour = event.starts_at.hour
+            start_minute = event.starts_at.minute
+            end_hour = event.ends_at.hour
+            end_minute = event.ends_at.minute
+
+            if start_time:
+                try:
+                    parts = start_time.split(':')
+                    start_hour, start_minute = int(parts[0]), int(parts[1])
+                except Exception:
+                    return JsonResponse({'error': 'Hora inicial inválida'}, status=400)
+            if end_time:
+                try:
+                    parts = end_time.split(':')
+                    end_hour, end_minute = int(parts[0]), int(parts[1])
+                except Exception:
+                    return JsonResponse({'error': 'Hora final inválida'}, status=400)
+
+            new_starts_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=start_hour, minute=start_minute)))
+            new_ends_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=end_hour, minute=end_minute)))
+
+            if new_ends_at <= new_starts_at:
+                return JsonResponse({'error': 'Hora de fim deve ser posterior à hora de início'}, status=400)
+
+            # Mudar recurso se necessário
+            if resource_id:
+                try:
+                    new_resource = Resource.objects.get(id=resource_id, organization=org)
+                except Resource.DoesNotExist:
+                    return JsonResponse({'error': 'Recurso não encontrado'}, status=404)
+            else:
+                new_resource = event.resource
+
+            # Verificar conflitos (excluir o próprio evento)
+            conflict_qs = Event.objects.filter(
+                organization=org,
+                resource=new_resource,
+                starts_at__lt=new_ends_at,
+                ends_at__gt=new_starts_at
+            ).exclude(id=event.id)
+
+            if conflict_qs.exists():
+                return JsonResponse({'error': 'Conflito de agenda no espaço selecionado'}, status=400)
+
+            # Aplicar alterações
+            event.resource = new_resource
+            event.starts_at = new_starts_at
+            event.ends_at = new_ends_at
+
         event.save()
 
         return JsonResponse({

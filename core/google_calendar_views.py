@@ -4,6 +4,7 @@ Configura OAuth2, sincronização e gestão de calendários.
 """
 
 import logging
+import os
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .auth_views import role_required
@@ -34,6 +35,19 @@ def google_calendar_setup(request):
         config = GoogleCalendarConfig.objects.get(organization=organization)
     except GoogleCalendarConfig.DoesNotExist:
         config = GoogleCalendarConfig.objects.create(organization=organization)
+
+    # Prefill credentials from environment if available and not yet set
+    updated = False
+    env_client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+    env_client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+    if env_client_id and not config.client_id:
+        config.client_id = env_client_id
+        updated = True
+    if env_client_secret and not config.client_secret:
+        config.client_secret = env_client_secret
+        updated = True
+    if updated:
+        config.save(update_fields=['client_id', 'client_secret'])
 
     context = {
         'config': config,

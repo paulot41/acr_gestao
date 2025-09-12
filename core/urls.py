@@ -69,10 +69,19 @@ urlpatterns = [
     path('google-calendar/', LoginRequiredRedirectView.as_view(pattern_name='core:google_calendar_setup'), name='google_calendar_home'),
     path('google-calendar/setup/', google_calendar_views.google_calendar_setup, name='google_calendar_setup'),
     path('google-calendar/instructors/', google_calendar_views.google_calendar_instructors, name='google_calendar_instructors'),
+    path('google-calendar/instructors/<int:instructor_id>/create/', google_calendar_views.google_calendar_create_instructor_calendar, name='google_calendar_create_instructor_calendar'),
+    path('google-calendar/instructors/<int:instructor_id>/sync/', google_calendar_views.google_calendar_sync_instructor, name='google_calendar_sync_instructor'),
+    path('google-calendar/instructors/<int:instructor_id>/toggle/', google_calendar_views.google_calendar_toggle_instructor_sync, name='google_calendar_toggle_instructor_sync'),
     path('google-calendar/sync-logs/', google_calendar_views.google_calendar_sync_logs, name='google_calendar_sync_logs'),
     path('google-calendar/settings/', google_calendar_views.google_calendar_settings, name='google_calendar_settings'),
     path('google-calendar/oauth/start/', google_calendar_views.google_calendar_oauth_start, name='google_calendar_oauth_start'),
     path('google-calendar/oauth/callback/', google_calendar_views.google_calendar_oauth_callback, name='google_calendar_oauth_callback'),
+    path('google-calendar/save-credentials/', google_calendar_views.google_calendar_save_credentials, name='google_calendar_save_credentials'),
+    path('google-calendar/api/event/<int:event_id>/sync/', google_calendar_views.google_calendar_api_sync_event, name='google_calendar_api_sync_event'),
+    path('google-calendar/export-backup/', google_calendar_views.google_calendar_export_backup, name='google_calendar_export_backup'),
+
+    # Settings
+    path('settings/', web_views.organization_settings, name='settings'),
 
     # APIs
     path('api/gantt/resources/', views.OptimizedGanttAPI.gantt_resources, name='api_gantt_resources'),
@@ -81,4 +90,9 @@ urlpatterns = [
     path('api/form-data/', views.get_form_data, name='api_form_data'),
     path('api/validate-conflict/', views.validate_event_conflict, name='api_validate_conflict'),
     path('api/bookings/<int:booking_id>/cancel/', views.cancel_booking_api, name='api_cancel_booking'),
+
+    # Espaços (Resources)
+    path('resources/', web_views.resource_list, name='resource_list'),
+    path('resources/add/', web_views.resource_add, name='resource_add'),
+    path('resources/<int:pk>/edit/', web_views.resource_edit, name='resource_edit'),
 ]

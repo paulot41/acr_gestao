@@ -8,7 +8,7 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 
 from .models import Person, Instructor, Modality, Event, Resource, Payment, Booking
-from .forms import PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm
+from .forms import PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm
 
 
 @role_required(["admin", "staff"])
@@ -380,6 +380,65 @@ def modality_add(request):
         'form': form,
         'title': 'Adicionar Modalidade',
         'action': 'add'
+    })
+
+
+# ESPAÇOS (RESOURCES) VIEWS
+@role_required(["admin", "staff"])
+def resource_list(request):
+    """Listagem de espaços/recursos."""
+    org = request.organization
+    resources = Resource.objects.filter(organization=org).order_by('name')
+
+    context = {
+        'resources': resources,
+    }
+    return render(request, 'core/resource_list.html', context)
+
+
+@role_required(["admin", "staff"])
+def resource_add(request):
+    """Adicionar novo espaço/recurso."""
+    org = request.organization
+
+    if request.method == 'POST':
+        form = ResourceForm(request.POST)
+        if form.is_valid():
+            resource = form.save(commit=False)
+            resource.organization = org
+            resource.save()
+            messages.success(request, f'Espaço "{resource.name}" criado com sucesso!')
+            return redirect('core:resource_list')
+    else:
+        form = ResourceForm()
+
+    return render(request, 'core/resource_form.html', {
+        'form': form,
+        'title': 'Adicionar Espaço',
+        'action': 'add'
+    })
+
+
+@role_required(["admin", "staff"])
+def resource_edit(request, pk):
+    """Editar espaço/recurso existente."""
+    org = request.organization
+    resource = get_object_or_404(Resource, pk=pk, organization=org)
+
+    if request.method == 'POST':
+        form = ResourceForm(request.POST, instance=resource)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Espaço "{resource.name}" atualizado com sucesso!')
+            return redirect('core:resource_list')
+    else:
+        form = ResourceForm(instance=resource)
+
+    return render(request, 'core/resource_form.html', {
+        'form': form,
+        'resource': resource,
+        'title': 'Editar Espaço',
+        'action': 'edit'
     })
 
 

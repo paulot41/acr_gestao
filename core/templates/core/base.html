@@ -132,6 +132,15 @@
                           </ul>
                       </li>
                       <li class="nav-item dropdown">
+                          <a class="nav-link dropdown-toggle" href="#" id="resourcesDropdown" role="button" data-bs-toggle="dropdown">
+                              <i class="fas fa-building"></i> Espaços
+                          </a>
+                          <ul class="dropdown-menu">
+                              <li><a class="dropdown-item" href="{% url 'core:resource_list' %}"><i class="fas fa-list"></i> Lista de Espaços</a></li>
+                              <li><a class="dropdown-item" href="{% url 'core:resource_add' %}"><i class="fas fa-plus"></i> Adicionar Espaço</a></li>
+                          </ul>
+                      </li>
+                      <li class="nav-item dropdown">
                           <a class="nav-link dropdown-toggle" href="#" id="eventsDropdown" role="button" data-bs-toggle="dropdown">
                               <i class="fas fa-calendar-check"></i> Eventos
                           </a>

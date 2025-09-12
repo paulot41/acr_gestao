@@ -275,7 +275,7 @@
                     <div class="text-center py-4">
                         <i class="bi bi-person-plus text-gray-400" style="font-size: 3rem;"></i>
                         <p class="text-gray-500 mt-2">Nenhum cliente cadastrado recentemente</p>
-                        <a href="/clientes/novo/" class="btn btn-primary">
+                        <a href="{% url 'core:client_add' %}" class="btn btn-primary">
                             <i class="bi bi-person-plus me-1"></i>Adicionar Cliente
                         </a>
                     </div>
@@ -295,25 +295,25 @@
                 </h6>
                 <div class="row text-center">
                     <div class="col-md-3 mb-3">
-                        <a href="/clientes/novo/" class="btn btn-outline-primary w-100">
+                        <a href="{% url 'core:client_add' %}" class="btn btn-outline-primary w-100">
                             <i class="bi bi-person-plus d-block mb-2" style="font-size: 2rem;"></i>
                             Novo Cliente
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="/instrutores/novo/" class="btn btn-outline-success w-100">
+                        <a href="{% url 'core:instructor_add' %}" class="btn btn-outline-success w-100">
                             <i class="bi bi-person-badge d-block mb-2" style="font-size: 2rem;"></i>
                             Novo Instrutor
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="/gantt-system/" class="btn btn-outline-warning w-100">
+                        <a href="{% url 'core:gantt' %}" class="btn btn-outline-warning w-100">
                             <i class="bi bi-calendar-plus d-block mb-2" style="font-size: 2rem;"></i>
                             Agendar Aula
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="/modalidades/nova/" class="btn btn-outline-info w-100">
+                        <a href="{% url 'core:modality_add' %}" class="btn btn-outline-info w-100">
                             <i class="bi bi-star d-block mb-2" style="font-size: 2rem;"></i>
                             Nova Modalidade
                         </a>
