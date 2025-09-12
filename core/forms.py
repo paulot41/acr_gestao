@@ -1,6 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Person, Instructor, Modality, Event, Resource, ClassGroup
+from .models import Person, Instructor, Modality, Event, Resource, ClassGroup, Booking
 
 
 class PersonForm(forms.ModelForm):
@@ -204,6 +204,26 @@ class EventForm(forms.ModelForm):
             cleaned_data['capacity'] = 1
 
         return cleaned_data
+
+
+class BookingForm(forms.ModelForm):
+    """Formulário para criação/edição de reservas."""
+
+    class Meta:
+        model = Booking
+        fields = ["event", "person", "status"]
+        widgets = {
+            "event": forms.Select(attrs={"class": "form-select"}),
+            "person": forms.Select(attrs={"class": "form-select"}),
+            "status": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        organization = kwargs.pop("organization", None)
+        super().__init__(*args, **kwargs)
+        if organization:
+            self.fields["event"].queryset = Event.objects.filter(organization=organization)
+            self.fields["person"].queryset = Person.objects.filter(organization=organization)
 
 
 class ResourceForm(forms.ModelForm):
