@@ -29,8 +29,9 @@ urlpatterns = [
     path('schedule/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='schedule'),
     path('instructors/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='instructors'),
 
-    # Clientes (redirecionar para admin)
-    path('clients/', LoginRequiredRedirectView.as_view(url='/admin/core/person/'), name='client_list'),
+    # Clientes
+    path('clients/', web_views.client_list, name='client_list'),
+    path('clients/add/', web_views.client_add, name='client_add'),
     path('modalities/', LoginRequiredRedirectView.as_view(url='/admin/core/modality/'), name='modality_list'),
     path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
     path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
