@@ -104,6 +104,17 @@ class PaymentAdmin(OrgScopedAdmin):
     autocomplete_fields = ['person']
 
 
+class InvoiceItemInline(admin.TabularInline):
+    model = models.InvoiceItem
+    extra = 1
+    fields = ['description', 'quantity', 'unit_price']
+
+
+class InvoiceAdmin(OrgScopedAdmin):
+    list_display = ['person', 'issue_date', 'total', 'status']
+    search_fields = ['person__first_name', 'person__last_name', 'person__email']
+    inlines = [InvoiceItemInline]
+
 
 class PriceInline(admin.TabularInline):
     model = models.Price
@@ -148,6 +159,6 @@ admin_site.register(models.GoogleCalendarConfig)
 admin_site.register(models.InstructorGoogleCalendar)
 admin_site.register(models.GoogleCalendarSyncLog)
 admin_site.register(models.SystemAlert)
-admin_site.register(models.Invoice)
+admin_site.register(models.Invoice, InvoiceAdmin)
 admin_site.register(models.Campaign)
 admin_site.register(models.MessageLog)
