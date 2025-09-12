@@ -7,7 +7,7 @@ import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 @login_required
 def google_calendar_setup(request):
     """Página de configuração inicial do Google Calendar."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     try:
         config = GoogleCalendarConfig.objects.get(organization=organization)
@@ -48,7 +51,10 @@ def google_calendar_setup(request):
 @require_http_methods(["POST"])
 def google_calendar_save_credentials(request):
     """Guardar credenciais OAuth2 do Google."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     client_id = request.POST.get('client_id', '').strip()
     client_secret = request.POST.get('client_secret', '').strip()
@@ -76,7 +82,10 @@ def google_calendar_save_credentials(request):
 @login_required
 def google_calendar_oauth_start(request):
     """Iniciar fluxo OAuth2 para autorização Google."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     try:
         service = get_google_calendar_service(organization)
@@ -101,7 +110,10 @@ def google_calendar_oauth_start(request):
 @login_required
 def google_calendar_oauth_callback(request):
     """Callback OAuth2 - processar autorização do Google."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     # Verificar parâmetros
     code = request.GET.get('code')
@@ -144,7 +156,10 @@ def google_calendar_oauth_callback(request):
 @login_required
 def google_calendar_instructors(request):
     """Página de gestão de calendários dos instrutores."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     # Verificar se a configuração está pronta
     try:
@@ -187,7 +202,10 @@ def google_calendar_instructors(request):
 @require_http_methods(["POST"])
 def google_calendar_create_instructor_calendar(request, instructor_id):
     """Criar calendário Google para um instrutor específico."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
     instructor = get_object_or_404(Instructor, id=instructor_id, organization=organization)
 
     try:
@@ -208,7 +226,10 @@ def google_calendar_create_instructor_calendar(request, instructor_id):
 @require_http_methods(["POST"])
 def google_calendar_sync_instructor(request, instructor_id):
     """Sincronizar todos os eventos de um instrutor."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
     instructor = get_object_or_404(Instructor, id=instructor_id, organization=organization)
 
     try:
@@ -234,7 +255,10 @@ def google_calendar_sync_instructor(request, instructor_id):
 @require_http_methods(["POST"])
 def google_calendar_toggle_instructor_sync(request, instructor_id):
     """Ativar/desativar sincronização para um instrutor."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
     instructor = get_object_or_404(Instructor, id=instructor_id, organization=organization)
 
     try:
@@ -260,7 +284,10 @@ def google_calendar_toggle_instructor_sync(request, instructor_id):
 @login_required
 def google_calendar_sync_logs(request):
     """Página de logs de sincronização."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     # Filtros
     instructor_id = request.GET.get('instructor')
@@ -302,7 +329,10 @@ def google_calendar_api_sync_event(request, event_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     try:
         event = Event.objects.get(id=event_id, organization=organization)
@@ -331,7 +361,10 @@ def google_calendar_api_sync_event(request, event_id):
 @login_required
 def google_calendar_settings(request):
     """Página de configurações avançadas do Google Calendar."""
-    organization = get_current_organization(request)
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
 
     try:
         config = GoogleCalendarConfig.objects.get(organization=organization)
