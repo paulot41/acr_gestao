@@ -4,6 +4,16 @@
 
 O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, desenvolvida como evolução do sistema GIG. **ESTADO ATUAL: Sistema completo e funcional com Dashboard Personalizado** com todas as funcionalidades principais implementadas e interface moderna.
 
+## Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com registo.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Consolidação do middleware de multi-tenancy.
+- Cálculos financeiros agora baseados em `Decimal` para maior precisão.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Limpeza de imports não utilizados no middleware core.
+- Adição de testes automatizados para modelos e middleware.
+
 ### 🎯 OBJETIVOS PRINCIPAIS
 - ✅ Dashboard personalizado como página inicial (IMPLEMENTADO)
 - ✅ Bootstrap 5 para interface moderna e responsiva (IMPLEMENTADO)

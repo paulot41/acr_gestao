@@ -2,6 +2,16 @@
 
 ## 🎯 **Principais Melhorias Implementadas**
 
+### Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas e logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Consolidação do middleware de multi-tenancy.
+- Uso de `Decimal` em cálculos monetários.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Remoção de imports não utilizados no middleware core.
+- Introdução de testes automatizados para modelos e middleware.
+
 ### 1. **Dashboard Personalizado como Página Inicial (NOVO!)**
 - ✅ **Página inicial moderna** com estatísticas em tempo real
 - ✅ **Navegação superior completa** com menus dropdown organizados

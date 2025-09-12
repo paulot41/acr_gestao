@@ -5,6 +5,16 @@
 
 Este documento detalha as funcionalidades avançadas planejadas para transformar o ACR Gestão num sistema CRM completo para ginásios, com automação de marketing, análises avançadas e conformidade RGPD.
 
+### Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Consolidação do middleware de multi-tenancy.
+- Cálculos monetários com `Decimal`.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Limpeza de imports redundantes.
+- Adição de testes automatizados para modelos e middleware.
+
 ### 🏆 **OBJETIVOS PRINCIPAIS**
 - **🔄 Automação completa** do ciclo de vida do cliente
 - **📊 Inteligência de negócio** com previsões ML

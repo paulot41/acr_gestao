@@ -2,6 +2,16 @@
 
 ## ✅ Problema 1: "empty compose file" - RESOLVIDO
 
+### Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com registo.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Middleware de multi-tenancy consolidado.
+- Cálculos financeiros com `Decimal`.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Remoção de imports não utilizados.
+- Novos testes automatizados para modelos e middleware.
+
 O erro "empty compose file" foi causado por um arquivo docker-compose.base-nginx.yml temporariamente vazio/corrompido no servidor de produção. O problema foi imediatamente resolvido com:
 
 ```bash

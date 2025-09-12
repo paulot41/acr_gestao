@@ -3,6 +3,16 @@
 ## 🏢 **Organization** - Entidade Multi-tenant
 Representa cada organização/cliente do sistema (ACR, Proform, etc.)
 
+### Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com registo.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Middleware de multi-tenancy consolidado.
+- Cálculos financeiros baseados em `Decimal`.
+- Migração para `UniqueConstraint` no modelo `Person`.
+- Limpeza de imports não utilizados.
+- Novos testes automatizados para `Person` e `OrganizationMiddleware`.
+
 ### Atributos:
 - **name**: Nome da organização
 - **domain**: Domínio único (ex: acr.local, proform.local)
