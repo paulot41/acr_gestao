@@ -31,10 +31,12 @@ urlpatterns = [
     # Clientes
     path('clients/', web_views.client_list, name='client_list'),
     path('clients/add/', web_views.client_add, name='client_add'),
-    path('modalities/', web_views.modality_list, name='modality_list'),
-    path('modalities/add/', web_views.modality_add, name='modality_add'),
     path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
     path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
+
+    # Modalidades
+    path('modalities/', web_views.modality_list, name='modality_list'),
+    path('modalities/add/', web_views.modality_add, name='modality_add'),
 
     # Instrutores
     path('instructors/', web_views.instructor_list, name='instructor_list'),
