@@ -135,12 +135,7 @@ def get_current_organization(request):
         return request.organization
 
     # Fallback: retornar primeira organização disponível
-    try:
-        return Organization.objects.first()
-    except Organization.DoesNotExist:
-        # Se não há organizações, criar uma por defeito
-        return Organization.objects.create(
-            name="ACR Gestão",
-            domain="localhost",
-            org_type=Organization.Type.BOTH
-        )
+    organization = Organization.objects.first()
+    if organization is None:
+        raise Organization.DoesNotExist("Nenhuma organização configurada")
+    return organization
