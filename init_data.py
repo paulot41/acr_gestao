@@ -11,7 +11,7 @@ from core.models import Organization, Modality, Resource, Instructor
 def create_initial_data():
     print("🚀 Criando dados iniciais para desenvolvimento local...")
 
-    # Criar organizacao localhost
+    # Criar organização localhost
     org_local, created = Organization.objects.get_or_create(
         domain='localhost',
         defaults={

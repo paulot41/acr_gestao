@@ -85,7 +85,7 @@ O **ACR Gestão** é um sistema Django multi-tenant para gestão de ginásios (A
 - **🚀 Produção**: VM Debian com Docker - domínios com HTTPS/SSL
 
 ### 🔧 **Arquitetura Técnica**
-- **Backend**: Django 4.2 + PostgreSQL 16 + Nginx
+- **Backend**: Django 5.1.1 + PostgreSQL 16 + Nginx
 - **Frontend**: Bootstrap 5 + FullCalendar.js (Sistema Gantt otimizado)
 - **Deploy**: Docker + Docker Compose
 - **Estado**: Sistema completo e funcional em produção
@@ -350,7 +350,7 @@ docker-compose exec -T db psql -U acruser -d acrdb < backup.sql
 4. **Timeouts HTTPS** → Já resolvido, verifique `.env.prod.local`
 
 ### **Informações para Suporte:**
-- **Sistema**: ACR Gestão - Django 4.2 Multi-tenant
+- **Sistema**: ACR Gestão - Django 5.1.1 Multi-tenant
 - **Ambientes**: Docker Desktop (macOS) + VM Debian
 - **Estado**: Produção-ready, todas funcionalidades implementadas
 - **Performance**: Sistema Gantt otimizado (70-80% melhoria)

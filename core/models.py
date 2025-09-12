@@ -492,7 +492,7 @@ class Booking(models.Model):
         return f"{self.person} => {self.event} ({self.status})"
 
     def clean(self):
-        ensure_no_conflict(self)
+        ensure_no_conflict(self.event)
         ensure_capacity(self)
         # Validar créditos se usar subscrição
         if self.subscription_used and self.status == "confirmed":
