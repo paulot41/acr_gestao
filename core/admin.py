@@ -42,11 +42,8 @@ class ACRAdminSite(admin.AdminSite):
 
         return super().index(request, extra_context)
 
-# Usar admin site padrão com customizações
-admin_site = admin.site
-admin_site.site_header = 'ACR Gestão - Administração'
-admin_site.site_title = 'ACR Gestão'
-admin_site.index_title = 'Dashboard Administrativo'
+# Instância customizada do site de administração
+admin_site = ACRAdminSite()
 
 
 # Admin Classes simplificadas
@@ -104,7 +101,7 @@ class PaymentAdmin(OrgScopedAdmin):
     search_fields = ['person__first_name', 'person__last_name']
 
 
-# Registar modelos no admin padrão
+# Registar modelos no site de administração
 admin_site.register(models.Person, PersonAdmin)
 admin_site.register(models.Instructor, InstructorAdmin)
 admin_site.register(models.Modality, ModalityAdmin)
