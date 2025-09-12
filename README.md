@@ -10,7 +10,7 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 - Remoção da criação automática de organização em `get_current_organization`.
 - Consolidação do middleware de multi-tenancy.
 - Cálculos financeiros agora utilizam `Decimal` para maior precisão.
-- Migração de `unique_together` para `UniqueConstraint` nos modelos.
+- Migração para `UniqueConstraint` no modelo `Person` (restantes modelos ainda usam `unique_together`).
 - Limpeza de imports não utilizados no middleware core.
 - Adição de testes automatizados para modelos e middleware.
 

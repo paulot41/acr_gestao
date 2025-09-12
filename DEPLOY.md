@@ -12,7 +12,7 @@ Este projeto suporta **dois tipos de deploy**:
 - Remoção da criação automática de organização em `get_current_organization`.
 - Middleware de multi-tenancy consolidado.
 - Cálculos monetários com `Decimal`.
-- Migração para `UniqueConstraint`.
+- Migração para `UniqueConstraint` no modelo `Person` (restantes modelos mantêm `unique_together`).
 - Limpeza de imports redundantes.
 - Novos testes automatizados para garantir estabilidade.
 

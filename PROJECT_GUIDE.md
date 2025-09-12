@@ -10,7 +10,7 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 - Remoção da criação automática de organização em `get_current_organization`.
 - Consolidação do middleware de multi-tenancy.
 - Cálculos financeiros agora baseados em `Decimal` para maior precisão.
-- Migração de `unique_together` para `UniqueConstraint`.
+- Migração para `UniqueConstraint` no modelo `Person` (outros modelos mantêm `unique_together`).
 - Limpeza de imports não utilizados no middleware core.
 - Adição de testes automatizados para modelos e middleware.
 
@@ -21,7 +21,7 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 - ✅ Gestão completa de clientes e memberships (IMPLEMENTADO)
 - ✅ Sistema Gantt para marcação de espaços por instrutores (OTIMIZADO)
 - ✅ Controlo financeiro com pagamentos e relatórios (IMPLEMENTADO)
-- 🔄 Integração com Google Calendar e Google Drive (10% IMPLEMENTADO)
+- 🔄 Integração com Google Calendar e Google Drive (núcleo implementado; em progresso)
 
 ---
 
@@ -339,25 +339,21 @@ O sistema suporta duas entidades distintas na mesma plataforma com interface uni
 **Estado: 100% Implementado - CONCLUÍDO em 04/09/2025**
 
 #### ✅ Implementação Concluída
-- ✅ **Django Admin Site customizado** (`ACRAdminSite`)
-- ✅ **Dashboard integrado** na página inicial do admin
-- ✅ **Templates modernizados** (base_site.html, index.html)
-- ✅ **URLs simplificadas** (eliminadas interfaces redundantes)
-- ✅ **Estatísticas detalhadas** por entidade (ACR/Proform)
+- ✅ **Admin modernizado via templates** (`core/templates/admin/base_site.html` e `index.html`)
+- ✅ **`ACRAdminSite` definido** em `core/admin.py` (instância disponível mas não ligada nas URLs)
+- ✅ **/admin/** usa o Django Admin padrão com templates modernizados
+- ✅ **Root `/`** mantém o Dashboard personalizado (não redireciona para `/admin/`)
+- ✅ **Estatísticas e ações rápidas** no index do Admin via template override
 - ✅ **Interface responsiva** com Bootstrap 5 e Bootstrap Icons
-- ✅ **Auto-refresh** automático a cada 5 minutos
 - ✅ **Badges coloridos** para identificar entidades
-- ✅ **Ações rápidas** para criar registos
-- ✅ **Correção ImportError** - admin_site adicionado
+- ✅ **Correção ImportError** – instância `admin_site` adicionada
 
 #### ✅ Deploy em Produção Concluído
-- ✅ **Script de deploy** `deploy_passo2_admin_unificado.sh` executado
-- ✅ **Django Admin Unificado** funcional em produção
-- ✅ **Interface única** substituindo 3 interfaces antigas
-- ✅ **URL de produção:** https://seu-dominio.com/admin/
-- ✅ **Performance otimizada** e manutenção simplificada
+- ✅ **Admin disponível** em https://seu-dominio.com/admin/ (com templates modernizados)
+- ✅ **Dashboard** permanece a homepage para utilizadores
+- ♻️ Nota: o `ACRAdminSite` custom ainda não substitui o `admin.site` nas URLs.
 
-**STATUS: ✅ PASSO 2 CONCLUÍDO - Django Admin Unificado em produção**
+**STATUS: ✅ PASSO 2 CONCLUÍDO - Admin modernizado e Dashboard ativo**
 
 ---
 
@@ -478,16 +474,15 @@ Nenhuma, todas as fases concluídas.
 Com a FASE 1 100% concluída, as próximas prioridades são:
 
 ### **🚀 FASE 2 - INTEGRAÇÕES EXTERNAS (EM ANDAMENTO)** 
-**Estado: 10% - INICIADA em 04/09/2025**
+**Estado: Em progresso (núcleo Google implementado)**
 
 #### **📱 Integração Google Calendar (EM DESENVOLVIMENTO)**
-- 🔄 **Configuração OAuth2** para Google Calendar API
-- [ ] **Exportação individual** das marcações de cada instrutor
-- [ ] **Sincronização bidirecional** (ACR → Google Calendar)
-- [ ] **Calendários separados** por instrutor e entidade
-- [ ] **Notificações automáticas** de mudanças e atualizações
-- [ ] **Partilha de calendários** entre equipa e gestão
-- [ ] **Interface de configuração** no admin para tokens
+- ✅ **Configuração OAuth2** para Google Calendar API (service layer + views)
+- ✅ **Criação de calendários** por instrutor
+- ✅ **Sincronização de eventos** (export/import por instrutor)
+- ✅ **Export de backup para Google Drive**
+- 🔄 **Sincronização bidirecional completa**
+- 🔄 **Gestão/validação de configurações** no Admin
 
 #### **☁️ Sistema de Backups Google Drive (IMPORTANTE)**
 - [ ] **Configuração OAuth2** para Google Drive API

@@ -8,7 +8,7 @@
 - Remoção da criação automática de organização em `get_current_organization`.
 - Consolidação do middleware de multi-tenancy.
 - Uso de `Decimal` em cálculos monetários.
-- Migração de `unique_together` para `UniqueConstraint`.
+- Migração para `UniqueConstraint` no modelo `Person` (restantes modelos mantêm `unique_together`).
 - Remoção de imports não utilizados no middleware core.
 - Introdução de testes automatizados para modelos e middleware.
 
@@ -128,6 +128,8 @@ Utilizador → Admin, perfil, logout
 - ✅ **admin_site.register() único** para evitar conflitos
 - ✅ **Classes admin personalizadas** para todos os modelos
 - ✅ **NoReverseMatch resolvido** completamente
+- ℹ️ **URLs** usam `admin.site` (o `ACRAdminSite` existe mas não está ligado)
+- 🔒 **Permissões**: Modelos de negócio no Admin são apenas leitura para não‑superusers; edição reservada a superusers. Operações de negócio devem usar a interface web.
 
 ---
 

@@ -8,7 +8,7 @@
 - Remoção da criação automática de organização em `get_current_organization`.
 - Middleware de multi-tenancy consolidado.
 - Cálculos financeiros com `Decimal`.
-- Migração de `unique_together` para `UniqueConstraint`.
+- Migração para `UniqueConstraint` no modelo `Person` (restantes modelos mantêm `unique_together`).
 - Remoção de imports não utilizados.
 - Novos testes automatizados para modelos e middleware.
 
@@ -35,7 +35,7 @@ git reset --hard origin/main
    - `TROUBLESHOOTING.md` - Guia completo para administradores
    - Instruções claras de prevenção e recuperação
 
-## ✅ Problema 2: Django Admin Unificado - IMPLEMENTADO
+## ✅ Problema 2: Admin Modernizado e Unificado (via templates)
 
 ### 🎯 Problema Identificado
 O sistema tinha **três interfaces administrativas separadas** e não sincronizadas:
@@ -43,24 +43,13 @@ O sistema tinha **três interfaces administrativas separadas** e não sincroniza
 - Admin integrado customizado (interface moderna)
 - Dashboard web (`/dashboard/`)
 
-### 🚀 Solução Implementada: Admin Unificado
+### 🚀 Solução Implementada: Admin com UI unificada (sem trocar o site)
 
-**Criado Django Admin Site customizado** que substitui as três interfaces:
-
-1. **ACRAdminSite personalizado** (`core/admin.py`)
-   - Dashboard integrado na página inicial
-   - Estatísticas detalhadas por entidade (ACR/Proform)
-   - Interface moderna com Bootstrap 5
-   - Auto-refresh automático
-
-2. **Templates modernizados**
-   - `core/templates/admin/base_site.html` - Base com CSS/JS customizado
-   - `core/templates/admin/index.html` - Dashboard com estatísticas
-
-3. **URLs simplificadas** (`core/urls.py`)
-   - Apenas `/admin/` (custom admin site)
-   - `/api/` (REST endpoints)
-   - Root redireciona para `/admin/`
+- O Django Admin padrão em `/admin/` foi modernizado via templates:
+  - `core/templates/admin/base_site.html` (CSS/JS, branding, Bootstrap 5)
+  - `core/templates/admin/index.html` (estatísticas + ações rápidas)
+- Um `ACRAdminSite` existe em `core/admin.py`, mas não está ligado às URLs; o projeto usa `admin.site`.
+- A homepage mantém o Dashboard personalizado (não há redirecionamento para `/admin/`).
 
 4. **Funcionalidades integradas**
    - ✅ Badges coloridos para entidades (ACR/Proform)
@@ -72,9 +61,7 @@ O sistema tinha **três interfaces administrativas separadas** e não sincroniza
 
 ### 🔧 Correções Técnicas Aplicadas
 
-**Erro corrigido:** `ImportError: cannot import name 'admin_site' from 'core.admin'`
-- **Causa:** Arquivo `core/admin.py` não tinha a instância `admin_site`
-- **Solução:** Adicionado `admin_site = ACRAdminSite(name='acr_admin')`
+**Nota técnica:** `admin_site` foi adicionado em `core/admin.py` para futura adoção, mas as URLs atuais usam `admin.site`.
 
 ### ✅ Estado Atual do Sistema
 
@@ -110,11 +97,9 @@ grep -n "admin_site" core/admin.py
 
 ### 🌐 Resultado Final no Servidor:
 
-- **URL única:** https://seu-dominio.com/admin/
-- **Interface unificada** com dashboard integrado
-- **Todas as funcionalidades** numa só página
-- **Performance melhorada** (menos código, menos requests)
-- **Manutenção simplificada** (1 interface vs 3)
+- **Admin:** https://seu-dominio.com/admin/ (padrão, com UI modernizada)
+- **Home:** Dashboard personalizado (estatísticas, atalhos, Gantt)
+- **Navegação clara** entre Dashboard e Admin
 
 ## 🎯 Benefícios da Solução
 
@@ -140,19 +125,18 @@ grep -n "admin_site" core/admin.py
    - ✅ Scripts de prevenção implementados
    - ✅ Documentação completa
 
-2. **✅ PASSO 2 - Django Admin Unificado** → **CONCLUÍDO** ✓
-   - ✅ Código implementado e testado no IDE
-   - ✅ Push para repositório concluído
-   - ✅ Deploy no servidor de produção executado
-   - ✅ Django Admin Unificado funcional em produção
-   - ✅ Interface única moderna substituindo 3 interfaces antigas
+2. **✅ PASSO 2 - Admin Modernizado** → **CONCLUÍDO** ✓
+   - ✅ Templates do Admin atualizados (UI moderna)
+   - ✅ `ACRAdminSite` definido (não ativo nas URLs)
+   - ✅ `/admin/` disponível e funcional
+   - ✅ Dashboard mantém-se como homepage
 
-3. **🚀 FASE 1 - Interface Web + Sistema Gantt** → **EM ANDAMENTO** 
-   - 🔄 **INICIANDO AGORA**: Desenvolvimento da interface web completa
-   - 🎯 Templates Django responsivos
-   - 🎯 Sistema Gantt com FullCalendar.js
-   - 🎯 CRUD web completo
+3. **🚀 FASE 1 - Interface Web + Sistema Gantt** → **CONCLUÍDA** ✓
+   - ✅ Templates Django responsivos
+   - ✅ Sistema Gantt com FullCalendar.js
+   - ✅ CRUD web completo
 
-4. **⏳ FASE 2 - Integrações Google** → **FUTURO**
+4. **⏳ FASE 2 - Integrações Google** → **EM PROGRESSO**
+   - Núcleo implementado: OAuth2, criação de calendários por instrutor, sincronização de eventos, export de backup para Drive
 
-**AÇÃO ATUAL: Iniciar desenvolvimento da FASE 1 - Interface Web + Sistema Gantt**
+**AÇÃO ATUAL: Manter e otimizar Gantt/Admin; evoluir integrações Google**

@@ -131,23 +131,21 @@ git reset --hard origin/main
 
 ---
 
-### 🚨 **Problema 2: Django Admin Duplicado - RESOLVIDO**
+### 🚨 **Problema 2: Confusão entre Admin e Dashboard - RESOLVIDO**
 
 #### **Sintomas:**
-- Três interfaces administrativas não sincronizadas
-- Confusão entre `/admin/`, dashboard customizado e interface web
-- Manutenção complexa e dados inconsistentes
+- Perceção de duplicação entre `/admin/` (Django Admin), Dashboard web e páginas CRUD
+- Manutenção complexa e navegação pouco clara
 
 #### **Solução Implementada:**
-- ✅ **Django Admin Site customizado** (`ACRAdminSite`)
-- ✅ **Interface única** substituindo 3 interfaces
-- ✅ **Dashboard integrado** na página inicial do admin
-- ✅ **Performance otimizada** e manutenção simplificada
+- ✅ Clarificação de papéis: `/admin/` é o Django Admin padrão com UI modernizada por templates
+- ✅ Homepage mantém o Dashboard personalizado (estatísticas, atalhos, Gantt)
+- ✅ `ACRAdminSite` definido para futura adoção (não ligado nas URLs atuais)
 
 #### **Resultado:**
-- **URL única**: https://seu-dominio.com/admin/
-- **Login**: admin/admin123
-- **Funcionalidades**: Todas integradas numa interface moderna
+- **Admin:** https://seu-dominio.com/admin/ (padrão, com UI modernizada)
+- **Home:** Dashboard personalizado
+- **Navegação clara** entre Dashboard e Admin
 
 ---
 

@@ -1,10 +1,10 @@
 # Instruções para Atualizar Docker com as Alterações do Dashboard
 
 ## Alterações Implementadas
-- ✅ Dashboard views simplificado em `core/dashboard_views.py`
-- ✅ Template unificado criado em `core/templates/core/dashboard_simple.html`
-- ✅ Todas as operações CRUD redirecionadas para Django Admin
-- ✅ Dashboard focado apenas em consulta e marcação de aulas
+- ✅ Dashboard views simplificadas em `core/dashboard_views.py`
+- ✅ Template atualizado em `core/templates/core/dashboard_simple.html`
+- ✅ CRUD disponível via páginas web e também no Django Admin
+- ✅ Dashboard focado em consulta e marcação de aulas
 
 ### Atualizações recentes
 

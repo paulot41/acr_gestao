@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.utils.html import format_html
 from django.urls import path
 from django.http import JsonResponse
@@ -20,6 +22,37 @@ class OrgScopedAdmin(admin.ModelAdmin):
         if not getattr(obj, "organization_id", None) and getattr(request, "organization", None):
             obj.organization = request.organization
         super().save_model(request, obj, form, change)
+
+    # Option B: business models are read-only for non-superusers in Django Admin
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        # Allow viewing entries but prevent editing for non-superusers
+        if not request.user.is_superuser:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return super().get_readonly_fields(request, obj)
+        # Make all fields read-only for non-superusers to support view-only pages
+        try:
+            base = [f.name for f in self.model._meta.fields]
+            base += [f.name for f in self.model._meta.many_to_many]
+            return tuple(set(base))
+        except Exception:
+            return super().get_readonly_fields(request, obj)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        # Remove bulk actions for non-superusers
+        if not request.user.is_superuser:
+            return {}
+        return actions
 
 
 # Admin Site Simplificado
@@ -162,3 +195,58 @@ admin_site.register(models.SystemAlert)
 admin_site.register(models.Invoice, InvoiceAdmin)
 admin_site.register(models.Campaign)
 admin_site.register(models.MessageLog)
+
+# Also register models with the default Django Admin site so they are visible under /admin/
+admin.site.register(models.Person, PersonAdmin)
+admin.site.register(models.Instructor, InstructorAdmin)
+admin.site.register(models.Modality, ModalityAdmin)
+admin.site.register(models.Resource, ResourceAdmin)
+admin.site.register(models.Event, EventAdmin)
+admin.site.register(models.PaymentPlan, PaymentPlanAdmin)
+admin.site.register(models.ClientSubscription, ClientSubscriptionAdmin)
+admin.site.register(models.Booking, BookingAdmin)
+admin.site.register(models.Payment, PaymentAdmin)
+
+admin.site.register(models.Organization)
+admin.site.register(models.ClassGroup)
+admin.site.register(models.InstructorCommission)
+admin.site.register(models.CreditHistory)
+admin.site.register(models.UserProfile)
+admin.site.register(models.Product, ProductAdmin)
+admin.site.register(models.Membership)
+admin.site.register(models.ClassTemplate)
+admin.site.register(models.GoogleCalendarConfig)
+admin.site.register(models.InstructorGoogleCalendar)
+admin.site.register(models.GoogleCalendarSyncLog)
+admin.site.register(models.SystemAlert)
+admin.site.register(models.Invoice, InvoiceAdmin)
+admin.site.register(models.Campaign)
+admin.site.register(models.MessageLog)
+
+
+# --- User management: Custom User admin with inline UserProfile ---
+class UserProfileInline(admin.StackedInline):
+    model = models.UserProfile
+    can_delete = False
+    extra = 0
+    verbose_name_plural = "Perfil"
+    fk_name = "user"
+
+
+class UserAdmin(DjangoUserAdmin):
+    inlines = [UserProfileInline]
+
+    def get_inline_instances(self, request, obj=None):
+        # Only show inline on change view (obj exists). The add form remains standard.
+        inline_instances = []
+        if obj is None:
+            return inline_instances
+        return super().get_inline_instances(request, obj)
+
+
+# Unregister the default User admin and register our customized one
+try:
+    admin.site.unregister(User)
+except admin.sites.NotRegistered:
+    pass
+admin.site.register(User, UserAdmin)

@@ -8,7 +8,7 @@ Sistema completo de gestão para ginásios ACR e Proform com deploy automatizado
 - Remoção da criação automática de organização em `get_current_organization`.
 - Middleware de multi-tenancy consolidado.
 - Cálculos financeiros com `Decimal`.
-- Migração de `unique_together` para `UniqueConstraint`.
+- Migração para `UniqueConstraint` no modelo `Person` (restantes modelos mantêm `unique_together`).
 - Limpeza de imports não utilizados.
 - Testes automatizados adicionados para modelos e middleware.
 
