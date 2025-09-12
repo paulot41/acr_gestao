@@ -6,6 +6,16 @@ Este projeto suporta **dois tipos de deploy**:
 - 🏭 **PRODUÇÃO (Debian/Ubuntu)** - Deploy completo com SSL e domínios
 - 💻 **DESENVOLVIMENTO LOCAL (Docker Desktop)** - Testes e desenvolvimento
 
+### Atualizações recentes
+
+- Substituição de blocos `except Exception` por exceções específicas com logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Middleware de multi-tenancy consolidado.
+- Cálculos monetários com `Decimal`.
+- Migração para `UniqueConstraint`.
+- Limpeza de imports redundantes.
+- Novos testes automatizados para garantir estabilidade.
+
 ---
 
 ## 💻 **DEPLOY LOCAL - Docker Desktop (Desenvolvimento/Testes)**

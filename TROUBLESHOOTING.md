@@ -3,6 +3,16 @@
 ## O que aconteceu
 O arquivo `docker-compose.base-nginx.yml` ficou vazio no servidor de produção, causando o erro "empty compose file" ao tentar usar docker-compose.
 
+## Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Consolidação do middleware de multi-tenancy.
+- Uso de `Decimal` para cálculos monetários.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Limpeza de imports redundantes.
+- Adição de testes automatizados.
+
 ## Causa provável
 - Edição acidental (abrir e salvar vazio)
 - Uso acidental de redirecionamento (`> docker-compose.base-nginx.yml`)

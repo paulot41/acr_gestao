@@ -4,6 +4,16 @@
 
 Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wellness (Proform) com **Dashboard personalizado como página inicial** e **Django Admin totalmente funcional**.
 
+## Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com registo adequado.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Consolidação do middleware de multi-tenancy.
+- Cálculos financeiros agora utilizam `Decimal` para maior precisão.
+- Migração de `unique_together` para `UniqueConstraint` nos modelos.
+- Limpeza de imports não utilizados no middleware core.
+- Adição de testes automatizados para modelos e middleware.
+
 ### 🚀 **Funcionalidades Principais**
 
 #### 📊 **Dashboard Personalizado (NOVIDADE!)**

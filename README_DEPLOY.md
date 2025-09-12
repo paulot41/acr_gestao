@@ -2,6 +2,16 @@
 
 Sistema completo de gestão para ginásios ACR e Proform com deploy automatizado para Docker Desktop.
 
+## Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Middleware de multi-tenancy consolidado.
+- Cálculos financeiros com `Decimal`.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Limpeza de imports não utilizados.
+- Testes automatizados adicionados para modelos e middleware.
+
 ## ⚡ Início Rápido (2 minutos)
 
 ```bash

@@ -6,6 +6,16 @@
 - ✅ Todas as operações CRUD redirecionadas para Django Admin
 - ✅ Dashboard focado apenas em consulta e marcação de aulas
 
+### Atualizações recentes
+
+- Substituição de `except Exception` por exceções específicas com logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Middleware de multi-tenancy consolidado.
+- Cálculos financeiros com `Decimal`.
+- Migração para `UniqueConstraint`.
+- Remoção de imports desnecessários.
+- Novos testes automatizados para modelos e middleware.
+
 ## Como Aplicar as Alterações no Docker Desktop
 
 ### Opção 1: Redeploy Completo (Recomendado)

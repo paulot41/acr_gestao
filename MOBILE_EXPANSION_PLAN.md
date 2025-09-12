@@ -3,6 +3,16 @@
 
 ## 📱 ESTRATÉGIA RECOMENDADA: Progressive Web App (PWA)
 
+### Atualizações recentes
+
+- Substituição de blocos `except Exception` por exceções específicas com logging.
+- Remoção da criação automática de organização em `get_current_organization`.
+- Consolidação do middleware de multi-tenancy.
+- Cálculos financeiros com `Decimal`.
+- Migração de `unique_together` para `UniqueConstraint`.
+- Limpeza de imports desnecessários.
+- Inclusão de testes automatizados para modelos e middleware.
+
 ### VANTAGENS:
 - Aproveita 90% do código atual
 - Instalável como app nativa
