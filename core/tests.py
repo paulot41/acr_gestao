@@ -48,3 +48,26 @@ class EventAPITestCase(APITestCase):
         with self.assertRaises(ValidationError):
             b2.full_clean()
 
+
+class PersonConsentTestCase(APITestCase):
+    def test_rgpd_consent_default(self):
+        org = Organization.objects.create(name="Org", domain="org.com")
+        person = Person.objects.create(
+            organization=org,
+            first_name="Ana",
+            email="ana@example.com",
+            nif="1",
+        )
+        self.assertFalse(person.consent_rgpd)
+
+    def test_rgpd_consent_set_true(self):
+        org = Organization.objects.create(name="Org", domain="org.com")
+        person = Person.objects.create(
+            organization=org,
+            first_name="Ana",
+            email="ana@example.com",
+            nif="1",
+            consent_rgpd=True,
+        )
+        self.assertTrue(person.consent_rgpd)
+

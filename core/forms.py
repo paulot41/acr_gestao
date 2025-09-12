@@ -11,7 +11,7 @@ class PersonForm(forms.ModelForm):
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'nif',
             'date_of_birth', 'address', 'emergency_contact',
-            'entity_affiliation', 'status', 'notes', 'photo'
+            'entity_affiliation', 'status', 'notes', 'consent_rgpd', 'photo'
         ]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome'}),
@@ -25,6 +25,7 @@ class PersonForm(forms.ModelForm):
             'entity_affiliation': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notas adicionais...'}),
+            'consent_rgpd': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
 

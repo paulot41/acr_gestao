@@ -77,6 +77,7 @@ class Person(models.Model):
     consent_terms = models.BooleanField(default=False)
     consent_privacy = models.BooleanField(default=False)
     consent_marketing = models.BooleanField(default=False)
+    consent_rgpd = models.BooleanField(default=False)
     consent_timestamp = models.DateTimeField(null=True, blank=True)
 
     # Busca full-text (Postgres) (conforme patch)
@@ -122,6 +123,10 @@ class Person(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        from django.db import connection
+
+        if connection.vendor != "postgresql":
+            return
         # Atualiza SearchVector (método simples; ideal usar trigger no Postgres)
         try:
             type(self).objects.filter(pk=self.pk).update(
