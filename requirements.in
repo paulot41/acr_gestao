@@ -6,3 +6,6 @@ Pillow
 gunicorn
 psycopg[binary]
 whitenoise
+
+pytest
+pytest-django
