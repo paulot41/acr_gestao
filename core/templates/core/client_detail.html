@@ -6,8 +6,8 @@
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'client_list' %}">Clientes</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:client_list' %}">Clientes</a></li>
         <li class="breadcrumb-item active">{{ client.full_name }}</li>
     </ol>
 </nav>
@@ -35,10 +35,10 @@
         </div>
     </div>
     <div class="col-md-4 text-end">
-        <a href="{% url 'client_edit' client.pk %}" class="btn btn-primary">
+        <a href="{% url 'core:client_edit' client.pk %}" class="btn btn-primary">
             <i class="bi bi-pencil me-1"></i>Editar
         </a>
-        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">
+        <a href="{% url 'core:client_list' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i>Voltar
         </a>
     </div>

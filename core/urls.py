@@ -39,6 +39,8 @@ urlpatterns = [
     # Instrutores
     path('instructors/', web_views.instructor_list, name='instructor_list'),
     path('instructors/add/', web_views.instructor_add, name='instructor_add'),
+    path('instructors/<int:pk>/', web_views.instructor_detail, name='instructor_detail'),
+    path('instructors/<int:pk>/edit/', web_views.instructor_edit, name='instructor_edit'),
 
     # Eventos
     path('events/', web_views.event_list, name='event_list'),
@@ -50,6 +52,8 @@ urlpatterns = [
 
     # Gantt
     path('gantt/', views.gantt_view, name='gantt'),
+    # Alias para compatibilidade com templates antigos
+    path('gantt/', views.gantt_view, name='gantt_view'),
     path('gantt/data/', views.gantt_data, name='gantt_data'),
     path('gantt-system/', web_views.gantt_system, name='gantt_system'),
     path('gantt/events-json/', web_views.events_json, name='events_json'),

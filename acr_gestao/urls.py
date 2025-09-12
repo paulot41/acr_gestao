@@ -19,6 +19,8 @@ urlpatterns = [
 
     path('reports/', include('reports.urls')),
     # Dashboard como página inicial e todas as funcionalidades através do core
+    # Incluir URLs do core com e sem namespace para compatibilidade
+    path('', include('core.urls', namespace='core')),
     path('', include('core.urls')),
 ]
 
@@ -26,4 +28,3 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
