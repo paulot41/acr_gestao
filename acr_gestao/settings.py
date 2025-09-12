@@ -66,7 +66,6 @@ MIDDLEWARE = [
     'core.auth_views.UserRoleMiddleware',  # Middleware personalizado para papéis de utilizador
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    #"acr_gestao.multitenant.OrganizationMiddleware",
 ]
 
 ROOT_URLCONF = "acr_gestao.urls"

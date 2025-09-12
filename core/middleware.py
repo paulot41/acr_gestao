@@ -4,10 +4,7 @@ Funcionalidades multi-tenant e gestão de organizações.
 """
 
 from django.http import Http404
-from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
-from django.contrib import messages
-from django.db import IntegrityError
+from django.db import IntegrityError, ProgrammingError, OperationalError, connection
 from django.core.exceptions import ValidationError
 from .models import Organization
 import logging
@@ -31,45 +28,54 @@ class OrganizationMiddleware:
         # Determinar organização baseada no domínio
         host = request.get_host().split(':')[0]  # Remove porta se existir
 
+        organization = None
         try:
-            # Tentar encontrar organização por domínio exato
-            organization = Organization.objects.get(domain=host)
-        except Organization.DoesNotExist:
-            try:
-                # Fallback: tentar encontrar por domínio similar (desenvolvimento)
-                if 'localhost' in host or '127.0.0.1' in host:
-                    organization = Organization.objects.filter(domain__contains='local').first()
-                    if not organization:
-                        # Criar organização padrão para desenvolvimento
-                        organization = Organization.objects.create(
-                            name="ACR Gestão - Desenvolvimento",
-                            domain=host,
-                            org_type="both"
-                        )
-                        logger.info(f"Organização de desenvolvimento criada: {host}")
-                else:
-                    # Em produção, retornar 404 se não encontrar organização
-                    raise Http404(f"Organização não encontrada para domínio: {host}")
-            except (IntegrityError, ValidationError) as e:
-                logger.error(f"Erro ao determinar organização: {e}")
-                raise Http404("Erro de configuração do sistema")
+            if connection.introspection.table_names():
+                try:
+                    # Tentar encontrar organização por domínio exato
+                    organization = Organization.objects.get(domain=host)
+                except Organization.DoesNotExist:
+                    try:
+                        # Fallback: tentar encontrar por domínio similar (desenvolvimento)
+                        if 'localhost' in host or '127.0.0.1' in host:
+                            organization = Organization.objects.filter(domain__contains='local').first()
+                            if not organization:
+                                # Criar organização padrão para desenvolvimento
+                                organization = Organization.objects.create(
+                                    name="ACR Gestão - Desenvolvimento",
+                                    domain=host,
+                                    org_type="both"
+                                )
+                                logger.info(f"Organização de desenvolvimento criada: {host}")
+                        else:
+                            # Em produção, retornar 404 se não encontrar organização
+                            raise Http404(f"Organização não encontrada para domínio: {host}")
+                    except (IntegrityError, ValidationError) as e:
+                        logger.error(f"Erro ao determinar organização: {e}")
+                        raise Http404("Erro de configuração do sistema")
+        except (ProgrammingError, OperationalError):
+            organization = None
 
         # Anexar organização ao request
         request.organization = organization
 
-        # Adicionar informações úteis ao contexto
-        request.org_settings = {
-            'gym_fee': float(organization.gym_monthly_fee),
-            'wellness_fee': float(organization.wellness_monthly_fee),
-            'org_type': organization.org_type,
-            'org_name': organization.name
-        }
+        # Adicionar informações úteis ao contexto quando disponível
+        if organization:
+            request.org_settings = {
+                'gym_fee': float(organization.gym_monthly_fee),
+                'wellness_fee': float(organization.wellness_monthly_fee),
+                'org_type': organization.org_type,
+                'org_name': organization.name
+            }
+        else:
+            request.org_settings = {}
 
         response = self.get_response(request)
 
         # Adicionar headers de segurança
-        response['X-Organization-Domain'] = organization.domain
-        response['X-Organization-Type'] = organization.org_type
+        if organization:
+            response['X-Organization-Domain'] = organization.domain
+            response['X-Organization-Type'] = organization.org_type
 
         return response
 
