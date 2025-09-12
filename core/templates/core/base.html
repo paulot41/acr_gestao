@@ -113,29 +113,36 @@
                             <li><a class="dropdown-item" href="{% url 'core:credit_history' %}"><i class="fas fa-coins"></i> Histórico de Créditos</a></li>
                         </ul>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="instructorsDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-chalkboard-teacher"></i> Instrutores
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'core:instructor_list' %}"><i class="fas fa-list"></i> Lista de Instrutores</a></li>
-                            <li><a class="dropdown-item" href="{% url 'core:instructor_add' %}"><i class="fas fa-plus"></i> Adicionar Instrutor</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="eventsDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-calendar-check"></i> Eventos
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'core:event_list' %}"><i class="fas fa-list"></i> Lista de Eventos</a></li>
-                            <li><a class="dropdown-item" href="{% url 'core:event_add' %}"><i class="fas fa-plus"></i> Criar Evento</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'core:booking_list' %}"><i class="fas fa-ticket-alt"></i> Reservas</a></li>
-                            <li><a class="dropdown-item" href="{% url 'core:booking_add' %}"><i class="fas fa-plus"></i> Criar Reserva</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/admin/core/modality/"><i class="fas fa-tags"></i> Modalidades</a></li>
-                        </ul>
-                    </li>
+                      <li class="nav-item dropdown">
+                          <a class="nav-link dropdown-toggle" href="#" id="instructorsDropdown" role="button" data-bs-toggle="dropdown">
+                              <i class="fas fa-chalkboard-teacher"></i> Instrutores
+                          </a>
+                          <ul class="dropdown-menu">
+                              <li><a class="dropdown-item" href="{% url 'core:instructor_list' %}"><i class="fas fa-list"></i> Lista de Instrutores</a></li>
+                              <li><a class="dropdown-item" href="{% url 'core:instructor_add' %}"><i class="fas fa-plus"></i> Adicionar Instrutor</a></li>
+                          </ul>
+                      </li>
+                      <li class="nav-item dropdown">
+                          <a class="nav-link dropdown-toggle" href="#" id="modalitiesDropdown" role="button" data-bs-toggle="dropdown">
+                              <i class="fas fa-tags"></i> Modalidades
+                          </a>
+                          <ul class="dropdown-menu">
+                              <li><a class="dropdown-item" href="{% url 'core:modality_list' %}"><i class="fas fa-list"></i> Lista de Modalidades</a></li>
+                              <li><a class="dropdown-item" href="{% url 'core:modality_add' %}"><i class="fas fa-plus"></i> Adicionar Modalidade</a></li>
+                          </ul>
+                      </li>
+                      <li class="nav-item dropdown">
+                          <a class="nav-link dropdown-toggle" href="#" id="eventsDropdown" role="button" data-bs-toggle="dropdown">
+                              <i class="fas fa-calendar-check"></i> Eventos
+                          </a>
+                          <ul class="dropdown-menu">
+                              <li><a class="dropdown-item" href="{% url 'core:event_list' %}"><i class="fas fa-list"></i> Lista de Eventos</a></li>
+                              <li><a class="dropdown-item" href="{% url 'core:event_add' %}"><i class="fas fa-plus"></i> Criar Evento</a></li>
+                              <li><hr class="dropdown-divider"></li>
+                              <li><a class="dropdown-item" href="{% url 'core:booking_list' %}"><i class="fas fa-ticket-alt"></i> Reservas</a></li>
+                              <li><a class="dropdown-item" href="{% url 'core:booking_add' %}"><i class="fas fa-plus"></i> Criar Reserva</a></li>
+                              </ul>
+                      </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="googleCalendarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fab fa-google"></i> Google Calendar
