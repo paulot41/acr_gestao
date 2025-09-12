@@ -2,10 +2,14 @@ from threading import local
 from django.utils.deprecation import MiddlewareMixin
 from django.db import connection
 from django.db.utils import ProgrammingError, OperationalError
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from core.models import Organization
-except Exception:
+except ImportError as e:
+    logger.error("Erro ao importar modelo Organization: %s", e)
     Organization = None
 
 _local = local()

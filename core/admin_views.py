@@ -8,12 +8,18 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from django.views.decorators.http import require_http_methods
 import json
+import logging
+from django.db import IntegrityError
+from django.core.exceptions import ValidationError
+from json import JSONDecodeError
 
 from .models import (
     Person, Instructor, Modality, Event, Resource, Booking,
     Payment, Organization, InstructorCommission
 )
 from .forms import PersonForm, InstructorForm, ModalityForm, EventForm
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -253,7 +259,8 @@ def admin_create_client(request):
                 'email': client.email
             }
         })
-    except Exception as e:
+    except (JSONDecodeError, ValidationError, IntegrityError) as e:
+        logger.error("Erro ao criar cliente: %s", e)
         return JsonResponse({
             'success': False,
             'message': f'Erro ao criar cliente: {str(e)}'
@@ -288,7 +295,8 @@ def admin_create_instructor(request):
                 'email': instructor.email
             }
         })
-    except Exception as e:
+    except (JSONDecodeError, ValidationError, IntegrityError) as e:
+        logger.error("Erro ao criar instrutor: %s", e)
         return JsonResponse({
             'success': False,
             'message': f'Erro ao criar instrutor: {str(e)}'
@@ -322,7 +330,8 @@ def admin_create_modality(request):
                 'price': str(modality.price_per_class)
             }
         })
-    except Exception as e:
+    except (JSONDecodeError, ValidationError, IntegrityError) as e:
+        logger.error("Erro ao criar modalidade: %s", e)
         return JsonResponse({
             'success': False,
             'message': f'Erro ao criar modalidade: {str(e)}'
@@ -378,7 +387,8 @@ def admin_bulk_action(request):
                 ).update(is_active=False)
                 messages.success(request, f'{len(selected_ids)} instrutores desativados.')
 
-        except Exception as e:
+        except (ValueError, IntegrityError) as e:
+            logger.error("Erro na ação em lote: %s", e)
             messages.error(request, f'Erro na ação em lote: {str(e)}')
 
     return redirect(request.META.get('HTTP_REFERER', '/admin/'))

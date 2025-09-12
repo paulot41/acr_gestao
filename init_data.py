@@ -1,12 +1,17 @@
 import os
 import sys
 import django
+import logging
+from django.db.utils import IntegrityError, OperationalError
+from django.core.exceptions import ValidationError
 
 # Configurar Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'acr_gestao.settings')
 django.setup()
 
 from core.models import Organization, Modality, Resource, Instructor
+
+logger = logging.getLogger(__name__)
 
 def create_initial_data():
     print("🚀 Criando dados iniciais para desenvolvimento local...")
@@ -167,6 +172,6 @@ def create_initial_data():
 if __name__ == '__main__':
     try:
         create_initial_data()
-    except Exception as e:
-        print(f"❌ Erro: {e}")
+    except (IntegrityError, ValidationError, OperationalError) as e:
+        logger.error("Erro ao criar dados iniciais: %s", e)
         sys.exit(1)

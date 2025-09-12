@@ -7,6 +7,8 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib import messages
+from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from .models import Organization
 import logging
 
@@ -48,7 +50,7 @@ class OrganizationMiddleware:
                 else:
                     # Em produção, retornar 404 se não encontrar organização
                     raise Http404(f"Organização não encontrada para domínio: {host}")
-            except Exception as e:
+            except (IntegrityError, ValidationError) as e:
                 logger.error(f"Erro ao determinar organização: {e}")
                 raise Http404("Erro de configuração do sistema")
 
