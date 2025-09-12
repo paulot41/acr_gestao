@@ -52,6 +52,38 @@ make clean               # Limpar sistema (apaga dados!)
 make reset               # Reset completo
 ```
 
+## 🔐 Variáveis de Ambiente
+
+| Variável | Descrição |
+|---------|-----------|
+| `SECRET_KEY` | Chave secreta do Django |
+| `ALLOWED_HOSTS` | Domínios permitidos separados por vírgula |
+| `DB_NAME` | Nome da base de dados PostgreSQL |
+| `DB_USER` | Utilizador da base de dados |
+| `DB_PASSWORD` | Password da base de dados |
+| `DB_HOST` | Host da base de dados |
+| `DB_PORT` | Porta da base de dados (5432 por defeito) |
+| `DOMAIN` | Domínio público usado no SSL |
+| `EMAIL` | Email para certificados Let's Encrypt |
+
+## 🌐 Deploy de Produção
+
+```bash
+# 1. Definir variáveis e módulo de settings
+export DJANGO_SETTINGS_MODULE=settings.production
+export SECRET_KEY="changeme"
+export ALLOWED_HOSTS="example.com"
+
+# 2. Configurar SSL (gera dhparam e autoassinados)
+./setup_ssl.sh production
+
+# 3. Obter certificados Let's Encrypt e iniciar Nginx
+DOMAIN=example.com EMAIL=admin@example.com ./deploy_nginx.sh
+
+# 4. Verificar serviço
+./monitor.sh http://example.com/health/
+```
+
 ## 🎯 Funcionalidades Incluídas
 
 ✅ **Gantt Dinâmico** - Drag & drop para criar aulas  
