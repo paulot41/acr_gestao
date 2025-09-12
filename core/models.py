@@ -101,11 +101,18 @@ class Person(models.Model):
     )
 
     class Meta:
-        unique_together = [("organization", "email"), ("organization", "nif")]
         ordering = ["first_name", "last_name"]
         indexes = [
             models.Index(fields=["organization", "status"]),
             GinIndex(fields=["search"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "email"], name="unique_person_org_email"
+            ),
+            models.UniqueConstraint(
+                fields=["organization", "nif"], name="unique_person_org_nif"
+            ),
         ]
 
     def __str__(self) -> str:
