@@ -34,10 +34,6 @@ urlpatterns = [
     path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
     path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
 
-    # Modalidades
-    path('modalities/', web_views.modality_list, name='modality_list'),
-    path('modalities/add/', web_views.modality_add, name='modality_add'),
-
     # Instrutores
     path('instructors/', web_views.instructor_list, name='instructor_list'),
     path('instructors/add/', web_views.instructor_add, name='instructor_add'),
@@ -49,6 +45,10 @@ urlpatterns = [
     # Reservas
     path('bookings/', web_views.booking_list, name='booking_list'),
     path('bookings/add/', web_views.booking_add, name='booking_add'),
+
+    # Modalidades
+    path('modalities/', web_views.modality_list, name='modality_list'),
+    path('modalities/add/', web_views.modality_add, name='modality_add'),
 
     # Gantt
     path('gantt/', views.gantt_view, name='gantt'),
