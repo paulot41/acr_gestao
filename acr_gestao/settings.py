@@ -1,4 +1,5 @@
 from pathlib import Path
+from django.urls import reverse_lazy
 import os
 import secrets
 
@@ -178,3 +179,7 @@ REST_FRAMEWORK = {
 
 if DEBUG:
     REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'].append('rest_framework.renderers.BrowsableAPIRenderer')
+
+# URLs de autenticação
+LOGIN_URL = reverse_lazy('core:login')
+LOGIN_REDIRECT_URL = reverse_lazy('core:home')

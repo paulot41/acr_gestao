@@ -9,6 +9,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.auth.forms import AuthenticationForm
+from django.conf import settings
 
 class CustomLoginView(LoginView):
     """Vista personalizada de login com suporte a multi-entidade."""
@@ -140,30 +141,17 @@ class UserRoleMiddleware:
         response = self.get_response(request)
         return response
 
-# Função de view para compatibilidade com URLs existentes
+# Funções simples de autenticação
 def login_view(request):
-    """Vista de login como função para compatibilidade."""
-    if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            if user is not None:
-                login(request, user)
-                messages.success(request, f'Bem-vindo, {user.first_name or user.username}!')
-                return redirect('dashboard_router')
-            else:
-                messages.error(request, 'Credenciais inválidas.')
-        else:
-            messages.error(request, 'Por favor, corrija os erros abaixo.')
-    else:
-        form = AuthenticationForm()
+    """Renderiza e processa o formulário de login."""
+    form = AuthenticationForm(request, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        login(request, form.get_user())
+        return redirect(settings.LOGIN_REDIRECT_URL)
+    return render(request, 'auth/login.html', {'form': form})
 
-    return render(request, 'registration/login.html', {'form': form})
-
+@login_required
 def logout_view(request):
-    """Vista de logout."""
+    """Termina a sessão do utilizador."""
     logout(request)
-    messages.success(request, 'Logout realizado com sucesso.')
-    return redirect('login')
+    return render(request, 'auth/logout.html')
