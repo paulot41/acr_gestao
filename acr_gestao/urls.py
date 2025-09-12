@@ -17,6 +17,7 @@ urlpatterns = [
     # Django Admin padrão
     path('admin/', admin.site.urls),
 
+    path('reports/', include('reports.urls')),
     # Dashboard como página inicial e todas as funcionalidades através do core
     path('', include('core.urls')),
 ]
@@ -25,3 +26,4 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
