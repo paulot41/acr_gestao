@@ -1,7 +1,10 @@
+from functools import wraps
+
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.contrib.auth.views import LoginView, LogoutView
@@ -72,28 +75,53 @@ def profile_view(request):
     }
     return render(request, 'registration/profile.html', context)
 
-def check_user_permissions(user, required_permission=None):
-    """Verificar permissões do utilizador."""
+def check_user_permissions(user, required_permission=None, allowed_roles=None):
+    """Verificar permissões e papéis do utilizador."""
     if not user.is_authenticated:
         return False
 
-    if required_permission:
-        return user.has_perm(required_permission)
+    if allowed_roles and get_user_role(user) not in allowed_roles:
+        return False
+
+    if required_permission and not user.has_perm(required_permission):
+        return False
 
     return True
 
 def get_user_role(user):
     """Determinar o papel do utilizador no sistema."""
+    if not user.is_authenticated:
+        return None
+
+    # Preferir informação do UserProfile se existir
+    profile = getattr(user, "profile", None)
+    if profile:
+        return profile.user_type
+
     if user.is_superuser:
-        return 'admin'
-    elif user.is_staff:
-        return 'staff'
-    elif user.groups.filter(name='Instrutores').exists():
-        return 'instructor'
-    elif user.groups.filter(name='Rececionistas').exists():
-        return 'receptionist'
-    else:
-        return 'client'
+        return "admin"
+    if user.is_staff:
+        return "staff"
+    if user.groups.filter(name="Instrutores").exists():
+        return "instructor"
+    if user.groups.filter(name="Rececionistas").exists():
+        return "staff"
+    return "client"
+
+
+def role_required(allowed_roles):
+    """Decorator para restringir acesso com base no papel do utilizador."""
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(request, *args, **kwargs):
+            if get_user_role(request.user) in allowed_roles:
+                return view_func(request, *args, **kwargs)
+            raise PermissionDenied
+
+        return login_required(_wrapped_view)
+
+    return decorator
 
 class UserRoleMiddleware:
     """Middleware para determinar e armazenar o papel do utilizador."""

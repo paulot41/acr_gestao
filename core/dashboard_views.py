@@ -11,6 +11,8 @@ from datetime import timedelta
 import logging
 from django.db import DatabaseError
 from django.core.exceptions import ObjectDoesNotExist
+
+from .auth_views import role_required
 from .models import (
     Person, Instructor, Event, Booking, ClientSubscription,
     SystemAlert, UserProfile, Modality, Resource, Payment, InstructorCommission
@@ -26,7 +28,7 @@ def dashboard_router(request):
     return redirect('core:gantt')
 
 
-@login_required
+@role_required(["admin", "staff"])
 def admin_dashboard(request):
     """Dashboard de leitura amigável dos dados do admin"""
     org = getattr(request, 'organization', None)
@@ -83,7 +85,7 @@ def admin_dashboard(request):
     return render(request, 'core/dashboard/admin_dashboard.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def clients_overview(request):
     """Vista de leitura dos clientes"""
     org = getattr(request, 'organization', None)
@@ -102,7 +104,7 @@ def clients_overview(request):
     return render(request, 'core/dashboard/clients_overview.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def instructors_overview(request):
     """Vista de leitura dos instrutores"""
     org = getattr(request, 'organization', None)
@@ -122,7 +124,7 @@ def instructors_overview(request):
     return render(request, 'core/dashboard/instructors_overview.html', context)
 
 
-@login_required
+@role_required(["admin", "staff"])
 def dashboard_admin(request):
     """Dashboard simplificado para administradores - consulta apenas."""
     org = request.organization
@@ -186,7 +188,7 @@ def dashboard_admin(request):
     return render(request, 'core/dashboard_simple.html', context)
 
 
-@login_required
+@role_required(["instructor", "admin", "staff"])
 def dashboard_instructor(request):
     """Dashboard simplificado para instrutores - apenas suas aulas."""
     try:
