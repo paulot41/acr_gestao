@@ -6,8 +6,8 @@
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'instructor_list' %}">Instrutores</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:instructor_list' %}">Instrutores</a></li>
         <li class="breadcrumb-item active">{{ title }}</li>
     </ol>
 </nav>
@@ -210,7 +210,7 @@
                         <div class="col-12">
                             <hr>
                             <div class="d-flex justify-content-between">
-                                <a href="{% if instructor %}{% url 'instructor_detail' instructor.pk %}{% else %}{% url 'instructor_list' %}{% endif %}"
+                                <a href="{% if instructor %}{% url 'core:instructor_detail' instructor.pk %}{% else %}{% url 'core:instructor_list' %}{% endif %}"
                                    class="btn btn-outline-secondary">
                                     <i class="bi bi-arrow-left me-1"></i>Cancelar
                                 </a>

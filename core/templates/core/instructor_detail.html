@@ -6,8 +6,8 @@
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'instructor_list' %}">Instrutores</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:instructor_list' %}">Instrutores</a></li>
         <li class="breadcrumb-item active">{{ instructor.full_name }}</li>
     </ol>
 </nav>
@@ -45,7 +45,7 @@
     </div>
     <div class="col-md-4 text-end">
         <div class="btn-group">
-            <a href="{% url 'instructor_edit' instructor.pk %}" class="btn btn-warning">
+            <a href="{% url 'core:instructor_edit' instructor.pk %}" class="btn btn-warning">
                 <i class="bi bi-pencil me-1"></i>Editar
             </a>
             <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
@@ -202,7 +202,7 @@
                 <h6 class="m-0 font-weight-bold text-primary">
                     <i class="bi bi-calendar-check me-2"></i>Próximas Aulas
                 </h6>
-                <a href="{% url 'gantt_view' %}?instructor={{ instructor.id }}" class="btn btn-primary btn-sm">
+                <a href="{% url 'core:gantt' %}?instructor={{ instructor.id }}" class="btn btn-primary btn-sm">
                     <i class="bi bi-calendar-plus me-1"></i>Nova Aula
                 </a>
             </div>
@@ -258,7 +258,7 @@
                     <div class="text-center py-4">
                         <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
                         <p class="text-muted mt-2">Nenhuma aula agendada</p>
-                        <a href="{% url 'gantt_view' %}?instructor={{ instructor.id }}" class="btn btn-primary">
+                        <a href="{% url 'core:gantt' %}?instructor={{ instructor.id }}" class="btn btn-primary">
                             <i class="bi bi-calendar-plus me-1"></i>Agendar Primeira Aula
                         </a>
                     </div>

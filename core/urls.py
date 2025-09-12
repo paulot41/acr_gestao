@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Dashboard adicional (manter para compatibilidade)
     path('dashboard/', dashboard_views.admin_dashboard, name='admin_dashboard'),
+    path('dashboard/router/', dashboard_views.dashboard_router, name='dashboard_router'),
     path('dashboard/clients/', dashboard_views.clients_overview, name='admin_clients_overview'),
     path('dashboard/instructors/', dashboard_views.instructors_overview, name='admin_instructors_overview'),
 
