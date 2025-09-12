@@ -1,6 +1,11 @@
 from django.urls import path
 from django.views.generic import RedirectView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from . import views, web_views, auth_views, dashboard_views, google_calendar_views
+
+
+class LoginRequiredRedirectView(LoginRequiredMixin, RedirectView):
+    pass
 
 app_name = 'core'
 
@@ -21,14 +26,14 @@ urlpatterns = [
     path('credit-history/', dashboard_views.credit_history_view, name='credit_history'),
 
     # Rotas antigas que redirecionam para o Gantt
-    path('schedule/', RedirectView.as_view(pattern_name='core:gantt', permanent=False), name='schedule'),
-    path('instructors/', RedirectView.as_view(pattern_name='core:gantt', permanent=False), name='instructors'),
+    path('schedule/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='schedule'),
+    path('instructors/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='instructors'),
 
     # Clientes (redirecionar para admin)
-    path('clients/', RedirectView.as_view(url='/admin/core/person/'), name='client_list'),
-    path('modalities/', RedirectView.as_view(url='/admin/core/modality/'), name='modality_list'),
-    path('clients/<int:pk>/', RedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
-    path('clients/<int:pk>/edit/', RedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
+    path('clients/', LoginRequiredRedirectView.as_view(url='/admin/core/person/'), name='client_list'),
+    path('modalities/', LoginRequiredRedirectView.as_view(url='/admin/core/modality/'), name='modality_list'),
+    path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
+    path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
 
     # Gantt
     path('gantt/', views.gantt_view, name='gantt'),
