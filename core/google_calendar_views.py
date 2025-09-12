@@ -236,9 +236,11 @@ def google_calendar_sync_instructor(request, instructor_id):
         service = get_google_calendar_service(organization)
         stats = service.sync_all_instructor_events(instructor)
 
-        messages.success(request,
+        messages.success(
+            request,
             f"Sincronização completa para {instructor.full_name}: "
-            f"{stats['success']} eventos sincronizados, "
+            f"{stats['success']} eventos exportados, "
+            f"{stats['imported']} importados, "
             f"{stats['errors']} erros, "
             f"{stats['skipped']} ignorados."
         )
@@ -387,3 +389,29 @@ def google_calendar_settings(request):
     }
 
     return render(request, 'core/google_calendar/settings.html', context)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def google_calendar_export_backup(request):
+    """Exportar ficheiro de backup para o Google Drive."""
+    try:
+        organization = get_current_organization(request)
+    except Organization.DoesNotExist:
+        raise Http404("Nenhuma organização configurada.")
+
+    file_path = request.POST.get('file_path', '').strip()
+    if not file_path:
+        messages.error(request, "Ficheiro de backup não especificado.")
+        return redirect('core:google_calendar_setup')
+
+    try:
+        service = get_google_calendar_service(organization)
+        service.upload_backup_to_drive(file_path)
+        messages.success(request, "Backup exportado para Google Drive com sucesso!")
+        logger.info(f"Backup {file_path} exportado para Google Drive")
+    except (ValidationError, HttpError, OSError) as e:
+        messages.error(request, f"Erro ao exportar backup: {e}")
+        logger.error(f"Erro ao exportar backup {file_path}: {e}")
+
+    return redirect('core:google_calendar_setup')
