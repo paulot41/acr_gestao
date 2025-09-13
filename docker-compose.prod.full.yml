@@ -4,14 +4,14 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-acrdb_local}
+      POSTGRES_DB: ${POSTGRES_DB:-acrdb}
       POSTGRES_USER: ${POSTGRES_USER:-acruser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-acrpass123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-acruser} -d ${POSTGRES_DB:-acrdb_local}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-acruser} -d ${POSTGRES_DB:-acrdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,43 +35,28 @@ services:
   web:
     build: .
     env_file:
-      - .env.local
+      - .env.prod
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: gunicorn acr_gestao.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+    ports:
+      - "8000:8000"
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
       - logs_data:/app/logs
-      - .:/app
     environment:
-      - DEBUG=1
-      - PYTHONUNBUFFERED=1
-    restart: unless-stopped
-    expose:
-      - "8000"
+      DJANGO_SETTINGS_MODULE: settings.production
+      DEBUG: "0"
+      PYTHONUNBUFFERED: "1"
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/admin/', timeout=10)"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - acr_network
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "8080:80"  # Usar porta 8080 para evitar conflitos
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - static_data:/app/staticfiles:ro
-      - media_data:/app/media:ro
-      - logs_data:/var/log/nginx
-    depends_on:
-      - web
     restart: unless-stopped
     networks:
       - acr_network
@@ -83,6 +68,7 @@ volumes:
   static_data:
   logs_data:
 
-networks
+networks:
   acr_network:
     driver: bridge
+

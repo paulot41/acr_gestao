@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    # Production overrides: run Gunicorn and use .env.prod
+    command: gunicorn acr_gestao.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: settings.production
+      DEBUG: "0"
+    ports:
+      - "8000:8000"
+    # Replace volumes: drop source bind mount for immutable image
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+      - logs_data:/app/logs
+
+  # Do not run nginx from the base compose in production
+  nginx:
+    profiles: ["dev"]
+    ports: []
+
+volumes:
+  media_data:
+  static_data:
+  logs_data:
+

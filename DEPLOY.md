@@ -340,220 +340,168 @@ docker system prune -a -f
 
 ---
 
-## 🏭 **DEPLOY PRODUÇÃO - VM Debian/Proxmox**
+## 🏭 **DEPLOY PRODUÇÃO - Dois Hosts (App VM + Nginx CT)**
 
-### ✨ **NOVIDADES DA VERSÃO ATUAL**
-- 🎯 **Gantt Dinâmico** com drag & drop para criação de aulas
-- 👥 **Sistema de Turmas** completo integrado
-- 🔄 **APIs otimizadas** para performance máxima
-- 📱 **Interface responsiva** moderna
-- ⚡ **Validações em tempo real** de conflitos
-- 🎨 **Personalização por modalidade** (cores, durações)
+### 🧭 Arquitetura
+- App VM (Debian) em 192.168.1.10: Docker Compose com Django (Gunicorn) + Postgres + Redis. Expõe a porta 8000 internamente.
+- Nginx CT (Proxmox) em 192.168.1.20: termina TLS para acrsantatecla.duckdns.org e proformsc.duckdns.org e faz proxy para 192.168.1.10:8000.
 
-### 📋 Pré-requisitos na VM Debian
+### ✅ Pré-requisitos gerais
+- DNS: ambos os domínios no DuckDNS devem apontar para o IP público do seu router/ISP.
+- Router: encaminhar portas 80 e 443 para 192.168.1.20 (Nginx CT).
 
-#### 1. Atualizar o sistema
+---
+
+### 🖥️ Passo 1 — App VM (192.168.1.10)
+
+1) Atualizar e instalar pacotes
 ```bash
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y ca-certificates curl git ufw
 ```
 
-#### 2. Instalar Docker
+2) Instalar Docker + Compose plugin
 ```bash
-# Remover versões antigas do Docker
-sudo apt remove docker docker-engine docker.io containerd runc
-
-# Instalar dependências
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
-
-# Adicionar chave GPG oficial do Docker
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-# Adicionar repositório Docker
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Instalar Docker
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Adicionar usuário ao grupo docker
+curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
-
-# Reiniciar sessão para aplicar mudanças de grupo
-echo "⚠️  IMPORTANTE: Fazer logout/login para aplicar mudanças do grupo docker"
+newgrp docker
+docker --version && docker compose version
 ```
 
-#### 3. Instalar Docker Compose (standalone)
+3) SSH key para GitHub e clonar por SSH
 ```bash
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+ssh-keygen -t ed25519 -C "acr-app@192.168.1.10" -N "" -f ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub  # adicione em GitHub > Settings > SSH and GPG keys
+ssh -T git@github.com      # deve mostrar mensagem de boas-vindas
 
-# Verificar instalação
-docker-compose --version
-```
-
-#### 4. Instalar Git e utilitários
-```bash
-sudo apt install -y git curl htop nano vim
-```
-
-### 🔄 Deploy do Projeto em Produção
-
-#### 1. Clonar o repositório
-```bash
-cd /home/$USER
-git clone https://github.com/paulot41/acr_gestao.git
+git clone git@github.com:paulot41/acr_gestao.git
 cd acr_gestao
-
-# Verificar se todos os ficheiros estão presentes
-ls -la
-echo "✅ Verificar se existem: docker-compose.yml, Dockerfile, deploy.sh"
 ```
 
-#### 2. Configurar ambiente de produção
+4) Configurar ambiente de produção
 ```bash
-# Copiar arquivo de configuração
 cp .env.prod.example .env.prod
-
-# Gerar SECRET_KEY segura
-python3 -c 'import secrets; print("SECRET_KEY=" + secrets.token_urlsafe(50))' >> temp_key.txt
-echo "✅ SECRET_KEY gerada. Copie o valor de temp_key.txt para .env.prod"
-cat temp_key.txt
-
-# Limpar arquivo temporário após uso
-rm temp_key.txt
+python3 - <<'PY'
+import secrets
+print('SECRET_KEY='+secrets.token_urlsafe(64))
+PY
+echo "Use o valor acima para SECRET_KEY e defina passwords fortes em .env.prod"
 ```
 
-#### 3. Editar configurações de produção
+Edite `.env.prod` e garanta:
 ```bash
-nano .env.prod
-```
-
-**Configurar as seguintes variáveis:**
-```bash
-# OBRIGATÓRIO: Usar a SECRET_KEY gerada acima
-SECRET_KEY=sua_chave_secreta_super_longa_aqui
-
-# Produção
 DEBUG=0
-ALLOWED_HOSTS=acrsantatecla.duckdns.org,proformsc.duckdns.org,localhost,127.0.0.1
-
-# Base de dados PostgreSQL
+DJANGO_SETTINGS_MODULE=settings.production
+ALLOWED_HOSTS=acrsantatecla.duckdns.org,proformsc.duckdns.org
 DB_ENGINE=django.db.backends.postgresql
-DB_NAME=acrdb
-DB_USER=acruser
-DB_PASSWORD=senha_super_segura_postgresql_aqui
 DB_HOST=db
 DB_PORT=5432
-
-# PostgreSQL (container)
-POSTGRES_DB=acrdb
-POSTGRES_USER=acruser
-POSTGRES_PASSWORD=senha_super_segura_postgresql_aqui
-
-# Superusuário Django (opcional mas recomendado)
-DJANGO_SUPERUSER_USERNAME=admin
-DJANGO_SUPERUSER_EMAIL=admin@acr.pt
-DJANGO_SUPERUSER_PASSWORD=senha_admin_muito_segura_aqui
-
-# URLs dos domínios
+REDIS_URL=redis://redis:6379/0
 ACR_DOMAIN=acrsantatecla.duckdns.org
 PROFORM_DOMAIN=proformsc.duckdns.org
-
-# Performance
-REDIS_URL=redis://redis:6379/0
 ```
 
-#### 4. Deploy automático em produção
+5) Firewall (apenas Nginx CT pode aceder à app)
 ```bash
-# Tornar scripts executáveis
-chmod +x deploy.sh deploy_nginx.sh monitor.sh
-
-# Validar configuração
-./validate_compose.sh
-
-# Deploy completo com SSL
-./deploy_nginx.sh
-
-# Ou deploy manual para produção:
-docker-compose -f docker-compose.base-nginx.yml -f docker-compose.prod.yml up -d --build
+sudo ufw allow OpenSSH
+sudo ufw allow from 192.168.1.20 to any port 8000 proto tcp
+sudo ufw enable
 ```
 
-#### 5. Configuração pós-deploy produção
+6) Subir a stack da aplicação (ficheiro único de produção)
 ```bash
-# Criar superusuário (se não configurado no .env.prod)
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml exec web python manage.py createsuperuser
+docker compose -f docker-compose.prod.full.yml up -d --build
+docker compose -f docker-compose.prod.full.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.full.yml exec web python manage.py collectstatic --noinput
+curl -f http://localhost:8000/health/
+```
 
-# Criar organizações para os domínios
-docker-compose -f docker-compose.base-nginx.yml -f docker-compose.prod.yml exec web python manage.py shell << 'EOF'
+7) Criar superuser e organizações
+```bash
+docker compose -f docker-compose.prod.full.yml exec web python manage.py createsuperuser
+
+docker compose -f docker-compose.prod.full.yml exec web python manage.py shell << 'EOF'
 from core.models import Organization
-# ACR Santa Tecla
-acr, created = Organization.objects.get_or_create(
+Organization.objects.get_or_create(
     domain='acrsantatecla.duckdns.org',
-    defaults={
-        'name': 'ACR Santa Tecla',
-        'org_type': 'gym',
-        'gym_monthly_fee': 30.00,
-        'wellness_monthly_fee': 0.00
-    }
+    defaults={'name':'ACR Santa Tecla','org_type':'gym','gym_monthly_fee':30.0,'wellness_monthly_fee':0.0}
 )
-print(f"ACR: {'Created' if created else 'Updated'} - {acr}")
-
-# Proform SC
-proform, created = Organization.objects.get_or_create(
+Organization.objects.get_or_create(
     domain='proformsc.duckdns.org',
-    defaults={
-        'name': 'Proform Santa Clara',
-        'org_type': 'wellness',
-        'gym_monthly_fee': 0.00,
-        'wellness_monthly_fee': 45.00
-    }
+    defaults={'name':'Proform Santa Clara','org_type':'wellness','gym_monthly_fee':0.0,'wellness_monthly_fee':45.0}
 )
-print(f"Proform: {'Created' if created else 'Updated'} - {proform}")
+print('✅ Organizações configuradas')
 EOF
+```
 
-# Criar dados de exemplo (opcional)
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml exec web python manage.py shell << 'EOF'
-from core.models import Organization, Modality, Resource, Instructor
+---
 
-# Para cada organização, criar modalidades e recursos básicos
-for org in Organization.objects.all():
-    print(f"Setting up {org.name}...")
-    
-    # Modalidades básicas
-    if org.org_type in ['gym', 'both']:
-        Modality.objects.get_or_create(
-            organization=org, name='Musculação',
-            defaults={'entity_type': 'acr', 'color': '#dc3545', 'max_capacity': 20}
-        )
-        Resource.objects.get_or_create(
-            organization=org, name='Sala de Musculação',
-            defaults={'entity_type': 'acr', 'capacity': 25}
-        )
-    
-    if org.org_type in ['wellness', 'both']:
-        Modality.objects.get_or_create(
-            organization=org, name='Pilates',
-            defaults={'entity_type': 'proform', 'color': '#28a745', 'max_capacity': 8}
-        )
-        Resource.objects.get_or_create(
-            organization=org, name='Estúdio Pilates',
-            defaults={'entity_type': 'proform', 'capacity': 10}
-        )
-    
-    print(f"✅ {org.name} configured successfully")
-EOF
+### 🌐 Passo 2 — Nginx CT (192.168.1.20)
+
+1) Instalar Docker e preparar pastas
+```bash
+apt update && apt upgrade -y
+apt install -y ca-certificates curl ufw
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker $USER
+newgrp docker
+ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
+mkdir -p ~/reverse-proxy/{certbot/conf,certbot/www}
+cd ~/reverse-proxy
+```
+
+2) Configurar Nginx (usar template do repositório)
+```bash
+# Copie o template para este host
+curl -o nginx-proxy.conf https://raw.githubusercontent.com/paulot41/acr_gestao/main/nginx-proxy.conf
+# OU transfira manualmente o ficheiro nginx-proxy.conf deste repositório.
+```
+
+3) Iniciar Nginx (HTTP primeiro, para ACME webroot)
+```bash
+docker run -d --name nginx -p 80:80 -p 443:443 \
+  -v "$(pwd)/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro" \
+  -v "$(pwd)/certbot/www:/var/www/certbot" \
+  -v "$(pwd)/certbot/conf:/etc/letsencrypt:ro" \
+  nginx:alpine
+```
+
+4) Obter certificados Let's Encrypt (SAN para ambos os domínios)
+```bash
+docker run --rm -it \
+  -v "$(pwd)/certbot/conf:/etc/letsencrypt" \
+  -v "$(pwd)/certbot/www:/var/www/certbot" \
+  certbot/certbot certonly --webroot -w /var/www/certbot \
+  -d acrsantatecla.duckdns.org -d proformsc.duckdns.org \
+  --email you@example.com --agree-tos --no-eff-email
+
+docker exec nginx nginx -s reload
+```
+
+5) Renovação automática (cron)
+```bash
+crontab -e
+# Adicione:
+0 3 * * * docker run --rm -v "$HOME/reverse-proxy/certbot/conf:/etc/letsencrypt" -v "$HOME/reverse-proxy/certbot/www:/var/www/certbot" certbot/certbot renew --webroot -w /var/www/certbot && docker exec nginx nginx -s reload
+```
+
+---
+
+### 🔎 Validação final
+```bash
+# Do Nginx CT
+curl -f http://192.168.1.10:8000/health/
+
+# Público (DNS + router ok)
+curl -I https://acrsantatecla.duckdns.org/health/
+curl -I https://proformsc.duckdns.org/health/
 ```
 
 ### 🎯 URLs de Acesso em Produção
-
-#### Principais:
-- **ACR Santa Tecla:** https://acrsantatecla.duckdns.org
-- **Proform SC:** https://proformsc.duckdns.org
-
-#### Funcionalidades:
-- **Gantt Dinâmico:** https://acrsantatecla.duckdns.org/gantt/
-- **Admin Django:** https://acrsantatecla.duckdns.org/admin/
-- **Dashboard:** https://acrsantatecla.duckdns.org/dashboard/
+- https://acrsantatecla.duckdns.org
+- https://proformsc.duckdns.org
+- Admin: https://acrsantatecla.duckdns.org/admin/
+- Gantt: https://acrsantatecla.duckdns.org/gantt/
 
 ---
 
