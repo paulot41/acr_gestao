@@ -55,6 +55,9 @@ Thumbs.db
 logs/
 *.log
 
+# Local agent instructions
+AGENTS.md
+
 # Backups (manter estrutura mas não os arquivos)
 backups/*.sql
 backups/*.sql.gz
