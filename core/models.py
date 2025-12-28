@@ -10,8 +10,8 @@ from decimal import Decimal
 import logging
 
 # PostgreSQL search functionality
-from django.contrib.postgres.indexes import GinIndex
-from django.contrib.postgres.search import SearchVectorField, SearchVector
+from django.contrib.postgres.search import SearchVector
+from .fields import OptionalSearchVectorField
 
 # Import validations (safe: service uses lazy model getters; no circular import)
 from .services.scheduling import ensure_no_conflict, ensure_capacity
@@ -81,7 +81,7 @@ class Person(models.Model):
     consent_timestamp = models.DateTimeField(null=True, blank=True)
 
     # Busca full-text (Postgres) (conforme patch)
-    search = SearchVectorField(null=True, editable=False)
+    search = OptionalSearchVectorField(null=True, editable=False)
 
     # Novos campos existentes
     date_of_birth = models.DateField("Data de Nascimento", null=True, blank=True)
@@ -106,14 +106,17 @@ class Person(models.Model):
         ordering = ["first_name", "last_name"]
         indexes = [
             models.Index(fields=["organization", "status"]),
-            GinIndex(fields=["search"]),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["organization", "email"], name="unique_person_org_email"
+                fields=["organization", "email"],
+                name="unique_person_org_email",
+                condition=~models.Q(email=""),
             ),
             models.UniqueConstraint(
-                fields=["organization", "nif"], name="unique_person_org_nif"
+                fields=["organization", "nif"],
+                name="unique_person_org_nif",
+                condition=~models.Q(nif=""),
             ),
         ]
 
@@ -186,10 +189,16 @@ class Instructor(models.Model):
     )
 
     class Meta:
-        unique_together = [("organization", "email")]
         ordering = ["first_name", "last_name"]
         indexes = [
             models.Index(fields=["organization", "is_active"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "email"],
+                name="unique_instructor_org_email",
+                condition=~models.Q(email=""),
+            ),
         ]
 
     def __str__(self) -> str:
@@ -464,7 +473,7 @@ class Event(models.Model):
     @property
     def bookings_count(self) -> int:
         """Count non-cancelled bookings."""
-        return self.bookings.exclude(status="cancelled").count()
+        return self.bookings.exclude(status=self.bookings.model.Status.CANCELLED).count()
 
     @property
     def is_full(self) -> bool:
@@ -484,10 +493,17 @@ class Event(models.Model):
 
 class Booking(models.Model):
     """Reservas com lista de espera e auto-check-in por QR."""
+    class Status(models.TextChoices):
+        CONFIRMED = "confirmed", "Confirmada"
+        WAITLIST = "waitlist", "Lista de espera"
+        CANCELLED = "cancelled", "Cancelada"
+        NO_SHOW = "no_show", "Falta"
+        CHECKED_IN = "checked_in", "Check-in"
+
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="bookings")
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="bookings")
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="bookings")
-    status = models.CharField(max_length=16, default="confirmed")  # confirmed|waitlist|cancelled|no_show|checked_in
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.CONFIRMED)
     created_at = models.DateTimeField(auto_now_add=True)
     checkin_code = models.CharField(max_length=16, blank=True)
 
@@ -514,7 +530,7 @@ class Booking(models.Model):
         ensure_no_conflict(self.event)
         ensure_capacity(self)
         # Validar créditos se usar subscrição
-        if self.subscription_used and self.status == "confirmed":
+        if self.subscription_used and self.status == self.Status.CONFIRMED:
             if not self.subscription_used.has_credits():
                 raise ValidationError("Subscrição não tem créditos suficientes.")
 
@@ -524,7 +540,7 @@ class Booking(models.Model):
 
     def can_be_cancelled(self) -> bool:
         """Verifica se a reserva pode ser cancelada (ex: até 2h antes)."""
-        if self.status == "cancelled":
+        if self.status == self.Status.CANCELLED:
             return False
 
         # Permitir cancelamento até 2 horas antes do evento
@@ -1044,4 +1060,3 @@ class MessageLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.campaign.name} -> {self.person.full_name} ({self.status})"
-

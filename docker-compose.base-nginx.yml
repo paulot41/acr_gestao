@@ -83,6 +83,6 @@ volumes:
   static_data:
   logs_data:
 
-networks
+networks:
   acr_network:
     driver: bridge

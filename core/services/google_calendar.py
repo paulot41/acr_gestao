@@ -187,11 +187,22 @@ class GoogleCalendarService:
         service = self._get_service()
 
         # Obter ou criar configuração do instrutor
+        default_color = "#0d6efd"
+        event_with_modality = (
+            instructor.events.filter(modality__isnull=False)
+            .select_related("modality")
+            .first()
+        )
+        calendar_color = (
+            event_with_modality.modality.color
+            if event_with_modality and event_with_modality.modality and event_with_modality.modality.color
+            else default_color
+        )
         instructor_config, created = InstructorGoogleCalendar.objects.get_or_create(
             instructor=instructor,
             defaults={
                 'calendar_name': f"{instructor.full_name} - Aulas",
-                'calendar_color': instructor.modality_set.first().color if instructor.modality_set.exists() else "#0d6efd"
+                'calendar_color': calendar_color
             }
         )
 
@@ -218,7 +229,7 @@ class GoogleCalendarService:
             GoogleCalendarSyncLog.objects.create(
                 organization=self.organization,
                 instructor=instructor,
-                sync_type=GoogleCalendarSyncLog.SyncType.CALENDAR_CREATE,
+                sync_type=GoogleCalendarSyncLog.SyncType.CREATE,
                 status=GoogleCalendarSyncLog.Status.SUCCESS,
                 google_calendar_id=calendar_id,
                 sync_data={'calendar_name': instructor_config.get_calendar_name()}
@@ -235,7 +246,7 @@ class GoogleCalendarService:
             GoogleCalendarSyncLog.objects.create(
                 organization=self.organization,
                 instructor=instructor,
-                sync_type=GoogleCalendarSyncLog.SyncType.CALENDAR_CREATE,
+                sync_type=GoogleCalendarSyncLog.SyncType.CREATE,
                 status=GoogleCalendarSyncLog.Status.ERROR,
                 error_message=error_msg
             )
@@ -296,7 +307,7 @@ class GoogleCalendarService:
                     body=event_body
                 ).execute()
 
-                sync_type = GoogleCalendarSyncLog.SyncType.EVENT_UPDATE
+                sync_type = GoogleCalendarSyncLog.SyncType.UPDATE
                 logger.info(f"Evento atualizado no Google Calendar: {event.title}")
 
             else:
@@ -311,7 +322,7 @@ class GoogleCalendarService:
                 event.last_google_sync = timezone.now()
                 event.save(update_fields=['google_calendar_id', 'last_google_sync'])
 
-                sync_type = GoogleCalendarSyncLog.SyncType.EVENT_CREATE
+                sync_type = GoogleCalendarSyncLog.SyncType.CREATE
                 logger.info(f"Evento criado no Google Calendar: {event.title}")
 
             # Log da sincronização bem-sucedida
@@ -345,7 +356,7 @@ class GoogleCalendarService:
                 organization=self.organization,
                 instructor=event.instructor,
                 event=event,
-                sync_type=GoogleCalendarSyncLog.SyncType.EVENT_CREATE if not event.google_calendar_id else GoogleCalendarSyncLog.SyncType.EVENT_UPDATE,
+                sync_type=GoogleCalendarSyncLog.SyncType.CREATE if not event.google_calendar_id else GoogleCalendarSyncLog.SyncType.UPDATE,
                 status=GoogleCalendarSyncLog.Status.ERROR,
                 google_calendar_id=instructor_config.google_calendar_id,
                 error_message=error_msg
@@ -377,7 +388,7 @@ class GoogleCalendarService:
                 organization=self.organization,
                 instructor=event.instructor,
                 event=event,
-                sync_type=GoogleCalendarSyncLog.SyncType.EVENT_DELETE,
+                sync_type=GoogleCalendarSyncLog.SyncType.DELETE,
                 status=GoogleCalendarSyncLog.Status.SUCCESS,
                 google_event_id=event.google_calendar_id,
                 google_calendar_id=instructor_config.google_calendar_id
@@ -399,7 +410,7 @@ class GoogleCalendarService:
                 organization=self.organization,
                 instructor=event.instructor,
                 event=event,
-                sync_type=GoogleCalendarSyncLog.SyncType.EVENT_DELETE,
+                sync_type=GoogleCalendarSyncLog.SyncType.DELETE,
                 status=GoogleCalendarSyncLog.Status.ERROR,
                 error_message=error_msg
             )

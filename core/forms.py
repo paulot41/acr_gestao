@@ -6,6 +6,17 @@ from .models import Person, Instructor, Modality, Event, Resource, ClassGroup, B
 class PersonForm(forms.ModelForm):
     """Formulário para criação/edição de clientes."""
 
+    def __init__(self, *args, **kwargs):
+        self.organization = kwargs.pop("organization", None)
+        super().__init__(*args, **kwargs)
+
+    def _get_org(self):
+        if self.organization:
+            return self.organization
+        if getattr(self.instance, "organization_id", None):
+            return self.instance.organization
+        return None
+
     class Meta:
         model = Person
         fields = [
@@ -34,6 +45,9 @@ class PersonForm(forms.ModelForm):
         if email:
             # Verificar se já existe outro cliente com este email na mesma organização
             existing = Person.objects.filter(email=email)
+            org = self._get_org()
+            if org:
+                existing = existing.filter(organization=org)
             if self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
@@ -46,11 +60,30 @@ class PersonForm(forms.ModelForm):
             # Validação básica do NIF português
             if len(nif) != 9 or not nif.isdigit():
                 raise ValidationError('NIF deve ter 9 dígitos.')
+            existing = Person.objects.filter(nif=nif)
+            org = self._get_org()
+            if org:
+                existing = existing.filter(organization=org)
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                raise ValidationError('Já existe um cliente com este NIF.')
         return nif
 
 
 class InstructorForm(forms.ModelForm):
     """Formulário para criação/edição de instrutores."""
+
+    def __init__(self, *args, **kwargs):
+        self.organization = kwargs.pop("organization", None)
+        super().__init__(*args, **kwargs)
+
+    def _get_org(self):
+        if self.organization:
+            return self.organization
+        if getattr(self.instance, "organization_id", None):
+            return self.instance.organization
+        return None
 
     class Meta:
         model = Instructor
@@ -76,6 +109,9 @@ class InstructorForm(forms.ModelForm):
         email = self.cleaned_data.get('email')
         if email:
             existing = Instructor.objects.filter(email=email)
+            org = self._get_org()
+            if org:
+                existing = existing.filter(organization=org)
             if self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():

@@ -5,8 +5,16 @@ from .models import Organization, Person, Membership, Product, Event, Booking, R
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        fields = [
+            'id',
+            'name',
+            'domain',
+            'org_type',
+            'primary_color',
+            'secondary_color',
+            'gym_monthly_fee',
+            'wellness_monthly_fee',
+        ]
 
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -20,13 +28,20 @@ class PersonSerializer(serializers.ModelSerializer):
 
 class MembershipSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source='person.full_name', read_only=True)
-    product_name = serializers.CharField(source='product.name', read_only=True)
 
     class Meta:
         model = Membership
-        fields = ['id', 'person', 'person_name', 'product', 'product_name',
-                  'starts_at', 'ends_at', 'is_active', 'organization']
-        read_only_fields = ['organization', 'is_active']
+        fields = [
+            'id',
+            'person',
+            'person_name',
+            'plan',
+            'status',
+            'starts_on',
+            'ends_on',
+            'organization',
+        ]
+        read_only_fields = ['organization']
 
 
 class ProductSerializer(serializers.ModelSerializer):

@@ -505,6 +505,52 @@ curl -I https://proformsc.duckdns.org/health/
 
 ---
 
+## 🖥️ **Deploy em Servidor Linux (Sem Docker)**
+
+Este modo usa **Gunicorn + systemd + Nginx**. Os ficheiros de exemplo estao em `deploy/`.
+
+### 1. Preparar ambiente
+```bash
+# Diretoria do projeto
+sudo mkdir -p /srv/acr_gestao
+sudo chown $USER:www-data /srv/acr_gestao
+
+# Virtualenv
+python -m venv /srv/acr_gestao/.venv
+source /srv/acr_gestao/.venv/bin/activate
+pip install -r /srv/acr_gestao/requirements.txt
+```
+
+### 2. Configurar variaveis
+```bash
+cp deploy/env.example /srv/acr_gestao/.env
+# Editar /srv/acr_gestao/.env com SECRET_KEY, DB_*, ALLOWED_HOSTS, etc.
+```
+
+### 3. Migrations e static
+```bash
+source /srv/acr_gestao/.venv/bin/activate
+python manage.py migrate
+python manage.py collectstatic --noinput
+```
+
+### 4. Gunicorn (systemd)
+```bash
+sudo cp deploy/gunicorn.service /etc/systemd/system/acr_gestao.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now acr_gestao
+```
+
+### 5. Nginx
+```bash
+sudo cp deploy/nginx_acr_gestao.conf /etc/nginx/sites-available/acr_gestao
+sudo ln -s /etc/nginx/sites-available/acr_gestao /etc/nginx/sites-enabled/acr_gestao
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+
 ## 🔍 **Diferenças entre Deploy Local vs Produção**
 
 | Aspecto | Local (Docker Desktop) | Produção (Debian) |

@@ -25,6 +25,28 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 
 ---
 
+## ✅ BOAS PRATICAS DE DESENVOLVIMENTO
+
+### Estilo e qualidade
+- Ferramentas: `ruff` (lint + format) e `pre-commit`.
+- Comandos: `make lint`, `make format`, `make format-check`.
+
+### Testes
+- Framework: `pytest` + `pytest-django`.
+- Executar: `make test` ou `pytest -q`.
+
+### Versionamento
+- Versao atual em `VERSION`.
+- Historico em `CHANGELOG.md`.
+- Commits convencionais recomendados (feat/fix/docs/chore/test).
+
+### Arquitetura
+- Lógica de negócio em `core/services/`.
+- Views focadas em fluxo e validação.
+- Multi-tenancy sempre com `request.organization`.
+
+---
+
 ## 🎨 INTERFACE MODERNA COM BOOTSTRAP 5
 
 ### **Framework CSS Atualizado**

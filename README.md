@@ -165,6 +165,28 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+### Qualidade e Estilo de Código:
+```bash
+# Dependências de desenvolvimento
+pip install -r requirements-dev.txt
+
+# Lint e formatação
+ruff check .
+ruff format .
+
+# Pre-commit (opcional)
+pre-commit install
+```
+
+### Versionamento:
+- Versão atual em `VERSION` (Semantic Versioning).
+- Histórico de mudanças em `CHANGELOG.md`.
+- Commits convencionais recomendados (feat/fix/docs/chore/test).
+
+### Deploy:
+- Guia completo em `DEPLOY.md`.
+- Exemplos de Gunicorn/systemd e Nginx em `deploy/`.
+
 ---
 
 ## 🏗️ **Estrutura do Projeto**

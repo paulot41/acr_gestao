@@ -253,7 +253,7 @@ def dashboard_client(request):
         upcoming_bookings = Booking.objects.filter(
             organization=org,
             person=person,
-            status='confirmed',
+            status=Booking.Status.CONFIRMED,
             event__starts_at__gte=timezone.now()
         ).select_related('event', 'event__resource', 'event__modality').order_by('event__starts_at')[:5]
 
@@ -317,7 +317,7 @@ def dashboard_staff(request):
             'todays_bookings': todays_bookings.count(),
             'total_capacity_today': sum(event.capacity for event in todays_events),
             'total_bookings_today': sum(
-                event.bookings.filter(status='confirmed').count()
+                event.bookings.filter(status=Booking.Status.CONFIRMED).count()
                 for event in todays_events
             )
         }

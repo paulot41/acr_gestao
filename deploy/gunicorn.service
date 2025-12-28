@@ -1,0 +1,17 @@
+[Unit]
+Description=Gunicorn daemon for ACR Gestao
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/acr_gestao
+EnvironmentFile=/srv/acr_gestao/.env
+RuntimeDirectory=acr_gestao
+ExecStart=/srv/acr_gestao/.venv/bin/gunicorn --config /srv/acr_gestao/deploy/gunicorn.conf.py acr_gestao.wsgi:application
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

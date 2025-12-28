@@ -1,11 +1,6 @@
-from rest_framework import viewsets, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
 from django.db.models import Count, Q
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -13,59 +8,9 @@ import json
 import logging
 from django.db import IntegrityError, DatabaseError
 from django.core.exceptions import ValidationError
-from .models import Person, Membership, Product, Event, Booking, Resource, Modality, Instructor, ClassGroup
-from .serializers import (
-    PersonSerializer, MembershipSerializer,
-    ProductSerializer, EventSerializer, BookingSerializer
-)
+from .models import Person, Event, Booking, Resource, Modality, Instructor, ClassGroup
 
 logger = logging.getLogger(__name__)
-
-
-class OrganizationMixin:
-    """Filtra automaticamente por organização do utilizador."""
-    def get_queryset(self):
-        return super().get_queryset().filter(organization=self.request.organization)
-
-
-class PersonViewSet(OrganizationMixin, viewsets.ModelViewSet):
-    queryset = Person.objects.all()
-    serializer_class = PersonSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
-class EventViewSet(OrganizationMixin, viewsets.ModelViewSet):
-    # Corrigir a sintaxe do Count com filter
-    queryset = Event.objects.annotate(
-        bookings_count=Count('bookings', filter=Q(bookings__status='confirmed'))
-    )
-    serializer_class = EventSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    @action(detail=True, methods=['post'])
-    def book(self, request, pk=None):
-        """Endpoint para fazer reserva de evento."""
-        event = self.get_object()
-        # Implementar lógica de booking
-        return Response({'status': 'booked'})
-
-
-class MembershipViewSet(OrganizationMixin, viewsets.ModelViewSet):
-    queryset = Membership.objects.all()
-    serializer_class = MembershipSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
-class ProductViewSet(OrganizationMixin, viewsets.ModelViewSet):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
-class BookingViewSet(OrganizationMixin, viewsets.ModelViewSet):
-    queryset = Booking.objects.all()
-    serializer_class = BookingSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
 
 # NOVOS ENDPOINTS PARA GANTT DINÂMICO
@@ -122,7 +67,7 @@ def gantt_data(request):
     ).select_related(
         'resource', 'modality', 'instructor', 'class_group', 'individual_client'
     ).annotate(
-        bookings_count=Count('bookings', filter=Q(bookings__status='confirmed'))
+        bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
     ).order_by('starts_at')
 
     # Serializar eventos para o Gantt
@@ -180,7 +125,6 @@ def gantt_data(request):
     })
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def create_event_from_gantt(request):
@@ -265,7 +209,6 @@ def create_event_from_gantt(request):
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def update_event_details(request):
@@ -512,7 +455,7 @@ class OptimizedGanttAPI:
         ).select_related(
             'resource', 'modality', 'instructor', 'class_group', 'individual_client'
         ).annotate(
-            bookings_count=Count('bookings', filter=Q(bookings__status='confirmed'))
+            bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
         )
 
         # Filtro por recursos se especificado
@@ -575,7 +518,6 @@ class OptimizedGanttAPI:
         })
 
     @staticmethod
-    @csrf_exempt
     @login_required
     @require_http_methods(["POST"])
     def gantt_create_event(request):
@@ -617,7 +559,6 @@ def get_form_data(request):
     })
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def validate_event_conflict(request):
@@ -676,7 +617,6 @@ def validate_event_conflict(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def cancel_booking_api(request, booking_id):
@@ -703,21 +643,21 @@ def cancel_booking_api(request, booking_id):
                 }, status=403)
 
         # Verificar se a reserva pode ser cancelada (ex: não está muito próxima)
-        if hasattr(booking, 'can_be_cancelled') and not booking.can_be_cancelled:
+        if not booking.can_be_cancelled():
             return JsonResponse({
                 'success': False,
                 'message': 'Esta reserva já não pode ser cancelada'
             }, status=400)
 
         # Verificar se já está cancelada
-        if booking.status == 'cancelled':
+        if booking.status == Booking.Status.CANCELLED:
             return JsonResponse({
                 'success': False,
                 'message': 'Esta reserva já está cancelada'
             }, status=400)
 
         # Cancelar a reserva
-        booking.status = 'cancelled'
+        booking.status = Booking.Status.CANCELLED
         booking.cancelled_at = timezone.now()
         booking.save()
 

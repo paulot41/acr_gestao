@@ -59,7 +59,7 @@ def dashboard(request):
     current_month = timezone.now().replace(day=1)
     monthly_payments = Payment.objects.filter(
         organization=org,
-        status='completed',
+        status=Payment.Status.COMPLETED,
         paid_date__gte=current_month
     )
     monthly_revenue = sum(payment.amount for payment in monthly_payments)
@@ -148,7 +148,7 @@ def client_detail(request, pk):
 def client_create(request):
     """Criar novo cliente."""
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES)
+        form = PersonForm(request.POST, request.FILES, organization=request.organization)
         if form.is_valid():
             client = form.save(commit=False)
             client.organization = request.organization
@@ -156,7 +156,7 @@ def client_create(request):
             messages.success(request, f'Cliente {client.full_name} criado com sucesso!')
             return redirect('client_detail', pk=client.pk)
     else:
-        form = PersonForm()
+        form = PersonForm(organization=request.organization)
 
     return render(request, 'core/client_form.html', {'form': form, 'title': 'Novo Cliente'})
 
@@ -167,13 +167,13 @@ def client_edit(request, pk):
     client = get_object_or_404(Person, pk=pk, organization=request.organization)
 
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES, instance=client)
+        form = PersonForm(request.POST, request.FILES, instance=client, organization=request.organization)
         if form.is_valid():
             form.save()
             messages.success(request, f'Cliente {client.full_name} atualizado com sucesso!')
             return redirect('client_detail', pk=client.pk)
     else:
-        form = PersonForm(instance=client)
+        form = PersonForm(instance=client, organization=request.organization)
 
     return render(request, 'core/client_form.html', {
         'form': form,
@@ -188,7 +188,7 @@ def client_add(request):
     org = request.organization
 
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES)
+        form = PersonForm(request.POST, request.FILES, organization=org)
         if form.is_valid():
             client = form.save(commit=False)
             client.organization = org
@@ -196,7 +196,7 @@ def client_add(request):
             messages.success(request, f'Cliente {client.full_name} criado com sucesso!')
             return redirect('core:client_detail', pk=client.pk)
     else:
-        form = PersonForm()
+        form = PersonForm(organization=org)
 
     return render(request, 'core/client_form.html', {
         'form': form,
@@ -254,7 +254,7 @@ def instructor_detail(request, pk):
 def instructor_create(request):
     """Criar novo instrutor."""
     if request.method == 'POST':
-        form = InstructorForm(request.POST, request.FILES)
+        form = InstructorForm(request.POST, request.FILES, organization=request.organization)
         if form.is_valid():
             instructor = form.save(commit=False)
             instructor.organization = request.organization
@@ -262,7 +262,7 @@ def instructor_create(request):
             messages.success(request, f'Instrutor {instructor.full_name} criado com sucesso!')
             return redirect('instructor_list')
     else:
-        form = InstructorForm()
+        form = InstructorForm(organization=request.organization)
 
     return render(request, 'core/instructor_form.html', {'form': form, 'title': 'Novo Instrutor'})
 
@@ -273,13 +273,13 @@ def instructor_edit(request, pk):
     instructor = get_object_or_404(Instructor, pk=pk, organization=request.organization)
 
     if request.method == 'POST':
-        form = InstructorForm(request.POST, request.FILES, instance=instructor)
+        form = InstructorForm(request.POST, request.FILES, instance=instructor, organization=request.organization)
         if form.is_valid():
             form.save()
             messages.success(request, f'Instrutor {instructor.full_name} atualizado com sucesso!')
             return redirect('instructor_detail', pk=instructor.pk)
     else:
-        form = InstructorForm(instance=instructor)
+        form = InstructorForm(instance=instructor, organization=request.organization)
 
     return render(request, 'core/instructor_form.html', {
         'form': form,
@@ -294,7 +294,7 @@ def instructor_add(request):
     org = request.organization
 
     if request.method == 'POST':
-        form = InstructorForm(request.POST, request.FILES)
+        form = InstructorForm(request.POST, request.FILES, organization=org)
         if form.is_valid():
             instructor = form.save(commit=False)
             instructor.organization = org
@@ -302,7 +302,7 @@ def instructor_add(request):
             messages.success(request, f'Instrutor {instructor.full_name} criado com sucesso!')
             return redirect('core:instructor_detail', pk=instructor.pk)
     else:
-        form = InstructorForm()
+        form = InstructorForm(organization=org)
 
     return render(request, 'core/instructor_form.html', {
         'form': form,
@@ -627,7 +627,11 @@ def event_list(request):
     # Enriquecer eventos com classes de ocupação para o template
     for ev in events:
         try:
-            booked = ev.bookings_count if hasattr(ev, 'bookings_count') else ev.bookings.exclude(status="cancelled").count()
+            booked = (
+                ev.bookings_count
+                if hasattr(ev, 'bookings_count')
+                else ev.bookings.exclude(status=Booking.Status.CANCELLED).count()
+            )
         except Exception:
             booked = ev.bookings.count()
         capacity = ev.capacity or 0

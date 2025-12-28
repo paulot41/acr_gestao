@@ -1,7 +1,7 @@
 # ACR Gestão - Makefile para Docker Desktop
 # Comandos simplificados para desenvolvimento
 
-.PHONY: help validate quick-start deploy status logs clean test
+.PHONY: help validate quick-start deploy status logs clean test lint format format-check
 
 # Configurações
 COMPOSE_FILE = docker-compose.base-nginx.yml
@@ -94,3 +94,12 @@ reset: clean quick-start ## Reset completo: limpar + deploy inicial
 
 test: ## Executar testes
 	@pytest
+
+lint: ## Lint com ruff (requer requirements-dev.txt instalado)
+	@ruff check .
+
+format: ## Formatar com ruff (requer requirements-dev.txt instalado)
+	@ruff format .
+
+format-check: ## Verificar formatação (sem alterar ficheiros)
+	@ruff format --check .

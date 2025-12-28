@@ -37,10 +37,6 @@ class EventAPITestCase(APITestCase):
             Person(organization=self.org, first_name="Bea", email="bea@example.com", nif="2"),
         ])
 
-        # Definir enumeração mínima esperada pelo validador
-        from types import SimpleNamespace
-        Booking.Status = SimpleNamespace(CONFIRMED="confirmed")
-
         b1 = Booking(organization=self.org, event=event, person=p1)
         b1.save()
 
@@ -70,4 +66,3 @@ class PersonConsentTestCase(APITestCase):
             consent_rgpd=True,
         )
         self.assertTrue(person.consent_rgpd)
-

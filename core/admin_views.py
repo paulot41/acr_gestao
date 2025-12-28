@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .auth_views import role_required
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -89,9 +89,9 @@ def _get_dashboard_data(org):
     current_month = timezone.now().replace(day=1)
     monthly_revenue = Payment.objects.filter(
         organization=org,
-        status='completed',
+        status=Payment.Status.COMPLETED,
         paid_date__gte=current_month
-    ).aggregate(total=Count('amount'))['total'] or 0
+    ).aggregate(total=Sum('amount'))['total'] or 0
 
     return {
         'total_clients': total_clients,
@@ -138,7 +138,7 @@ def _get_clients_data(request, org):
         'entity_filter': entity_filter,
         'status_choices': Person.Status.choices,
         'entity_choices': Person.EntityAffiliation.choices,
-        'client_form': PersonForm(),
+        'client_form': PersonForm(organization=org),
     }
 
 
@@ -168,7 +168,7 @@ def _get_instructors_data(request, org):
         'search': search,
         'entity_filter': entity_filter,
         'entity_choices': Instructor.EntityAffiliation.choices,
-        'instructor_form': InstructorForm(),
+        'instructor_form': InstructorForm(organization=org),
     }
 
 
