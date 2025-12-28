@@ -6,9 +6,20 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from django.db import connection
 
 def health(_request):
-    return JsonResponse({"status": "ok"})
+    db_ok = True
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        db_ok = False
+
+    status = "ok" if db_ok else "degraded"
+    http_status = 200 if db_ok else 503
+    return JsonResponse({"status": status, "db": db_ok}, status=http_status)
 
 urlpatterns = [
     # Health check (manter para monitorização)

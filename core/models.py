@@ -2,7 +2,7 @@ from __future__ import annotations
 
 # Core Django imports (models/validators/timezone)
 from django.db import models, DatabaseError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
@@ -37,8 +37,20 @@ class Organization(models.Model):
     logo_svg = models.TextField(blank=True, help_text="Conteúdo SVG para branding no admin e dashboard.")
 
     # Configurações financeiras
-    gym_monthly_fee = models.DecimalField("Mensalidade Ginásio (ACR)", max_digits=10, decimal_places=2, default=30.00)
-    wellness_monthly_fee = models.DecimalField("Mensalidade Pilates (Proform)", max_digits=10, decimal_places=2, default=45.00)
+    gym_monthly_fee = models.DecimalField(
+        "Mensalidade Ginásio (ACR)",
+        max_digits=10,
+        decimal_places=2,
+        default=30.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    wellness_monthly_fee = models.DecimalField(
+        "Mensalidade Pilates (Proform)",
+        max_digits=10,
+        decimal_places=2,
+        default=45.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
 
     class Meta:
         ordering = ["name"]
@@ -439,6 +451,12 @@ class Event(models.Model):
             models.Index(fields=["organization", "starts_at"]),
             models.Index(fields=["organization", "resource", "starts_at"]),
         ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(ends_at__gt=models.F("starts_at")),
+                name="event_ends_after_starts",
+            )
+        ]
         ordering = ["starts_at"]
 
     def __str__(self) -> str:
@@ -521,6 +539,7 @@ class Booking(models.Model):
         unique_together = [("event","person")]
         indexes = [
             models.Index(fields=["organization","created_at"]),
+            models.Index(fields=["organization", "status"]),
         ]
 
     def __str__(self) -> str:
@@ -637,10 +656,34 @@ class InstructorCommission(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
     # Valores financeiros
-    total_revenue = models.DecimalField("Receita Total", max_digits=10, decimal_places=2, default=0.00)
-    instructor_amount = models.DecimalField("Valor Instrutor", max_digits=10, decimal_places=2, default=0.00)
-    entity_amount = models.DecimalField("Valor Entidade", max_digits=10, decimal_places=2, default=0.00)
-    commission_rate = models.DecimalField("Taxa Comissão (%)", max_digits=5, decimal_places=2, default=60.00)
+    total_revenue = models.DecimalField(
+        "Receita Total",
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    instructor_amount = models.DecimalField(
+        "Valor Instrutor",
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    entity_amount = models.DecimalField(
+        "Valor Entidade",
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    commission_rate = models.DecimalField(
+        "Taxa Comissão (%)",
+        max_digits=5,
+        decimal_places=2,
+        default=60.00,
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("100.00"))],
+    )
 
     # Controlo
     is_paid = models.BooleanField("Pago", default=False)

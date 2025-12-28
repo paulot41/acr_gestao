@@ -138,6 +138,33 @@ docker-compose -f docker-compose.base-nginx.yml logs -f
 - **Eventos:** http://localhost/api/gantt/events/
 - **Dados Formulários:** http://localhost/api/form-data/
 
+### ✅ Health Check
+- Endpoint: `GET /health/`
+- Resposta: `{"status": "ok", "db": true}` (200) ou `{"status": "degraded", "db": false}` (503)
+- Ideal para Nginx/Load Balancer e monitorização externa.
+
+### 💾 Backups Automatizados
+Script simples para backups de PostgreSQL via `pg_dump`:
+```bash
+chmod +x deploy/backup.sh
+
+# Exemplo de uso (variaveis podem vir do .env do servidor)
+export DB_HOST=127.0.0.1
+export DB_PORT=5432
+export DB_NAME=acrdb
+export DB_USER=acruser
+export DB_PASSWORD=change-me
+export BACKUP_DIR=/var/backups/acr_gestao
+export BACKUP_RETENTION_DAYS=14
+
+./deploy/backup.sh
+```
+
+Exemplo de cron (backup diario as 02:00):
+```
+0 2 * * * /bin/bash -lc 'cd /srv/acr_gestao && ./deploy/backup.sh'
+```
+
 ### 📊 **Configuração Inicial Local**
 
 #### **Método Recomendado - Script Automático**

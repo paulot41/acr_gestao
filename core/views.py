@@ -3,11 +3,14 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
+from django.core.cache import cache
 from datetime import datetime, timedelta
 import json
 import logging
 from django.db import IntegrityError, DatabaseError
 from django.core.exceptions import ValidationError
+from .auth_views import role_required
+from .services.bookings import cancel_booking
 from .models import Person, Event, Booking, Resource, Modality, Instructor, ClassGroup
 
 logger = logging.getLogger(__name__)
@@ -15,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # NOVOS ENDPOINTS PARA GANTT DINÂMICO
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
 def gantt_view(request):
     """Vista principal do Gantt dinâmico."""
     from django.shortcuts import render
@@ -41,7 +44,7 @@ def gantt_view(request):
     return render(request, 'core/gantt_dynamic.html', context)
 
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
 def gantt_data(request):
     """API endpoint para dados do Gantt com otimizações."""
     org = request.organization
@@ -67,7 +70,7 @@ def gantt_data(request):
     ).select_related(
         'resource', 'modality', 'instructor', 'class_group', 'individual_client'
     ).annotate(
-        bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
+        confirmed_bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
     ).order_by('starts_at')
 
     # Serializar eventos para o Gantt
@@ -94,8 +97,8 @@ def gantt_data(request):
             },
             'event_type': event.event_type,
             'capacity': event.capacity,
-            'bookings_count': event.bookings_count,
-            'is_full': event.bookings_count >= event.capacity,
+            'bookings_count': event.confirmed_bookings_count,
+            'is_full': event.confirmed_bookings_count >= event.capacity,
             'class_group': {
                 'id': event.class_group.id if event.class_group else None,
                 'name': event.class_group.name if event.class_group else None
@@ -125,7 +128,7 @@ def gantt_data(request):
     })
 
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
 @require_http_methods(["POST"])
 def create_event_from_gantt(request):
     """Criar evento a partir do drag & drop no Gantt."""
@@ -209,7 +212,7 @@ def create_event_from_gantt(request):
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
 @require_http_methods(["POST"])
 def update_event_details(request):
     """Atualizar detalhes do evento após criação no Gantt."""
@@ -362,7 +365,32 @@ def update_event_details(request):
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
+@require_http_methods(["POST"])
+def delete_event_api(request):
+    """Eliminar um evento via API do Gantt."""
+    try:
+        data = json.loads(request.body)
+        org = request.organization
+        event_id = data.get('event_id')
+        if not event_id:
+            return JsonResponse({'success': False, 'error': 'ID do evento obrigatório'}, status=400)
+
+        try:
+            event = Event.objects.get(id=event_id, organization=org)
+        except Event.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Evento não encontrado'}, status=404)
+
+        event.delete()
+        return JsonResponse({'success': True})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+    except DatabaseError as e:
+        logger.error("Erro ao eliminar evento: %s", e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@role_required(["admin", "staff", "instructor"])
 def get_event_details(request, event_id):
     """Obter detalhes de um evento para edição."""
     try:
@@ -398,10 +426,15 @@ class OptimizedGanttAPI:
     """API otimizada para operações do Gantt com cache inteligente."""
 
     @staticmethod
-    @login_required
+    @role_required(["admin", "staff", "instructor"])
     def gantt_resources(request):
         """Lista otimizada de recursos para o Gantt."""
         org = request.organization
+
+        cache_key = f"gantt:resources:{org.id}"
+        cached = cache.get(cache_key)
+        if cached:
+            return JsonResponse(cached)
 
         resources = Resource.objects.filter(
             organization=org,
@@ -419,21 +452,24 @@ class OptimizedGanttAPI:
             'description': r.description[:100] if r.description else ''
         } for r in resources]
 
-        return JsonResponse({
+        payload = {
             'resources': data,
             'total_count': len(data),
             'cache_timestamp': timezone.now().isoformat()
-        })
+        }
+        cache.set(cache_key, payload, timeout=300)
+        return JsonResponse(payload)
 
     @staticmethod
-    @login_required
+    @role_required(["admin", "staff", "instructor"])
     def gantt_events_fast(request):
         """API ultra-rápida para eventos do Gantt."""
         org = request.organization
 
         # Parâmetros de filtro
         date_param = request.GET.get('date')
-        resource_ids = request.GET.get('resources', '').split(',') if request.GET.get('resources') else []
+        resource_ids_param = request.GET.get('resources', '')
+        resource_ids = [rid for rid in resource_ids_param.split(',') if rid] if resource_ids_param else []
 
         # Data selecionada
         try:
@@ -443,6 +479,13 @@ class OptimizedGanttAPI:
                 selected_date = timezone.now().date()
         except ValueError:
             selected_date = timezone.now().date()
+
+        resource_ids = sorted({int(rid) for rid in resource_ids if rid.isdigit()})
+        resource_key = ",".join(str(rid) for rid in resource_ids) if resource_ids else "all"
+        cache_key = f"gantt:events:{org.id}:{selected_date.isoformat()}:{resource_key}"
+        cached = cache.get(cache_key)
+        if cached:
+            return JsonResponse(cached)
 
         # Query otimizada
         start_datetime = timezone.make_aware(datetime.combine(selected_date, datetime.min.time()))
@@ -455,16 +498,12 @@ class OptimizedGanttAPI:
         ).select_related(
             'resource', 'modality', 'instructor', 'class_group', 'individual_client'
         ).annotate(
-            bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
+            confirmed_bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
         )
 
         # Filtro por recursos se especificado
-        if resource_ids and resource_ids[0]:
-            try:
-                resource_ids = [int(id) for id in resource_ids if id.isdigit()]
-                events_query = events_query.filter(resource_id__in=resource_ids)
-            except ValueError:
-                pass
+        if resource_ids:
+            events_query = events_query.filter(resource_id__in=resource_ids)
 
         events = events_query.order_by('starts_at')[:500]
 
@@ -484,7 +523,7 @@ class OptimizedGanttAPI:
                 'end_time': event.ends_at.strftime('%H:%M'),
                 'event_type': event.event_type,
                 'capacity': event.capacity,
-                'bookings_count': event.bookings_count,
+                'bookings_count': event.confirmed_bookings_count,
 
                 'modality': {
                     'id': event.modality.id if event.modality else None,
@@ -510,15 +549,17 @@ class OptimizedGanttAPI:
 
             events_data.append(event_data)
 
-        return JsonResponse({
+        payload = {
             'events': events_data,
             'date': selected_date.isoformat(),
             'current_time': timezone.now().strftime('%H:%M'),
             'total_events': len(events_data)
-        })
+        }
+        cache.set(cache_key, payload, timeout=15)
+        return JsonResponse(payload)
 
     @staticmethod
-    @login_required
+    @role_required(["admin", "staff", "instructor"])
     @require_http_methods(["POST"])
     def gantt_create_event(request):
         """Criar evento otimizado via API."""
@@ -527,7 +568,7 @@ class OptimizedGanttAPI:
 
 
 # API para dados auxiliares do formulário
-@login_required
+@role_required(["admin", "staff", "instructor"])
 def get_form_data(request):
     """Obter dados para formulários (modalities, instructors, etc.)."""
     org = request.organization
@@ -559,7 +600,7 @@ def get_form_data(request):
     })
 
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
 @require_http_methods(["POST"])
 def validate_event_conflict(request):
     """Validar conflitos de eventos antes da criação."""
@@ -633,43 +674,11 @@ def cancel_booking_api(request, booking_id):
                 'message': 'Reserva não encontrada'
             }, status=404)
 
-        # Verificar permissões - o cliente só pode cancelar as suas próprias reservas
-        if hasattr(request.user, 'profile') and hasattr(request.user.profile, 'person'):
-            person = request.user.profile.person
-            if booking.person != person and not (request.user.is_staff or request.user.is_superuser):
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Sem permissão para cancelar esta reserva'
-                }, status=403)
-
-        # Verificar se a reserva pode ser cancelada (ex: não está muito próxima)
-        if not booking.can_be_cancelled():
-            return JsonResponse({
-                'success': False,
-                'message': 'Esta reserva já não pode ser cancelada'
-            }, status=400)
-
-        # Verificar se já está cancelada
-        if booking.status == Booking.Status.CANCELLED:
-            return JsonResponse({
-                'success': False,
-                'message': 'Esta reserva já está cancelada'
-            }, status=400)
-
-        # Cancelar a reserva
-        booking.status = Booking.Status.CANCELLED
-        booking.cancelled_at = timezone.now()
-        booking.save()
-
-        # Se a reserva usou créditos, devolver os créditos (lógica de negócio)
-        if hasattr(booking, 'credits_used') and booking.credits_used > 0:
-            # Implementar lógica para devolver créditos se necessário
-            pass
-
-        return JsonResponse({
-            'success': True,
-            'message': 'Reserva cancelada com sucesso'
-        })
+        result = cancel_booking(booking, request.user)
+        return JsonResponse(
+            {'success': result.ok, 'message': result.message},
+            status=result.status_code,
+        )
 
     except DatabaseError as e:
         logger.error("Erro ao cancelar reserva: %s", e)

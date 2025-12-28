@@ -6,13 +6,12 @@ O **ACR Gestão** é uma aplicação Django para gestão completa de ginásios, 
 
 ## Atualizações recentes
 
-- Substituição de `except Exception` por exceções específicas com registo.
-- Remoção da criação automática de organização em `get_current_organization`.
-- Consolidação do middleware de multi-tenancy.
-- Cálculos financeiros agora baseados em `Decimal` para maior precisão.
-- Migração para `UniqueConstraint` no modelo `Person` (outros modelos mantêm `unique_together`).
-- Limpeza de imports não utilizados no middleware core.
-- Adição de testes automatizados para modelos e middleware.
+- Observabilidade com logging estruturado + request-id e integração opcional Sentry.
+- Sincronização Google Calendar com tasks assíncronas (Celery).
+- Cache e otimizações de contagens para Gantt e relatórios.
+- Exportação CSV e filtros avançados em eventos e reservas.
+- Health check com verificação de DB + script de backup.
+- CI GitHub Actions com lint (ruff) e testes (pytest).
 
 ### 🎯 OBJETIVOS PRINCIPAIS
 - ✅ Dashboard personalizado como página inicial (IMPLEMENTADO)

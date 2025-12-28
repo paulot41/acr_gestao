@@ -1,11 +1,14 @@
+import csv
+from datetime import datetime, timedelta
+
 from django.shortcuts import render, get_object_or_404, redirect
 from .auth_views import role_required
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q
-from django.http import JsonResponse
+from django.db.models import Q, Count
+from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from datetime import datetime, timedelta
+from django.utils.dateparse import parse_date
 
 from .models import Person, Instructor, Modality, Event, Resource, Payment, Booking
 from .forms import PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm
@@ -590,7 +593,11 @@ def event_list(request):
     org = request.organization
 
     # Base queryset
-    events_qs = Event.objects.filter(organization=org).select_related('resource', 'modality', 'instructor').order_by('-starts_at')
+    events_qs = Event.objects.filter(organization=org).select_related(
+        'resource', 'modality', 'instructor'
+    ).annotate(
+        active_bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
+    ).order_by('-starts_at')
 
     # Filtros (opcional)
     search = request.GET.get('search') or ''
@@ -619,6 +626,37 @@ def event_list(request):
     elif period_filter == 'upcoming':
         events_qs = events_qs.filter(starts_at__gte=timezone.now())
 
+    export = request.GET.get('export')
+    if export == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename=eventos.csv'
+        writer = csv.writer(response)
+        writer.writerow([
+            'Data Inicio', 'Hora Inicio', 'Hora Fim', 'Titulo', 'Modalidade',
+            'Instrutor', 'Espaco', 'Capacidade', 'Reservas', 'Estado'
+        ])
+        now = timezone.now()
+        for ev in events_qs.iterator():
+            if ev.starts_at > now:
+                status_label = 'Agendada'
+            elif ev.ends_at < now:
+                status_label = 'Concluida'
+            else:
+                status_label = 'A decorrer'
+            writer.writerow([
+                ev.starts_at.strftime('%Y-%m-%d'),
+                ev.starts_at.strftime('%H:%M'),
+                ev.ends_at.strftime('%H:%M'),
+                ev.title,
+                ev.modality.name if ev.modality else '',
+                ev.instructor.full_name if ev.instructor else '',
+                ev.resource.name if ev.resource else '',
+                ev.capacity,
+                ev.active_bookings_count,
+                status_label,
+            ])
+        return response
+
     # Paginação
     paginator = Paginator(events_qs, 20)
     page_number = request.GET.get('page')
@@ -626,14 +664,9 @@ def event_list(request):
 
     # Enriquecer eventos com classes de ocupação para o template
     for ev in events:
-        try:
-            booked = (
-                ev.bookings_count
-                if hasattr(ev, 'bookings_count')
-                else ev.bookings.exclude(status=Booking.Status.CANCELLED).count()
-            )
-        except Exception:
-            booked = ev.bookings.count()
+        booked = getattr(ev, 'active_bookings_count', None)
+        if booked is None:
+            booked = ev.bookings.exclude(status=Booking.Status.CANCELLED).count()
         capacity = ev.capacity or 0
         ratio = (booked / capacity) if capacity else 0
         if ratio >= 1:
@@ -736,11 +769,54 @@ def booking_list(request):
     org = request.organization
     bookings = Booking.objects.filter(organization=org).select_related("event", "person").order_by('-created_at')
 
+    search = (request.GET.get('search') or '').strip()
+    status_filter = request.GET.get('status') or ''
+    start_date_raw = request.GET.get('start_date') or ''
+    end_date_raw = request.GET.get('end_date') or ''
+    start_date = parse_date(start_date_raw) if start_date_raw else None
+    end_date = parse_date(end_date_raw) if end_date_raw else None
+
+    if search:
+        bookings = bookings.filter(
+            Q(person__first_name__icontains=search) |
+            Q(person__last_name__icontains=search) |
+            Q(event__title__icontains=search)
+        )
+    if status_filter:
+        bookings = bookings.filter(status=status_filter)
+    if start_date:
+        bookings = bookings.filter(event__starts_at__date__gte=start_date)
+    if end_date:
+        bookings = bookings.filter(event__starts_at__date__lte=end_date)
+
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename=reservas.csv'
+        writer = csv.writer(response)
+        writer.writerow(['Evento', 'Data', 'Hora', 'Cliente', 'Estado', 'Criada em'])
+        for booking in bookings.iterator():
+            writer.writerow([
+                booking.event.title,
+                booking.event.starts_at.strftime('%Y-%m-%d'),
+                booking.event.starts_at.strftime('%H:%M'),
+                booking.person.full_name,
+                booking.status,
+                booking.created_at.strftime('%Y-%m-%d %H:%M'),
+            ])
+        return response
+
     paginator = Paginator(bookings, 20)
     page_number = request.GET.get('page')
     bookings = paginator.get_page(page_number)
 
-    return render(request, 'core/booking_list.html', {'bookings': bookings})
+    return render(request, 'core/booking_list.html', {
+        'bookings': bookings,
+        'search': search,
+        'status_filter': status_filter,
+        'start_date': start_date_raw,
+        'end_date': end_date_raw,
+        'status_choices': Booking.Status.choices,
+    })
 
 
 @role_required(["admin", "staff"])

@@ -63,6 +63,7 @@ urlpatterns = [
     path('gantt/events-json/', web_views.events_json, name='events_json'),
     path('gantt/create-event/', views.create_event_from_gantt, name='create_event_from_gantt'),
     path('gantt/update-event/', views.update_event_details, name='update_event_details'),
+    path('gantt/delete-event/', views.delete_event_api, name='delete_event_api'),
     path('gantt/event/<int:event_id>/details/', views.get_event_details, name='get_event_details'),
 
     # Google Calendar

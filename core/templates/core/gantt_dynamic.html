@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Gantt Dinâmico - Gestão de Horários{% endblock %}
+{% block title %}Agenda de Marcações - Gestão de Horários{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -286,9 +286,17 @@
                 <div class="d-flex align-items-center gap-3">
                     <h4 class="mb-0">
                         <i class="fas fa-calendar-alt text-primary"></i>
-                        Gantt Dinâmico
+                        Agenda de Marcações
                     </h4>
                     <input type="date" id="gantt-date" class="form-control" style="width: auto;" value="{{ request.GET.date|default:'' }}">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Navegar dias">
+                        <button type="button" class="btn btn-outline-secondary" id="gantt-prev-day">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="gantt-next-day">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -468,6 +476,9 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-outline-danger" id="delete-event" style="display: none;">
+                    <i class="fas fa-trash"></i> Eliminar Aula
+                </button>
                 <button type="button" class="btn btn-primary" id="save-event">
                     <i class="fas fa-save"></i> Guardar Aula
                 </button>
@@ -486,6 +497,12 @@
 
 {% block extra_js %}
 <script>
+const GANTT_DATA_URL = "{% url 'core:gantt_data' %}";
+const GANTT_CREATE_URL = "{% url 'core:create_event_from_gantt' %}";
+const GANTT_UPDATE_URL = "{% url 'core:update_event_details' %}";
+const GANTT_DELETE_URL = "{% url 'core:delete_event_api' %}";
+const GANTT_DETAILS_URL_TEMPLATE = "{% url 'core:get_event_details' 0 %}";
+
 class GanttDynamic {
     constructor() {
         this.selectedDate = new Date().toISOString().split('T')[0];
@@ -494,6 +511,8 @@ class GanttDynamic {
         this.selectionStart = null;
         this.selectionEnd = null;
         this.selectedResource = null;
+        this.isDragging = false;
+        this.dragging = null;
         this.events = [];
         this.resources = [];
 
@@ -501,6 +520,12 @@ class GanttDynamic {
     }
 
     init() {
+        const dateInput = document.getElementById('gantt-date');
+        if (dateInput.value) {
+            this.selectedDate = dateInput.value;
+        } else {
+            dateInput.value = this.selectedDate;
+        }
         this.setupEventListeners();
         this.loadGanttData();
         this.updateCurrentTimeLine();
@@ -514,6 +539,12 @@ class GanttDynamic {
         document.getElementById('gantt-date').addEventListener('change', (e) => {
             this.selectedDate = e.target.value;
             this.loadGanttData();
+        });
+        document.getElementById('gantt-prev-day').addEventListener('click', () => {
+            this.shiftDay(-1);
+        });
+        document.getElementById('gantt-next-day').addEventListener('click', () => {
+            this.shiftDay(1);
         });
 
         // Botões de vista
@@ -540,13 +571,23 @@ class GanttDynamic {
         document.getElementById('save-event').addEventListener('click', () => {
             this.saveEvent();
         });
+
+        // Delete event
+        document.getElementById('delete-event').addEventListener('click', () => {
+            this.deleteEvent();
+        });
     }
 
     loadGanttData() {
         document.getElementById('loading-overlay').style.display = 'flex';
 
-        fetch(`/gantt/data/?date=${this.selectedDate}`)
-            .then(response => response.json())
+        fetch(`${GANTT_DATA_URL}?date=${this.selectedDate}`, { credentials: 'same-origin' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 this.events = data.events;
                 this.resources = data.resources;
@@ -675,7 +716,14 @@ class GanttDynamic {
             `;
 
             // Click para editar
-            eventBlock.addEventListener('click', () => this.editEvent(event.id));
+            eventBlock.addEventListener('dblclick', (ev) => {
+                if (this.isDragging) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    return;
+                }
+                this.editEvent(event.id);
+            });
 
             // Drag horizontal para ajustar horário
             eventBlock.addEventListener('mousedown', (ev) => this.beginDrag(ev, event, eventBlock));
@@ -687,15 +735,14 @@ class GanttDynamic {
     beginDrag(ev, event, eventBlock) {
         // Permitir apenas botão esquerdo
         if (ev.button !== 0) return;
-        ev.preventDefault();
         this.dragging = {
             id: event.id,
             startClientX: ev.clientX,
             origLeft: parseFloat(eventBlock.style.left) || 0,
             width: parseFloat(eventBlock.style.width) || 80,
-            resourceId: event.resource_id
+            resourceId: event.resource_id,
+            hasMoved: false
         };
-        eventBlock.classList.add('dragging');
         this._dragMove = (e) => this.onDragMove(e, eventBlock);
         this._dragEnd = (e) => this.onDragEnd(e, event, eventBlock);
         document.addEventListener('mousemove', this._dragMove);
@@ -705,6 +752,14 @@ class GanttDynamic {
     onDragMove(e, eventBlock) {
         if (!this.dragging) return;
         const delta = e.clientX - this.dragging.startClientX;
+        if (!this.dragging.hasMoved && Math.abs(delta) < 5) {
+            return;
+        }
+        if (!this.dragging.hasMoved) {
+            this.dragging.hasMoved = true;
+            this.isDragging = true;
+            eventBlock.classList.add('dragging');
+        }
         const newLeft = Math.max(0, this.dragging.origLeft + delta);
         eventBlock.style.left = `${newLeft}px`;
     }
@@ -712,6 +767,11 @@ class GanttDynamic {
     onDragEnd(e, event, eventBlock) {
         document.removeEventListener('mousemove', this._dragMove);
         this._dragMove = null;
+        if (!this.dragging || !this.dragging.hasMoved) {
+            this.dragging = null;
+            this.isDragging = false;
+            return;
+        }
         const startHourView = this.currentView === 'standard' ? 6 : 0;
         const left = parseFloat(eventBlock.style.left) || 0;
         // Converter left -> minutos desde o início da vista
@@ -733,7 +793,7 @@ class GanttDynamic {
             resource_id: this.dragging.resourceId
         };
 
-        fetch('/gantt/update-event/', {
+        fetch(GANTT_UPDATE_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -759,7 +819,24 @@ class GanttDynamic {
         .finally(() => {
             eventBlock.classList.remove('dragging');
             this.dragging = null;
+            setTimeout(() => {
+                this.isDragging = false;
+            }, 50);
         });
+    }
+
+    shiftDay(delta) {
+        const dateInput = document.getElementById('gantt-date');
+        const value = dateInput.value || this.selectedDate;
+        if (!value) return;
+        const parts = value.split('-').map(Number);
+        if (parts.length !== 3) return;
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        date.setDate(date.getDate() + delta);
+        const newValue = date.toISOString().split('T')[0];
+        dateInput.value = newValue;
+        this.selectedDate = newValue;
+        this.loadGanttData();
     }
 
     startSelection(e) {
@@ -837,6 +914,7 @@ class GanttDynamic {
         document.getElementById('event-form').reset();
         document.getElementById('event-id').value = '';
         document.getElementById('modal-title-text').textContent = 'Criar Nova Aula';
+        document.getElementById('delete-event').style.display = 'none';
 
         // Set selected info
         document.getElementById('selected-resource').textContent = resource.name;
@@ -865,7 +943,7 @@ class GanttDynamic {
         const isEdit = !!eventId;
 
         if (isEdit) {
-            this.updateEvent();
+            this.updateEventWithFormData(eventId);
         } else {
             this.createEvent();
         }
@@ -879,7 +957,7 @@ class GanttDynamic {
             date: this.currentSelection.date
         };
 
-        fetch('/gantt/create-event/', {
+        fetch(GANTT_CREATE_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -904,9 +982,16 @@ class GanttDynamic {
 
     updateEventWithFormData(eventId) {
         const formData = new FormData(document.getElementById('event-form'));
+        let titleValue = (formData.get('title') || '').toString().trim();
+        if (!titleValue) {
+            const resource = this.resources.find(r => r.id == this.currentSelection?.resourceId);
+            const resourceName = resource ? resource.name : 'Espaço';
+            titleValue = `Marcação - ${resourceName}`;
+            document.getElementById('event-title').value = titleValue;
+        }
         const data = {
             event_id: eventId,
-            title: formData.get('title'),
+            title: titleValue,
             description: formData.get('description'),
             event_type: formData.get('event_type'),
             modality_id: formData.get('modality_id') || null,
@@ -921,7 +1006,7 @@ class GanttDynamic {
             data.individual_client_id = formData.get('individual_client_id') || null;
         }
 
-        fetch('/gantt/update-event/', {
+        fetch(GANTT_UPDATE_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -946,7 +1031,8 @@ class GanttDynamic {
     }
 
     editEvent(eventId) {
-        fetch(`/gantt/event/${eventId}/details/`)
+        const detailsUrl = GANTT_DETAILS_URL_TEMPLATE.replace('/0/', `/${eventId}/`);
+        fetch(detailsUrl, { credentials: 'same-origin' })
             .then(response => response.json())
             .then(data => {
                 // Populate form with event data
@@ -964,10 +1050,16 @@ class GanttDynamic {
                     document.getElementById('event-client').value = data.individual_client_id || '';
                 }
 
+                this.currentSelection = {
+                    resourceId: data.resource_id,
+                    date: this.selectedDate
+                };
+
                 this.toggleEventTypeFields(data.event_type);
 
                 // Update modal title
                 document.getElementById('modal-title-text').textContent = 'Editar Aula';
+                document.getElementById('delete-event').style.display = 'inline-block';
 
                 // Show modal
                 const modal = new bootstrap.Modal(document.getElementById('eventModal'));
@@ -977,6 +1069,35 @@ class GanttDynamic {
                 console.error('Error:', error);
                 this.showAlert('Erro ao carregar detalhes do evento', 'danger');
             });
+    }
+
+    deleteEvent() {
+        const eventId = document.getElementById('event-id').value;
+        if (!eventId) return;
+        if (!confirm('Tem a certeza que quer eliminar esta aula?')) return;
+
+        fetch(GANTT_DELETE_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify({ event_id: eventId })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                this.showAlert('Aula eliminada com sucesso', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                this.loadGanttData();
+            } else {
+                this.showAlert(result.error || 'Erro ao eliminar aula', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            this.showAlert('Erro ao eliminar aula', 'danger');
+        });
     }
 
     updateCurrentTimeLine() {

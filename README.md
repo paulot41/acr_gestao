@@ -6,13 +6,12 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 
 ## Atualizações recentes
 
-- Substituição de `except Exception` por exceções específicas com registo adequado.
-- Remoção da criação automática de organização em `get_current_organization`.
-- Consolidação do middleware de multi-tenancy.
-- Cálculos financeiros agora utilizam `Decimal` para maior precisão.
-- Migração para `UniqueConstraint` no modelo `Person` (restantes modelos ainda usam `unique_together`).
-- Limpeza de imports não utilizados no middleware core.
-- Adição de testes automatizados para modelos e middleware.
+- Observabilidade com logging estruturado + request-id e integração opcional Sentry.
+- Sincronização Google Calendar com tasks assíncronas (Celery).
+- Cache e otimizações de contagens para Gantt e relatórios.
+- Exportação CSV e filtros avançados em eventos e reservas.
+- Health check com verificação de DB + script de backup.
+- CI GitHub Actions com lint (ruff) e testes (pytest).
 
 ### 🚀 **Funcionalidades Principais**
 
@@ -31,10 +30,11 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 - **Filtros e pesquisas** otimizadas
 - **Fieldsets organizados** para melhor UX
 
-#### 🎯 **Gantt Dinâmico**
+#### 🗓️ **Agenda de Marcações (Gantt Dinâmico)**
 - **Drag & Drop** para criação instantânea de aulas
 - **Interface moderna** com espaços à esquerda e horas no topo
 - **Linha de tempo atual** em tempo real
+- **Abre na data do dia** por defeito
 - **Vista 6h-22h ou 24h** configurável
 - **Três tipos de aulas**: Abertas, Turmas e Individuais
 - **Validação automática** de conflitos de horário
@@ -85,7 +85,7 @@ Sistema completo de gestão multi-entidade para ginásios (ACR) e centros de wel
 ### DevOps:
 - **Docker & Docker Compose** - Containerização
 - **Nginx** - Proxy reverso com SSL automático
-- **GitHub Actions** - CI/CD (preparado)
+- **GitHub Actions** - CI (lint/test)
 
 ---
 

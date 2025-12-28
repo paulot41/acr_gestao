@@ -6,10 +6,35 @@ Funcionalidades multi-tenant e gestão de organizações.
 from django.http import Http404
 from django.db import IntegrityError, ProgrammingError, OperationalError, connection
 from django.core.exceptions import ValidationError
+from uuid import uuid4
 from .models import Organization
+from .logging_utils import set_request_id, reset_request_id
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class RequestIdMiddleware:
+    """Attach a request id for tracing and logging correlation."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        header_request_id = request.headers.get("X-Request-ID") or request.headers.get("X-Request-Id")
+        request_id = header_request_id.strip() if header_request_id else ""
+        if not request_id or len(request_id) > 64:
+            request_id = uuid4().hex
+
+        token = set_request_id(request_id)
+        request.request_id = request_id
+        try:
+            response = self.get_response(request)
+        finally:
+            reset_request_id(token)
+
+        response["X-Request-ID"] = request_id
+        return response
 
 
 class OrganizationMiddleware:

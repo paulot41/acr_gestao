@@ -26,6 +26,15 @@
             <a href="{% url 'core:gantt' %}" class="btn btn-outline-primary">
                 <i class="bi bi-calendar-week me-1"></i>Vista Gantt
             </a>
+            {% if request.GET %}
+                <a href="?{{ request.GET.urlencode }}&export=csv" class="btn btn-outline-secondary">
+                    <i class="bi bi-download me-1"></i>Exportar CSV
+                </a>
+            {% else %}
+                <a href="?export=csv" class="btn btn-outline-secondary">
+                    <i class="bi bi-download me-1"></i>Exportar CSV
+                </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -186,12 +195,12 @@
                             </td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <span class="me-2 {% if event.bookings.count >= event.capacity %}text-danger fw-bold{% endif %}">
-                                        {{ event.bookings.count }}/{{ event.capacity }}
+                                    <span class="me-2 {% if event.active_bookings_count >= event.capacity %}text-danger fw-bold{% endif %}">
+                                        {{ event.active_bookings_count }}/{{ event.capacity }}
                                     </span>
                                     <div class="progress flex-grow-1" style="height: 6px;">
                                         <div class="progress-bar {{ event.occupancy_class }}"
-                                             style="width: {% widthratio event.bookings.count event.capacity 100 %}%"></div>
+                                             style="width: {% widthratio event.active_bookings_count event.capacity 100 %}%"></div>
                                     </div>
                                 </div>
                             </td>

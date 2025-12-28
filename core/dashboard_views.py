@@ -22,7 +22,7 @@ from .services.alerts import AlertService, CreditHistoryService
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@role_required(["admin", "staff", "instructor"])
 def dashboard_router(request):
     """Dashboard unificado: redireciona para o Gantt para consulta/marcação de aulas."""
     return redirect('core:gantt')
@@ -39,13 +39,26 @@ def admin_dashboard(request):
     today = timezone.now().date()
 
     # Estatísticas gerais - usando campos corretos
+    client_counts = Person.objects.filter(organization=org).aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(status='active')),
+    )
+    instructor_counts = Instructor.objects.filter(organization=org).aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(is_active=True)),
+    )
+    modality_counts = Modality.objects.filter(organization=org).aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(is_active=True)),
+    )
+
     stats = {
-        'total_clients': Person.objects.filter(organization=org).count(),
-        'active_clients': Person.objects.filter(organization=org, status='active').count(),
-        'total_instructors': Instructor.objects.filter(organization=org).count(),
-        'active_instructors': Instructor.objects.filter(organization=org, is_active=True).count(),
-        'total_modalities': Modality.objects.filter(organization=org).count(),
-        'active_modalities': Modality.objects.filter(organization=org, is_active=True).count(),
+        'total_clients': client_counts['total'],
+        'active_clients': client_counts['active'],
+        'total_instructors': instructor_counts['total'],
+        'active_instructors': instructor_counts['active'],
+        'total_modalities': modality_counts['total'],
+        'active_modalities': modality_counts['active'],
     }
 
     # Eventos de hoje e próximos - usando campos corretos
@@ -62,7 +75,7 @@ def admin_dashboard(request):
 
     # Reservas recentes - usando relacionamento correto
     recent_bookings = Booking.objects.filter(
-        event__organization=org
+        organization=org
     ).select_related('event', 'person').order_by('-created_at')[:10]
 
     # Clientes com poucos créditos - usando relacionamento 'subscriptions'

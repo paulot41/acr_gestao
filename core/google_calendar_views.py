@@ -7,6 +7,7 @@ import logging
 import os
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.conf import settings
 from .auth_views import role_required
 from django.http import JsonResponse, Http404
 from django.urls import reverse
@@ -19,6 +20,7 @@ from googleapiclient.errors import HttpError
 from .models import Organization, Instructor, Event, GoogleCalendarConfig, InstructorGoogleCalendar, GoogleCalendarSyncLog
 from .services.google_calendar import get_google_calendar_service
 from .middleware import get_current_organization
+from .tasks import sync_instructor_events_task, sync_event_task
 
 logger = logging.getLogger(__name__)
 
@@ -247,18 +249,21 @@ def google_calendar_sync_instructor(request, instructor_id):
     instructor = get_object_or_404(Instructor, id=instructor_id, organization=organization)
 
     try:
-        service = get_google_calendar_service(organization)
-        stats = service.sync_all_instructor_events(instructor)
-
-        messages.success(
-            request,
-            f"Sincronização completa para {instructor.full_name}: "
-            f"{stats['success']} eventos exportados, "
-            f"{stats['imported']} importados, "
-            f"{stats['errors']} erros, "
-            f"{stats['skipped']} ignorados."
-        )
-        logger.info(f"Sincronização manual completa para {instructor.full_name}: {stats}")
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            stats = sync_instructor_events_task.apply(args=[organization.id, instructor.id]).get()
+            messages.success(
+                request,
+                f"Sincronização completa para {instructor.full_name}: "
+                f"{stats.get('success', 0)} eventos exportados, "
+                f"{stats.get('imported', 0)} importados, "
+                f"{stats.get('errors', 0)} erros, "
+                f"{stats.get('skipped', 0)} ignorados."
+            )
+            logger.info(f"Sincronização manual completa para {instructor.full_name}: {stats}")
+        else:
+            sync_instructor_events_task.delay(organization.id, instructor.id)
+            messages.success(request, f"Sincronização iniciada para {instructor.full_name}.")
+            logger.info("Sincronização agendada para %s", instructor.full_name)
 
     except HttpError as e:
         messages.error(request, f"Erro na sincronização para {instructor.full_name}: {e}")
@@ -353,19 +358,23 @@ def google_calendar_api_sync_event(request, event_id):
     try:
         event = Event.objects.get(id=event_id, organization=organization)
 
-        service = get_google_calendar_service(organization)
-        success = service.sync_event_to_google(event)
-
-        if success:
-            return JsonResponse({
-                'success': True,
-                'message': f'Evento "{event.title}" sincronizado com sucesso!'
-            })
-        else:
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            result = sync_event_task.apply(args=[organization.id, event.id]).get()
+            if result.get("success"):
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Evento "{event.title}" sincronizado com sucesso!'
+                })
             return JsonResponse({
                 'success': False,
                 'message': f'Evento "{event.title}" não foi sincronizado (verificar configurações).'
             })
+
+        sync_event_task.delay(organization.id, event.id)
+        return JsonResponse({
+            'success': True,
+            'message': f'Sincronização iniciada para "{event.title}".'
+        }, status=202)
 
     except Event.DoesNotExist:
         return JsonResponse({'error': 'Evento não encontrado'}, status=404)

@@ -3,10 +3,14 @@
 
 {% block title %}Sistema Gantt - Gestão de Espaços | ACR Gestão{% endblock %}
 
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-timeline@6.1.8/index.global.min.css" rel="stylesheet">
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
         <li class="breadcrumb-item active">Sistema Gantt</li>
     </ol>
 </nav>
@@ -40,24 +44,19 @@
                     <!-- Filtro por Espaço/Resource -->
                     <div class="col-md-3">
                         <label class="form-label">Espaços:</label>
+                        {% for resource in resources %}
                         <div class="form-check">
-                            <input class="form-check-input resource-filter" type="checkbox" value="ginasio" id="filterGinasio" checked>
-                            <label class="form-check-label" for="filterGinasio">
-                                <span class="badge" style="background-color: #0d6efd;">Ginásio</span> (Cap. 20)
+                            <input class="form-check-input resource-filter" type="checkbox" value="{{ resource.id }}" id="filterResource{{ resource.id }}" checked>
+                            <label class="form-check-label" for="filterResource{{ resource.id }}">
+                                <span class="badge" style="background-color:
+                                    {% if resource.entity_type == 'acr' %}#0d6efd
+                                    {% elif resource.entity_type == 'proform' %}#198754
+                                    {% else %}#6f42c1{% endif %};">
+                                    {{ resource.name }}
+                                </span> (Cap. {{ resource.capacity }})
                             </label>
                         </div>
-                        <div class="form-check">
-                            <input class="form-check-input resource-filter" type="checkbox" value="pilates" id="filterPilates" checked>
-                            <label class="form-check-label" for="filterPilates">
-                                <span class="badge" style="background-color: #198754;">Sala Pilates</span> (Cap. 15)
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input resource-filter" type="checkbox" value="pavilhao" id="filterPavilhao" checked>
-                            <label class="form-check-label" for="filterPavilhao">
-                                <span class="badge" style="background-color: #ffc107; color: #000;">Pavilhão</span> (Cap. 30)
-                            </label>
-                        </div>
+                        {% endfor %}
                     </div>
 
                     <!-- Filtro por Instrutor -->
@@ -262,6 +261,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-timeline@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/pt.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let calendar;
@@ -311,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // OTIMIZAÇÃO: Carregar eventos com cache e throttling
             events: {
-                url: '{% url "events_json" %}',
+                url: '{% url "core:events_json" %}',
                 method: 'GET',
                 extraParams: function() {
                     return getActiveFilters();
@@ -395,7 +396,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Filtros de recursos
         const activeResources = Array.from(document.querySelectorAll('.resource-filter:checked'))
             .map(cb => cb.value);
-        if (activeResources.length > 0 && activeResources.length < 3) {
+        const totalResources = {{ resources|length }};
+        if (activeResources.length > 0 && activeResources.length < totalResources) {
             filters.resources = activeResources.join(',');
         }
 
@@ -521,7 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
             end: nextWeek.toISOString()
         });
 
-        fetch(`{% url "events_json" %}?${params}`)
+        fetch(`{% url "core:events_json" %}?${params}`)
             .then(response => response.json())
             .then(data => {
                 // Cache eventos para navegação futura
