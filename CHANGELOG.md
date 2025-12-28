@@ -15,6 +15,7 @@ This project follows Semantic Versioning.
 - Gantt: close modal on save and allow deleting events from the modal.
 - Gantt: use double-click to edit; single click reserved for drag adjustments.
 - Gantt: add day navigation arrows and drag threshold to enable double-click edit.
+- Clientes: prompt após criação e ação de eliminar na lista.
 
 ## 0.1.0
 - Initial baseline.

@@ -36,6 +36,7 @@ urlpatterns = [
     path('modalities/add/', web_views.modality_add, name='modality_add'),
     path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
     path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
+    path('clients/<int:pk>/delete/', web_views.client_delete, name='client_delete'),
 
     # Instrutores
     path('instructors/', web_views.instructor_list, name='instructor_list'),

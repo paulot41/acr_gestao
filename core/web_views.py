@@ -5,10 +5,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .auth_views import role_required
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import DatabaseError
 from django.db.models import Q, Count
+from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_http_methods
 
 from .models import Person, Instructor, Modality, Event, Resource, Payment, Booking
 from .forms import PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm
@@ -196,8 +200,7 @@ def client_add(request):
             client = form.save(commit=False)
             client.organization = org
             client.save()
-            messages.success(request, f'Cliente {client.full_name} criado com sucesso!')
-            return redirect('core:client_detail', pk=client.pk)
+            return redirect(f"{reverse('core:client_list')}?created=1&client_id={client.pk}")
     else:
         form = PersonForm(organization=org)
 
@@ -206,6 +209,22 @@ def client_add(request):
         'title': 'Adicionar Cliente',
         'action': 'add'
     })
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def client_delete(request, pk):
+    """Eliminar cliente."""
+    client = get_object_or_404(Person, pk=pk, organization=request.organization)
+
+    try:
+        client.delete()
+        messages.success(request, f'Cliente {client.full_name} eliminado com sucesso!')
+    except ProtectedError:
+        messages.error(request, 'Não é possível eliminar este cliente porque existem faturas associadas.')
+    except DatabaseError:
+        messages.error(request, 'Não foi possível eliminar o cliente. Tente novamente.')
+
+    return redirect('core:client_list')
 
 
 # INSTRUTORES VIEWS
@@ -867,7 +886,7 @@ def client_list(request):
 
     # Filtros
     search = request.GET.get('search', '')
-    status = request.GET.get('status', '')
+    status_filter = request.GET.get('status', '')
     entity = request.GET.get('entity', '')
 
     if search:
@@ -878,8 +897,8 @@ def client_list(request):
             Q(phone__icontains=search)
         )
 
-    if status:
-        clients = clients.filter(status=status)
+    if status_filter:
+        clients = clients.filter(status=status_filter)
 
     if entity:
         clients = clients.filter(entity_affiliation=entity)
@@ -888,11 +907,23 @@ def client_list(request):
     page = request.GET.get('page')
     clients = paginator.get_page(page)
 
+    created = request.GET.get('created') == '1'
+    created_client = None
+    created_client_id = request.GET.get('client_id')
+    if created and created_client_id and created_client_id.isdigit():
+        created_client = Person.objects.filter(
+            organization=org, pk=int(created_client_id)
+        ).first()
+
     return render(request, 'core/client_list.html', {
         'clients': clients,
         'search': search,
-        'status': status,
-        'entity': entity
+        'status': status_filter,
+        'status_filter': status_filter,
+        'status_choices': Person.Status.choices,
+        'entity': entity,
+        'created': created,
+        'created_client': created_client,
     })
 
 @role_required(["admin", "staff"])
