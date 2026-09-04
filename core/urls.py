@@ -37,12 +37,18 @@ urlpatterns = [
     path('clients/<int:pk>/delete/', web_views.client_delete, name='client_delete'),
     path('clients/<int:client_id>/pay/', web_views.client_pay, name='client_pay'),
     path('clients/<int:client_id>/subscribe/', web_views.client_subscribe, name='client_subscribe'),
+    path('clients/<int:client_id>/resend-welcome/', web_views.client_resend_welcome, name='client_resend_welcome'),
 
     # Balcão de Caixa e Pagamentos
     path('cashier/', web_views.cashier_dashboard, name='cashier_dashboard'),
     path('payments/', web_views.cashier_dashboard, name='payment_list'),
     path('payments/add/', web_views.payment_create, name='payment_add'),
     path('payments/<int:payment_id>/receipt/', web_views.payment_receipt, name='payment_receipt'),
+
+    # Google Drive & Sheets da ACR
+    path('google-drive/', web_views.google_drive_sync_view, name='google_drive_sync'),
+    path('google-drive/sync/', web_views.google_drive_trigger_sync, name='google_drive_trigger_sync'),
+    path('google-drive/export/', web_views.export_athletes_sheet, name='export_athletes_sheet'),
 
     # Modalidades
     path('modalities/', web_views.modality_list, name='modality_list'),
@@ -54,16 +60,19 @@ urlpatterns = [
     path('instructors/<int:pk>/', web_views.instructor_detail, name='instructor_detail'),
     path('instructors/<int:pk>/edit/', web_views.instructor_edit, name='instructor_edit'),
 
-    # Eventos
+    # Eventos e Check-in no Tapete
     path('events/', web_views.event_list, name='event_list'),
     path('events/add/', web_views.event_add, name='event_add'),
     path('events/create/', web_views.event_create, name='event_create'),
     path('events/<int:pk>/edit/', web_views.event_edit, name='event_edit'),
     path('events/<int:pk>/delete/', web_views.event_delete, name='event_delete'),
+    path('events/<int:event_id>/checkin/', web_views.event_checkin, name='event_checkin'),
+    path('events/<int:event_id>/quick-add/', web_views.event_quick_add_attendance, name='event_quick_add_attendance'),
 
-    # Reservas
+    # Reservas e Presenças
     path('bookings/', web_views.booking_list, name='booking_list'),
     path('bookings/add/', web_views.booking_add, name='booking_add'),
+    path('bookings/<int:booking_id>/toggle-checkin/', web_views.booking_toggle_checkin, name='booking_toggle_checkin'),
 
     # Gantt
     path('gantt/', views.gantt_view, name='gantt'),

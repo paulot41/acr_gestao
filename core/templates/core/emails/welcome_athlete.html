@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e1e4e8;
+        }
+        .header {
+            background: linear-gradient(135deg, #0d6efd 0%, #198754 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 15px;
+        }
+        .info-card {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 16px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .insurance-card {
+            background-color: #f0fdf4;
+            border-left: 4px solid #198754;
+            padding: 16px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .minor-card {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .card-title {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .badge-success { background-color: #198754; }
+        .badge-primary { background-color: #0d6efd; }
+        .badge-warning { background-color: #f59e0b; color: #000; }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .details-table td {
+            padding: 6px 0;
+            font-size: 14px;
+            vertical-align: top;
+        }
+        .details-table td.label {
+            width: 45%;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .details-table td.value {
+            font-weight: 600;
+            color: #212529;
+        }
+        .rules-list {
+            padding-left: 20px;
+            margin: 15px 0;
+            font-size: 14px;
+            color: #495057;
+        }
+        .rules-list li {
+            margin-bottom: 6px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .footer p {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Cabeçalho -->
+        <div class="header">
+            <h1>ACR & Proform SC</h1>
+            <p>Protocolo Desportivo: Artes Marciais & Desportos de Combate</p>
+        </div>
+
+        <!-- Conteúdo -->
+        <div class="content">
+            <div class="greeting">
+                Olá, {% if person.is_minor and person.guardian_name %}{{ person.guardian_name }} (Encarregado de Educação de {{ person.full_name }}){% else %}{{ person.full_name }}{% endif %}!
+            </div>
+            <p>
+                É com enorme satisfação que confirmamos a inscrição nas atividades desportivas promovidas pela <strong>Associação Cultural e Recreativa (ACR)</strong> em parceria com o <strong>Proform SC</strong>.
+            </p>
+
+            <!-- Ficha de Inscrição -->
+            <div class="info-card">
+                <div class="card-title" style="color: #0d6efd;">
+                    Resumo da Inscrição
+                </div>
+                <table class="details-table">
+                    <tr>
+                        <td class="label">Atleta / Praticante:</td>
+                        <td class="value">{{ person.full_name }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">NIF:</td>
+                        <td class="value">{{ person.nif|default:'Não facultado' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Afiliação Protocolar:</td>
+                        <td class="value">{{ person.get_entity_affiliation_display }}</td>
+                    </tr>
+                    {% if person.date_of_birth %}
+                    <tr>
+                        <td class="label">Data de Nascimento:</td>
+                        <td class="value">{{ person.date_of_birth|date:'d/m/Y' }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+
+            {% if person.is_minor %}
+            <!-- Informação para Menores -->
+            <div class="minor-card">
+                <div class="card-title" style="color: #b45309;">
+                    Encarregado de Educação (Atleta Menor de Idade)
+                </div>
+                <table class="details-table">
+                    <tr>
+                        <td class="label">Nome do Responsável:</td>
+                        <td class="value">{{ person.guardian_name|default:'-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Contacto Telefónico:</td>
+                        <td class="value">{{ person.guardian_phone|default:'-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">NIF do Responsável:</td>
+                        <td class="value">{{ person.guardian_nif|default:'-' }}</td>
+                    </tr>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Informação do Seguro Desportivo Obrigatório -->
+            <div class="insurance-card">
+                <div class="card-title" style="color: #198754;">
+                    Apólice de Seguro Desportivo & Aptidão Médica
+                </div>
+                <p style="font-size: 13px; margin: 0 0 10px 0; color: #2b6e40;">
+                    Em conformidade com a legislação desportiva e o protocolo institucional, a prática de atividades desportivas está salvaguardada por seguro obrigatório.
+                </p>
+                <table class="details-table">
+                    <tr>
+                        <td class="label">N.º da Apólice:</td>
+                        <td class="value">{{ person.insurance_policy|default:'Apólice Coletiva ACR / Proform SC' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Validade do Seguro:</td>
+                        <td class="value">
+                            {% if person.insurance_expiry %}
+                                {{ person.insurance_expiry|date:'d/m/Y' }} ({{ person.insurance_status.label }})
+                            {% else %}
+                                Em regularização na secretaria
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label">Atestado Médico:</td>
+                        <td class="value">
+                            {% if person.medical_certificate_expiry %}
+                                Válido até {{ person.medical_certificate_expiry|date:'d/m/Y' }}
+                            {% else %}
+                                Entrega pendente (obrigatório nos primeiros 15 dias)
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Normas do Tapete e Recomendações -->
+            <h4 style="margin-top: 25px; margin-bottom: 10px; font-size: 15px; color: #333;">
+                Recomendações e Normas do Tapete:
+            </h4>
+            <ul class="rules-list">
+                <li><strong>Check-in Obrigatório:</strong> No início de cada aula, confirme a sua presença com o instrutor de serviço para registo no sistema de chamada do tapete.</li>
+                <li><strong>Higiene e Fardamento:</strong> Utilize o equipamento/quimono devidamente limpo e calçado adequado apenas fora do tapete/tatami.</li>
+                <li><strong>Pontualidade:</strong> Compareça 10 minutos antes do horário de início do treino agendado.</li>
+                <li><strong>Em caso de lesão:</strong> Qualquer incidente ocorrido durante os treinos deve ser imediatamente comunicado ao instrutor para ativação do protocolo da seguradora.</li>
+            </ul>
+
+            <p style="margin-top: 25px; font-size: 14px;">
+                Se tiver qualquer dúvida, a equipa de receção do Proform SC e a Direção da ACR estão à sua inteira disposição.
+            </p>
+            <p style="font-size: 14px; font-weight: bold; margin-bottom: 0;">
+                Bons treinos e bem-vindo(a) à nossa equipa!
+            </p>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="footer">
+            <p><strong>Associação Cultural e Recreativa (ACR) & Proform SC</strong></p>
+            <p>Mensagem gerada automaticamente pelo sistema ACR Gestão.</p>
+            <p>Por favor não responda diretamente a este e-mail.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -908,6 +908,30 @@ class GoogleCalendarSyncLog(models.Model):
         return f"{self.get_sync_type_display()} - {self.get_status_display()} ({self.created_at})"
 
 
+class GoogleDriveSyncLog(models.Model):
+    """Log de sincronização da lista de praticantes com Google Drive / Google Sheets da ACR."""
+    class Status(models.TextChoices):
+        SUCCESS = "success", "Sucesso"
+        WARNING = "warning", "Aviso / Parcial"
+        ERROR = "error", "Erro"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="drive_sync_logs")
+    athletes_count = models.PositiveIntegerField("Atletas Sincronizados", default=0)
+    status = models.CharField("Estado", max_length=10, choices=Status.choices, default=Status.SUCCESS)
+    file_name = models.CharField("Ficheiro / Planilha", max_length=255, blank=True)
+    google_sheet_id = models.CharField("ID da Google Sheet", max_length=255, blank=True)
+    details = models.TextField("Detalhes", blank=True)
+    created_at = models.DateTimeField("Data de Sincronização", auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Log de Sincronização Google Drive"
+        verbose_name_plural = "Logs de Sincronização Google Drive"
+
+    def __str__(self):
+        return f"Sync Drive ({self.athletes_count} atletas) - {self.get_status_display()} em {self.created_at:%d/%m/%Y %H:%M}"
+
+
 # Adicionar antes do modelo Payment
 class PaymentPlan(models.Model):
     """Planos de pagamento flexíveis para mensalidades e créditos."""

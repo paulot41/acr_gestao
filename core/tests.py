@@ -7,10 +7,13 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse
 from rest_framework.test import APITestCase
 
+from django.core import mail
+from notifications.models import NotificationLog
+
 from .models import (
     Organization, Person, Event, Resource, Booking,
     Instructor, Modality, ClassGroup, PaymentPlan,
-    ClientSubscription, CreditHistory, Payment
+    ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog
 )
 from .middleware import OrganizationMiddleware
 from .context_processors import organization_context
@@ -562,4 +565,305 @@ class CashierAndPaymentsTestCase(TestCase):
         sub = ClientSubscription.objects.filter(person=self.athlete, payment_plan=self.monthly_plan).first()
         self.assertIsNotNone(sub)
         self.assertTrue(sub.is_paid)
+
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class CommunicationsTestCase(TestCase):
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="acr.local",
+            org_type=Organization.Type.BOTH
+        )
+        self.athlete = Person.objects.create(
+            organization=self.org,
+            first_name="Tiago",
+            last_name="Ribeiro",
+            email="tiago@example.com",
+            phone="919998877",
+            insurance_policy="AP-998877",
+            insurance_expiry=timezone.now().date() + timedelta(days=180)
+        )
+        self.minor = Person.objects.create(
+            organization=self.org,
+            first_name="Martim",
+            last_name="Ribeiro",
+            date_of_birth=timezone.now().date() - timedelta(days=10 * 365),
+            guardian_name="Tiago Ribeiro",
+            guardian_phone="919998877",
+            guardian_nif="123123123"
+        )
+        self.user = User.objects.create_superuser(username="admin_comm", password="password123", email="admin@acr.local")
+        self.client = Client()
+        self.client.login(username="admin_comm", password="password123")
+
+    def test_send_athlete_welcome_email(self):
+        """Valida envio de e-mail de boas-vindas com apólice de seguro e registo em NotificationLog."""
+        from core.services.communications import send_athlete_welcome_email
+        success = send_athlete_welcome_email(self.athlete)
+        self.assertTrue(success)
+
+        # Verificar e-mail na outbox do Django
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertIn("ACR & Proform SC", sent_email.subject)
+        self.assertIn(self.athlete.email, sent_email.to)
+        self.assertIn("AP-998877", sent_email.body)
+
+        # Verificar NotificationLog
+        log = NotificationLog.objects.filter(person=self.athlete).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, "sent")
+        self.assertEqual(log.channel, "email")
+
+    def test_send_athlete_welcome_email_no_email(self):
+        """Atleta sem e-mail não deve provocar erro e deve retornar False."""
+        from core.services.communications import send_athlete_welcome_email
+        athlete_no_email = Person.objects.create(
+            organization=self.org,
+            first_name="Sem",
+            last_name="Email"
+        )
+        self.assertFalse(send_athlete_welcome_email(athlete_no_email))
+
+    def test_get_whatsapp_url(self):
+        """Valida geração de links universais do WhatsApp com mensagens pré-formatadas."""
+        from core.services.communications import get_whatsapp_url
+        url_welcome = get_whatsapp_url(self.athlete, "welcome")
+        self.assertIn("https://wa.me/351919998877", url_welcome)
+        self.assertIn("Seguro", url_welcome)
+
+        url_minor = get_whatsapp_url(self.minor, "welcome")
+        self.assertIn("https://wa.me/351919998877", url_minor)
+
+    def test_client_resend_welcome_view(self):
+        """Garante funcionamento do botão de reenvio de e-mail na ficha do atleta."""
+        res = self.client.get(f"/clients/{self.athlete.pk}/resend-welcome/", follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "reenviado com sucesso")
+        self.assertTrue(len(mail.outbox) >= 1)
+
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class GoogleDriveSyncTestCase(TestCase):
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.user = User.objects.create_superuser(username="admin_drive", password="password123", email="drive@acr.local")
+        self.client = Client()
+        self.client.login(username="admin_drive", password="password123")
+
+        self.athlete = Person.objects.create(
+            organization=self.org,
+            first_name="Bruno",
+            last_name="Alves",
+            email="bruno@example.com",
+            nif="111222333",
+            insurance_policy="AP-554433",
+            insurance_expiry=timezone.now().date() + timedelta(days=60)
+        )
+
+    def test_generate_athletes_excel(self):
+        """Valida criação da folha de cálculo Excel (.xlsx) dos praticantes com openpyxl."""
+        from core.services.google_drive import generate_athletes_excel
+        excel_bytes = generate_athletes_excel(self.org)
+        self.assertTrue(len(excel_bytes) > 1000)
+        # Assinatura zip/xlsx (PK\x03\x04)
+        self.assertTrue(excel_bytes.startswith(b'PK'))
+
+    def test_generate_athletes_csv(self):
+        """Valida exportação CSV da lista oficial de atletas."""
+        from core.services.google_drive import generate_athletes_csv
+        csv_str = generate_athletes_csv(self.org)
+        self.assertIn("Bruno Alves", csv_str)
+        self.assertIn("AP-554433", csv_str)
+        self.assertIn("Apólice Seguro", csv_str)
+
+    def test_google_drive_sync_view(self):
+        """Garante acesso ao painel de controlo da Google Drive."""
+        res = self.client.get("/google-drive/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Sincronização Google Drive da ACR")
+        self.assertIn("total_athletes", res.context)
+
+    def test_google_drive_trigger_sync_and_log(self):
+        """Disparo manual de sincronização deve registar histórico em GoogleDriveSyncLog."""
+        res = self.client.post("/google-drive/sync/", follow=True)
+        self.assertEqual(res.status_code, 200)
+
+        log = GoogleDriveSyncLog.objects.filter(organization=self.org).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.athletes_count, 1)
+        self.assertEqual(log.status, GoogleDriveSyncLog.Status.SUCCESS)
+
+    def test_export_athletes_sheet_view(self):
+        """Garante download direto das planilhas em Excel e CSV."""
+        res_xlsx = self.client.get("/google-drive/export/?format=xlsx")
+        self.assertEqual(res_xlsx.status_code, 200)
+        self.assertEqual(res_xlsx["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        res_csv = self.client.get("/google-drive/export/?format=csv")
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertIn("text/csv", res_csv["Content-Type"])
+
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class MatCheckinTestCase(TestCase):
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.user = User.objects.create_superuser(username="instructor_mat", password="password123", email="coach@acr.local")
+        self.client = Client()
+        self.client.login(username="instructor_mat", password="password123")
+
+        self.modality = Modality.objects.create(
+            organization=self.org,
+            name="Jiu-Jitsu",
+            color="#0d6efd"
+        )
+        self.resource = Resource.objects.create(
+            organization=self.org,
+            name="Tatami Principal",
+            capacity=20
+        )
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Mestre",
+            last_name="Silva"
+        )
+        now = timezone.now().replace(microsecond=0)
+        self.event = Event.objects.create(
+            organization=self.org,
+            modality=self.modality,
+            resource=self.resource,
+            instructor=self.instructor,
+            title="Jiu-Jitsu Avançado",
+            starts_at=now + timedelta(hours=1),
+            ends_at=now + timedelta(hours=2),
+            capacity=20
+        )
+
+        # Atleta 1 (com mensalidade ativa)
+        self.athlete_monthly = Person.objects.create(
+            organization=self.org,
+            first_name="Duarte",
+            last_name="Ferreira",
+            email="duarte@example.com"
+        )
+        self.plan_monthly = PaymentPlan.objects.create(
+            organization=self.org,
+            name="Mensalidade Livre",
+            plan_type=PaymentPlan.PlanType.MONTHLY,
+            price=45.0,
+            duration_months=1,
+            is_active=True
+        )
+        self.sub_monthly = ClientSubscription.objects.create(
+            organization=self.org,
+            person=self.athlete_monthly,
+            payment_plan=self.plan_monthly,
+            status=ClientSubscription.Status.ACTIVE,
+            start_date=now.date(),
+            end_date=now.date() + timedelta(days=30),
+            is_paid=True
+        )
+
+        # Atleta 2 (com pacote de créditos)
+        self.athlete_credits = Person.objects.create(
+            organization=self.org,
+            first_name="Diogo",
+            last_name="Melo",
+            email="diogo@example.com"
+        )
+        self.plan_credits = PaymentPlan.objects.create(
+            organization=self.org,
+            name="Pack 10",
+            plan_type=PaymentPlan.PlanType.CREDITS,
+            price=60.0,
+            credits_included=10,
+            credits_validity_days=60,
+            is_active=True
+        )
+        self.sub_credits = ClientSubscription.objects.create(
+            organization=self.org,
+            person=self.athlete_credits,
+            payment_plan=self.plan_credits,
+            status=ClientSubscription.Status.ACTIVE,
+            start_date=now.date(),
+            end_date=now.date() + timedelta(days=60),
+            remaining_credits=5,
+            is_paid=True
+        )
+
+        # Reserva inicial do atleta mensal
+        self.booking_monthly = Booking.objects.create(
+            organization=self.org,
+            event=self.event,
+            person=self.athlete_monthly,
+            status=Booking.Status.CONFIRMED
+        )
+
+    def test_event_checkin_view(self):
+        """Garante acesso ao ecrã de check-in no tapete e listagem de participantes."""
+        res = self.client.get(f"/events/{self.event.pk}/checkin/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Check-in no Tapete")
+        self.assertContains(res, self.event.title)
+        self.assertContains(res, self.athlete_monthly.full_name)
+
+    def test_booking_toggle_checkin(self):
+        """Garante alternância rápida de presença (Presente, Falta, Pendente) com 1 toque."""
+        # Marcar Presente
+        res_present = self.client.post(
+            f"/bookings/{self.booking_monthly.pk}/toggle-checkin/",
+            data={"status": "checked_in"},
+            follow=True
+        )
+        self.assertEqual(res_present.status_code, 200)
+        self.booking_monthly.refresh_from_db()
+        self.assertEqual(self.booking_monthly.status, Booking.Status.CHECKED_IN)
+
+        # Marcar Falta
+        res_noshow = self.client.post(
+            f"/bookings/{self.booking_monthly.pk}/toggle-checkin/",
+            data={"status": "no_show"},
+            follow=True
+        )
+        self.assertEqual(res_noshow.status_code, 200)
+        self.booking_monthly.refresh_from_db()
+        self.assertEqual(self.booking_monthly.status, Booking.Status.NO_SHOW)
+
+    def test_event_quick_add_attendance_credits(self):
+        """Adição de atleta com créditos no tapete consome 1 crédito e cria histórico em CreditHistory."""
+        res = self.client.post(
+            f"/events/{self.event.pk}/quick-add/",
+            data={"person_id": self.athlete_credits.pk},
+            follow=True
+        )
+        self.assertEqual(res.status_code, 200)
+
+        # Booking criado como checked_in
+        booking = Booking.objects.filter(event=self.event, person=self.athlete_credits).first()
+        self.assertIsNotNone(booking)
+        self.assertEqual(booking.status, Booking.Status.CHECKED_IN)
+
+        # Crédito consumido (de 5 para 4)
+        self.sub_credits.refresh_from_db()
+        self.assertEqual(self.sub_credits.remaining_credits, 4)
+
+        # Histórico de débito de créditos criado
+        history = CreditHistory.objects.filter(
+            person=self.athlete_credits,
+            action=CreditHistory.Action.USE
+        ).first()
+        self.assertIsNotNone(history)
+        self.assertEqual(history.credits_amount, -1)
+        self.assertEqual(history.credits_after, 4)
+
 

@@ -118,6 +118,8 @@
                             <li><a class="dropdown-item" href="{% url 'core:cashier_dashboard' %}"><i class="fas fa-cash-register"></i> Balcão de Caixa</a></li>
                             <li><a class="dropdown-item" href="{% url 'core:payment_add' %}"><i class="fas fa-euro-sign"></i> Registar Pagamento</a></li>
                             <li><a class="dropdown-item" href="{% url 'core:credit_history' %}"><i class="fas fa-coins"></i> Histórico de Créditos</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'core:google_drive_sync' %}"><i class="fab fa-google-drive"></i> Google Drive (Praticantes)</a></li>
                         </ul>
                     </li>
                       <li class="nav-item dropdown">
@@ -161,10 +163,12 @@
                       </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="googleCalendarDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fab fa-google"></i> Google Calendar
+                            <i class="fab fa-google"></i> Google & Drive
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'core:google_calendar_home' %}"><i class="fas fa-cog"></i> Configuração</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:google_drive_sync' %}"><i class="fab fa-google-drive"></i> Google Drive (Praticantes)</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'core:google_calendar_home' %}"><i class="fas fa-cog"></i> Configuração Calendar</a></li>
                             <li><a class="dropdown-item" href="{% url 'core:google_calendar_instructors' %}"><i class="fas fa-users"></i> Instrutores</a></li>
                             <li><a class="dropdown-item" href="{% url 'core:google_calendar_sync_logs' %}"><i class="fas fa-history"></i> Logs de Sync</a></li>
                         </ul>

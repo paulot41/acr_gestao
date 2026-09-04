@@ -17,12 +17,15 @@ from django.views.decorators.http import require_http_methods
 
 from .models import (
     Person, Instructor, Modality, Event, Resource, Payment, Booking,
-    PaymentPlan, ClientSubscription, CreditHistory
+    PaymentPlan, ClientSubscription, CreditHistory, GoogleDriveSyncLog
 )
+from notifications.models import NotificationLog
 from .forms import (
     PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm,
     PaymentRegistrationForm, ClientSubscriptionForm
 )
+from .services.communications import send_athlete_welcome_email, get_whatsapp_url
+
 
 
 @role_required(["admin", "staff"])
@@ -171,6 +174,13 @@ def client_detail(request, pk):
     recent_payments = client.payments.order_by('-paid_date', '-created_at')[:10]
     credit_history = client.credit_history.order_by('-created_at')[:10]
 
+    # Comunicações e WhatsApp
+    recent_notifications = NotificationLog.objects.filter(person=client).order_by('-sent_at', '-id')[:5]
+    whatsapp_welcome = get_whatsapp_url(client, 'welcome')
+    whatsapp_insurance = get_whatsapp_url(client, 'insurance')
+    whatsapp_payment = get_whatsapp_url(client, 'payment')
+    whatsapp_schedule = get_whatsapp_url(client, 'schedule')
+
     context = {
         'client': client,
         'subscriptions': subscriptions,
@@ -181,6 +191,11 @@ def client_detail(request, pk):
         'insurance_status': client.insurance_status,
         'medical_status': client.medical_status,
         'is_minor': client.is_minor,
+        'recent_notifications': recent_notifications,
+        'whatsapp_welcome': whatsapp_welcome,
+        'whatsapp_insurance': whatsapp_insurance,
+        'whatsapp_payment': whatsapp_payment,
+        'whatsapp_schedule': whatsapp_schedule,
     }
     return render(request, 'core/client_detail.html', context)
 
@@ -195,7 +210,17 @@ def client_create(request):
             client = form.save(commit=False)
             client.organization = org
             client.save()
-            messages.success(request, f'Atleta {client.full_name} registado com sucesso!')
+
+            # Disparar e-mail de boas-vindas com apólice de seguro se tiver e-mail
+            if client.email:
+                welcome_sent = send_athlete_welcome_email(client, request)
+                if welcome_sent:
+                    messages.success(request, f'Atleta {client.full_name} registado com sucesso! E-mail de boas-vindas com dados da apólice enviado para {client.email}.')
+                else:
+                    messages.success(request, f'Atleta {client.full_name} registado com sucesso!')
+            else:
+                messages.success(request, f'Atleta {client.full_name} registado com sucesso!')
+
             return redirect('core:client_detail', pk=client.pk)
     else:
         form = PersonForm(organization=org)
@@ -236,7 +261,17 @@ def client_add(request):
             client = form.save(commit=False)
             client.organization = org
             client.save()
-            return redirect(f"{reverse('core:client_list')}?created=1&client_id={client.pk}")
+
+            if client.email:
+                welcome_sent = send_athlete_welcome_email(client, request)
+                if welcome_sent:
+                    messages.success(request, f'Atleta {client.full_name} registado com sucesso! E-mail de boas-vindas com dados da apólice enviado para {client.email}.')
+                else:
+                    messages.success(request, f'Atleta {client.full_name} registado com sucesso!')
+            else:
+                messages.success(request, f'Atleta {client.full_name} registado com sucesso!')
+
+            return redirect('core:client_detail', pk=client.pk)
     else:
         form = PersonForm(organization=org)
 
@@ -1183,4 +1218,197 @@ def client_subscribe(request, client_id):
         'title': f"Subscrever Plano - {client.full_name}"
     }
     return render(request, 'core/subscription_form.html', context)
+
+
+@role_required(["admin", "staff"])
+def client_resend_welcome(request, client_id):
+    """Reenviar e-mail de boas-vindas e apólice de seguro."""
+    org = request.organization
+    client = get_object_or_404(Person, pk=client_id, organization=org)
+    if not client.email:
+        messages.error(request, "Este atleta não possui endereço de e-mail registado.")
+        return redirect('core:client_detail', pk=client.pk)
+
+    sent = send_athlete_welcome_email(client, request)
+    if sent:
+        messages.success(request, f"E-mail de boas-vindas e apólice reenviado com sucesso para {client.email}!")
+    else:
+        messages.warning(request, f"Não foi possível enviar o e-mail para {client.email}. Consulte o histórico de notificações.")
+    return redirect('core:client_detail', pk=client.pk)
+
+
+@role_required(["admin", "staff"])
+def google_drive_sync_view(request):
+    """Painel de sincronização da lista de praticantes com o Google Drive da ACR."""
+    org = request.organization
+    total_athletes = Person.objects.filter(organization=org).count()
+    logs = GoogleDriveSyncLog.objects.filter(organization=org).order_by('-created_at')[:20]
+    last_log = logs.first()
+
+    context = {
+        'total_athletes': total_athletes,
+        'logs': logs,
+        'last_log': last_log,
+        'title': 'Sincronização Google Drive da ACR'
+    }
+    return render(request, 'core/google_drive_sync.html', context)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def google_drive_trigger_sync(request):
+    """Dispara a sincronização imediata dos praticantes para a Google Drive."""
+    org = request.organization
+    from .services.google_drive import sync_athletes_to_google_drive
+    result = sync_athletes_to_google_drive(org)
+    if result.get('success'):
+        messages.success(request, result.get('message', 'Sincronização concluída com sucesso!'))
+    else:
+        messages.error(request, "Ocorreu um erro ao sincronizar com a Google Drive.")
+    return redirect('core:google_drive_sync')
+
+
+@role_required(["admin", "staff"])
+def export_athletes_sheet(request):
+    """Exportar lista de atletas consolidada em Excel (.xlsx) ou CSV."""
+    org = request.organization
+    file_format = request.GET.get('format', 'xlsx').lower()
+    timestamp_str = timezone.now().strftime('%Y%m%d_%H%M')
+
+    if file_format == 'csv':
+        from .services.google_drive import generate_athletes_csv
+        csv_data = generate_athletes_csv(org)
+        response = HttpResponse(csv_data, content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="Atletas_ACR_Proform_{timestamp_str}.csv"'
+        return response
+    else:
+        from .services.google_drive import generate_athletes_excel
+        excel_data = generate_athletes_excel(org)
+        response = HttpResponse(
+            excel_data,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="Atletas_ACR_Proform_{timestamp_str}.xlsx"'
+        return response
+
+
+@role_required(["admin", "staff", "instructor"])
+def event_checkin(request, event_id):
+    """Interface de lista de chamada e check-in no tapete para instrutores e receção."""
+    org = request.organization
+    event = get_object_or_404(
+        Event.objects.select_related('modality', 'resource', 'instructor'),
+        pk=event_id,
+        organization=org
+    )
+    bookings = event.bookings.select_related('person').order_by('person__first_name', 'person__last_name')
+    checked_in_count = bookings.filter(status=Booking.Status.CHECKED_IN).count()
+
+    # Contar atletas com seguro vencido ou em falta presentes na lista da aula
+    expired_insurance_count = sum(
+        1 for b in bookings if not b.person.insurance_status.get('is_valid', False)
+    )
+
+    # Lista de atletas disponíveis para adicionar rapidamente (que ainda não têm reserva nesta aula)
+    existing_person_ids = bookings.values_list('person_id', flat=True)
+    available_athletes = Person.objects.filter(
+        organization=org, status='active'
+    ).exclude(id__in=existing_person_ids).order_by('first_name', 'last_name')
+
+    context = {
+        'event': event,
+        'bookings': bookings,
+        'checked_in_count': checked_in_count,
+        'expired_insurance_count': expired_insurance_count,
+        'available_athletes': available_athletes,
+        'title': f"Check-in no Tapete: {event.title}"
+    }
+    return render(request, 'core/mat_checkin.html', context)
+
+
+@role_required(["admin", "staff", "instructor"])
+@require_http_methods(["POST"])
+def booking_toggle_checkin(request, booking_id):
+    """Alternar o estado da presença na aula (checked_in, no_show, confirmed)."""
+    org = request.organization
+    booking = get_object_or_404(Booking.objects.select_related('person', 'event'), pk=booking_id, organization=org)
+    new_status = request.POST.get('status')
+
+    if new_status in [Booking.Status.CHECKED_IN, Booking.Status.NO_SHOW, Booking.Status.CONFIRMED]:
+        booking.status = new_status
+        booking.save(update_fields=['status'])
+        status_label = "Presente" if new_status == Booking.Status.CHECKED_IN else ("Falta" if new_status == Booking.Status.NO_SHOW else "Pendente")
+        messages.success(request, f"{booking.person.full_name}: marcado como '{status_label}' no tapete.")
+    else:
+        messages.error(request, "Estado de presença inválido.")
+
+    return redirect('core:event_checkin', event_id=booking.event.pk)
+
+
+@role_required(["admin", "staff", "instructor"])
+@require_http_methods(["POST"])
+def event_quick_add_attendance(request, event_id):
+    """Adicionar atleta que apareceu no treino sem reserva prévia, consumindo crédito ou validando plano."""
+    org = request.organization
+    event = get_object_or_404(Event, pk=event_id, organization=org)
+    person_id = request.POST.get('person_id')
+
+    if not person_id:
+        messages.error(request, "Selecione um praticante para adicionar à aula.")
+        return redirect('core:event_checkin', event_id=event.pk)
+
+    person = get_object_or_404(Person, pk=person_id, organization=org)
+
+    # Verificar se já tem reserva
+    existing_booking = Booking.objects.filter(event=event, person=person).first()
+    if existing_booking:
+        existing_booking.status = Booking.Status.CHECKED_IN
+        existing_booking.save(update_fields=['status'])
+        messages.info(request, f"{person.full_name} já estava inscrito e foi marcado como Presente.")
+        return redirect('core:event_checkin', event_id=event.pk)
+
+    # Verificar subscrição ativa
+    active_sub = person.active_subscription
+    subscription_used = None
+    note = ""
+
+    if active_sub:
+        if active_sub.payment_plan.plan_type == PaymentPlan.PlanType.CREDITS:
+            if active_sub.has_credits():
+                credits_before = active_sub.remaining_credits
+                active_sub.use_credit()
+                subscription_used = active_sub
+                credits_after = active_sub.remaining_credits
+                CreditHistory.objects.create(
+                    organization=org,
+                    person=person,
+                    subscription=active_sub,
+                    action=CreditHistory.Action.USE,
+                    credits_amount=-1,
+                    credits_before=credits_before,
+                    credits_after=credits_after,
+                    description=f"Presença na aula {event.title} ({event.starts_at:%d/%m/%Y %H:%M})"
+                )
+                note = f"1 crédito debitado ({credits_after} restantes)."
+            else:
+                note = "Saldo de créditos esgotado - cobrar aula no Caixa!"
+        else:
+            subscription_used = active_sub
+            note = "Mensalidade ativa confirmada."
+    else:
+        note = "Sem plano ativo - pagamento pendente de registo no Caixa!"
+
+    # Criar booking com status checked_in
+    booking = Booking.objects.create(
+        organization=org,
+        event=event,
+        person=person,
+        status=Booking.Status.CHECKED_IN,
+        subscription_used=subscription_used,
+        is_paid=bool(subscription_used)
+    )
+
+    messages.success(request, f"Atleta {person.full_name} entrou no tapete! {note}")
+    return redirect('core:event_checkin', event_id=event.pk)
+
 

@@ -38,8 +38,9 @@ class NotificationLog(models.Model):
         ("sent", "Enviado"),
         ("failed", "Falhou"),
     ]
-    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="logs")
+    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, related_name="logs", null=True, blank=True)
     person = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
+    subject = models.CharField(max_length=255, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     channel = models.CharField(max_length=10, choices=Campaign.CHANNEL_CHOICES, default="email")
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -52,4 +53,6 @@ class NotificationLog(models.Model):
         self.save(update_fields=["status", "sent_at", "detail"])
 
     def __str__(self) -> str:
-        return f"{self.campaign.name} -> {self.person} ({self.status})"
+        target = self.campaign.name if self.campaign else (self.subject or "Notificação")
+        return f"{target} -> {self.person} ({self.status})"
+
