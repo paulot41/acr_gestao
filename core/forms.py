@@ -1,10 +1,14 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Person, Instructor, Modality, Event, Resource, ClassGroup, Booking
+from django.utils import timezone
+from .models import (
+    Person, Instructor, Modality, Event, Resource, ClassGroup, Booking,
+    Payment, PaymentPlan, ClientSubscription
+)
 
 
 class PersonForm(forms.ModelForm):
-    """Formulário para criação/edição de clientes."""
+    """Formulário para criação/edição de clientes e atletas."""
 
     def __init__(self, *args, **kwargs):
         self.organization = kwargs.pop("organization", None)
@@ -22,20 +26,28 @@ class PersonForm(forms.ModelForm):
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'nif',
             'date_of_birth', 'address', 'emergency_contact',
+            'insurance_policy', 'insurance_expiry', 'medical_certificate_expiry',
+            'guardian_name', 'guardian_phone', 'guardian_nif',
             'entity_affiliation', 'status', 'notes', 'consent_rgpd', 'photo'
         ]
         widgets = {
-            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome próprio'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Apelido'}),
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@exemplo.com'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+351 912 345 678'}),
-            'nif': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NIF (opcional)'}),
+            'nif': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NIF'}),
             'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Morada completa'}),
-            'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contacto de emergência'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Morada completa'}),
+            'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome e contacto de emergência'}),
+            'insurance_policy': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: APÓLICE-FID-12345'}),
+            'insurance_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'medical_certificate_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'guardian_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do Encarregado de Educação'}),
+            'guardian_phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Telefone do Encarregado'}),
+            'guardian_nif': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NIF do Encarregado'}),
             'entity_affiliation': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notas adicionais...'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Notas e observações...'}),
             'consent_rgpd': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
@@ -358,3 +370,87 @@ class EventFilterForm(forms.Form):
                 required=False,
                 widget=forms.Select(attrs={'class': 'form-select'})
             )
+
+
+class PaymentRegistrationForm(forms.Form):
+    """Formulário ágil de caixa para registo de pagamentos e atribuição de planos."""
+    person = forms.ModelChoiceField(
+        label="Atleta / Membro",
+        queryset=Person.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select select2-enable'})
+    )
+    payment_plan = forms.ModelChoiceField(
+        label="Plano / Subscrição",
+        queryset=PaymentPlan.objects.none(),
+        required=False,
+        empty_label="-- Pagamento Avulso / Sem Plano --",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    amount = forms.DecimalField(
+        label="Valor (€)",
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'})
+    )
+    method = forms.ChoiceField(
+        label="Método de Pagamento",
+        choices=Payment.Method.choices,
+        initial=Payment.Method.CASH,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    paid_date = forms.DateField(
+        label="Data de Pagamento",
+        initial=timezone.now,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    description = forms.CharField(
+        label="Descrição",
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Mensalidade de Setembro, Pack 10 Aulas Kickboxing...'})
+    )
+    notes = forms.CharField(
+        label="Notas / Observações",
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Notas internas da receção...'})
+    )
+    auto_activate = forms.BooleanField(
+        label="Ativar/Renovar Subscrição ou Carregar Créditos automaticamente",
+        initial=True,
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        organization = kwargs.pop('organization', None)
+        super().__init__(*args, **kwargs)
+        if organization:
+            self.fields['person'].queryset = Person.objects.filter(
+                organization=organization, status__in=['active', 'suspended']
+            ).order_by('first_name', 'last_name')
+            self.fields['payment_plan'].queryset = PaymentPlan.objects.filter(
+                organization=organization, is_active=True
+            ).order_by('entity_type', 'name')
+
+
+class ClientSubscriptionForm(forms.ModelForm):
+    """Formulário para subscrever diretamente um atleta a um plano."""
+    class Meta:
+        model = ClientSubscription
+        fields = ['payment_plan', 'start_date', 'end_date', 'is_paid', 'notes']
+        widgets = {
+            'payment_plan': forms.Select(attrs={'class': 'form-select'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'is_paid': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Observações da subscrição...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        organization = kwargs.pop('organization', None)
+        super().__init__(*args, **kwargs)
+        if organization:
+            self.fields['payment_plan'].queryset = PaymentPlan.objects.filter(
+                organization=organization, is_active=True
+            ).order_by('entity_type', 'name')
+

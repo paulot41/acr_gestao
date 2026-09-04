@@ -102,14 +102,21 @@
                         </a>
                     </li>
                     {% if request.user_role == 'admin' or request.user_role == 'staff' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'cashier' in request.resolver_match.url_name or 'payment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:cashier_dashboard' %}">
+                            <i class="fas fa-cash-register"></i> Caixa
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="clientsDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-users"></i> Clientes
+                        <a class="nav-link dropdown-toggle {% if 'client' in request.resolver_match.url_name %}active{% endif %}" href="#" id="clientsDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-users"></i> Atletas
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'core:client_list' %}"><i class="fas fa-list"></i> Lista de Clientes</a></li>
-                            <li><a class="dropdown-item" href="{% url 'core:client_add' %}"><i class="fas fa-plus"></i> Adicionar Cliente</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:client_list' %}"><i class="fas fa-list"></i> Lista de Atletas</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:client_add' %}"><i class="fas fa-user-plus"></i> Novo Atleta</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'core:cashier_dashboard' %}"><i class="fas fa-cash-register"></i> Balcão de Caixa</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:payment_add' %}"><i class="fas fa-euro-sign"></i> Registar Pagamento</a></li>
                             <li><a class="dropdown-item" href="{% url 'core:credit_history' %}"><i class="fas fa-coins"></i> Histórico de Créditos</a></li>
                         </ul>
                     </li>

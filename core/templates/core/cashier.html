@@ -1,0 +1,224 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Balcão de Caixa - ACR & Proform SC{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Balcão de Caixa</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-7">
+        <h2 class="fw-bold mb-1"><i class="fas fa-cash-register text-success me-2"></i>Balcão de Caixa</h2>
+        <p class="text-muted mb-0">Gestão de pagamentos, cobrança de mensalidades e compra de packs de créditos</p>
+    </div>
+    <div class="col-md-5 text-md-end mt-3 mt-md-0">
+        <a href="{% url 'core:payment_add' %}" class="btn btn-success btn-lg shadow-sm">
+            <i class="fas fa-plus-circle me-1"></i>Registar Novo Pagamento
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+<div class="row mb-3">
+    <div class="col-12">
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Cards de Resumo do Dia de Hoje -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">Total Cobrado Hoje</small>
+                        <h3 class="fw-bold mt-1 mb-0">€{{ total_today|floatformat:2 }}</h3>
+                        <small class="text-white-50">{{ count_today }} transaç{% if count_today == 1 %}ão{% else %}ões{% endif %}</small>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-calendar-day"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">Em Dinheiro</small>
+                        <h3 class="fw-bold mt-1 mb-0">€{{ cash_today|floatformat:2 }}</h3>
+                        <small class="text-white-50">Numerário em caixa</small>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-money-bill-wave"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-white h-100" style="background-color: #e63946;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">MB WAY</small>
+                        <h3 class="fw-bold mt-1 mb-0">€{{ mbway_today|floatformat:2 }}</h3>
+                        <small class="text-white-50">Pagamentos móveis</small>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-mobile-alt"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-dark text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">Cartão / Transferência</small>
+                        <h3 class="fw-bold mt-1 mb-0">€{{ card_today|floatformat:2 }}</h3>
+                        <small class="text-white-50">Multibanco e IBAN</small>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-credit-card"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros e Histórico de Pagamentos -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="Pesquisar por atleta, NIF ou descrição...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="method">
+                    <option value="">Todos os Métodos</option>
+                    {% for value, label in method_choices %}
+                        <option value="{{ value }}" {% if method_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="date" class="form-control" name="date" value="{{ date_filter }}" title="Filtrar por data">
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-primary flex-grow-1">Filtrar</button>
+                <a href="{% url 'core:cashier_dashboard' %}" class="btn btn-outline-secondary" title="Limpar filtros">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        {% if payments %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>N.º</th>
+                            <th>Atleta / Membro</th>
+                            <th>Descrição</th>
+                            <th>Método</th>
+                            <th>Valor</th>
+                            <th>Data Pagamento</th>
+                            <th>Estado</th>
+                            <th width="100" class="text-end">Comprovativo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %}
+                        <tr>
+                            <td class="text-muted fw-bold">#{{ payment.pk }}</td>
+                            <td>
+                                <a href="{% url 'core:client_detail' payment.person.pk %}" class="fw-bold text-dark text-decoration-none">
+                                    {{ payment.person.full_name }}
+                                </a>
+                                {% if payment.person.nif %}
+                                    <br><small class="text-muted">NIF: {{ payment.person.nif }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="fw-semibold">{{ payment.description|default:'Pagamento no Balcão' }}</span>
+                                {% if payment.notes %}
+                                    <br><small class="text-muted">{{ payment.notes|truncatechars:40 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">
+                                    {{ payment.get_method_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="fw-bold fs-6 text-success">€{{ payment.amount|floatformat:2 }}</span>
+                            </td>
+                            <td>
+                                <span class="small">{{ payment.paid_date|date:"d/m/Y"|default:payment.created_at|date:"d/m/Y" }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ payment.status|yesno:'success,warning,secondary' }}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'core:payment_receipt' payment.pk %}" class="btn btn-outline-secondary btn-sm" title="Imprimir / Ver Recibo">
+                                    <i class="fas fa-print me-1"></i>Recibo
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            {% if payments.has_other_pages %}
+            <div class="p-3 border-top d-flex justify-content-between align-items-center">
+                <small class="text-muted">Página {{ payments.number }} de {{ payments.paginator.num_pages }}</small>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if payments.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page={{ payments.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}">Anterior</a></li>
+                    {% endif %}
+                    {% for p in payments.paginator.page_range %}
+                        {% if p == payments.number %}
+                            <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                        {% elif p > payments.number|add:"-3" and p < payments.number|add:"3" %}
+                            <li class="page-item"><a class="page-link" href="?page={{ p }}{% if search %}&search={{ search }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}">{{ p }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if payments.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ payments.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}">Seguinte</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-receipt fs-1 mb-3 d-block text-secondary"></i>
+                <h5>Nenhum registo de pagamento encontrado</h5>
+                <p class="small">Utilize o botão "Registar Novo Pagamento" para começar a cobrar no balcão.</p>
+                <a href="{% url 'core:payment_add' %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-plus me-1"></i>Registar Pagamento
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

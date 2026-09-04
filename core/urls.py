@@ -29,14 +29,24 @@ urlpatterns = [
     # Rotas antigas que redirecionam para o Gantt
     path('schedule/', LoginRequiredRedirectView.as_view(pattern_name='core:gantt', permanent=False), name='schedule'),
 
-    # Clientes
+    # Clientes / Atletas
     path('clients/', web_views.client_list, name='client_list'),
     path('clients/add/', web_views.client_add, name='client_add'),
+    path('clients/<int:pk>/', web_views.client_detail, name='client_detail'),
+    path('clients/<int:pk>/edit/', web_views.client_edit, name='client_edit'),
+    path('clients/<int:pk>/delete/', web_views.client_delete, name='client_delete'),
+    path('clients/<int:client_id>/pay/', web_views.client_pay, name='client_pay'),
+    path('clients/<int:client_id>/subscribe/', web_views.client_subscribe, name='client_subscribe'),
+
+    # Balcão de Caixa e Pagamentos
+    path('cashier/', web_views.cashier_dashboard, name='cashier_dashboard'),
+    path('payments/', web_views.cashier_dashboard, name='payment_list'),
+    path('payments/add/', web_views.payment_create, name='payment_add'),
+    path('payments/<int:payment_id>/receipt/', web_views.payment_receipt, name='payment_receipt'),
+
+    # Modalidades
     path('modalities/', web_views.modality_list, name='modality_list'),
     path('modalities/add/', web_views.modality_add, name='modality_add'),
-    path('clients/<int:pk>/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_detail'),
-    path('clients/<int:pk>/edit/', LoginRequiredRedirectView.as_view(url='/admin/core/person/%(pk)d/change/'), name='client_edit'),
-    path('clients/<int:pk>/delete/', web_views.client_delete, name='client_delete'),
 
     # Instrutores
     path('instructors/', web_views.instructor_list, name='instructor_list'),

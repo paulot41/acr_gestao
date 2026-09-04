@@ -114,6 +114,16 @@ class Person(models.Model):
     address = models.TextField("Morada", blank=True)
     emergency_contact = models.CharField("Contacto de Emergência", max_length=100, blank=True)
 
+    # Seguro Desportivo Obrigatório e Exame Médico
+    insurance_policy = models.CharField("Apólice de Seguro", max_length=100, blank=True, help_text="Número da apólice do seguro desportivo")
+    insurance_expiry = models.DateField("Validade do Seguro", null=True, blank=True, help_text="Data de expiração do seguro desportivo")
+    medical_certificate_expiry = models.DateField("Validade do Atestado Médico", null=True, blank=True, help_text="Data de expiração do atestado/exame médico")
+
+    # Encarregado de Educação (para praticantes menores de 18 anos)
+    guardian_name = models.CharField("Nome do Encarregado de Educação", max_length=120, blank=True)
+    guardian_phone = models.CharField("Telefone do Encarregado", max_length=50, blank=True)
+    guardian_nif = models.CharField("NIF do Encarregado", max_length=20, blank=True)
+
     def _person_upload_to(instance, filename):
         return f"clients/org_{instance.organization_id}/{filename}"
 
@@ -166,6 +176,48 @@ class Person(models.Model):
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def is_minor(self) -> bool:
+        """Verifica se o atleta é menor de 18 anos."""
+        if not self.date_of_birth:
+            return False
+        today = timezone.now().date()
+        age = today.year - self.date_of_birth.year - (
+            (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+        )
+        return age < 18
+
+    @property
+    def insurance_status(self) -> dict:
+        """Retorna o estado do seguro desportivo com rótulo e classe visual."""
+        if not self.insurance_expiry:
+            return {'status': 'missing', 'label': 'Sem Seguro', 'badge': 'bg-secondary', 'is_valid': False}
+        today = timezone.now().date()
+        if self.insurance_expiry < today:
+            return {'status': 'expired', 'label': f'Vencido ({self.insurance_expiry.strftime("%d/%m/%Y")})', 'badge': 'bg-danger', 'is_valid': False}
+        days_left = (self.insurance_expiry - today).days
+        if days_left <= 30:
+            return {'status': 'expiring_soon', 'label': f'Expira em {days_left}d', 'badge': 'bg-warning text-dark', 'is_valid': True}
+        return {'status': 'valid', 'label': f'Válido até {self.insurance_expiry.strftime("%d/%m/%Y")}', 'badge': 'bg-success', 'is_valid': True}
+
+    @property
+    def medical_status(self) -> dict:
+        """Retorna o estado do atestado/exame médico."""
+        if not self.medical_certificate_expiry:
+            return {'status': 'missing', 'label': 'Sem Exame', 'badge': 'bg-secondary', 'is_valid': False}
+        today = timezone.now().date()
+        if self.medical_certificate_expiry < today:
+            return {'status': 'expired', 'label': f'Vencido ({self.medical_certificate_expiry.strftime("%d/%m/%Y")})', 'badge': 'bg-danger', 'is_valid': False}
+        days_left = (self.medical_certificate_expiry - today).days
+        if days_left <= 30:
+            return {'status': 'expiring_soon', 'label': f'Expira em {days_left}d', 'badge': 'bg-warning text-dark', 'is_valid': True}
+        return {'status': 'valid', 'label': f'Válido até {self.medical_certificate_expiry.strftime("%d/%m/%Y")}', 'badge': 'bg-success', 'is_valid': True}
+
+    @property
+    def active_subscription(self):
+        """Retorna a subscrição ativa mais recente."""
+        return self.subscriptions.filter(status='active').order_by('-start_date').first()
 
     def get_monthly_fee(self) -> Decimal:
         """Calcular mensalidade baseada na afiliação."""

@@ -114,12 +114,12 @@
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Cliente</th>
-                            <th>Email</th>
-                            <th>Telefone</th>
+                            <th>Cliente / Atleta</th>
+                            <th>Contactos</th>
+                            <th>Seguro Desportivo</th>
                             <th>Estado</th>
                             <th>Registado em</th>
-                            <th width="100">Ações</th>
+                            <th width="140">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -128,16 +128,21 @@
                             <td>
                                 <div class="d-flex align-items-center">
                                     {% if client.photo %}
-                                        <img src="{{ client.photo.url }}" class="rounded-circle me-2"
-                                             width="32" height="32" alt="{{ client.full_name }}">
+                                        <img src="{{ client.photo.url }}" class="rounded-circle me-2 border"
+                                             width="36" height="36" alt="{{ client.full_name }}" style="object-fit: cover;">
                                     {% else %}
-                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2"
-                                             style="width: 32px; height: 32px;">
-                                            <span class="text-white fw-bold">{{ client.first_name|first }}</span>
+                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2 text-white fw-bold"
+                                             style="width: 36px; height: 36px;">
+                                            {{ client.first_name|first }}
                                         </div>
                                     {% endif %}
                                     <div>
-                                        <strong>{{ client.full_name }}</strong>
+                                        <a href="{% url 'core:client_detail' client.pk %}" class="fw-bold text-dark text-decoration-none">
+                                            {{ client.full_name }}
+                                        </a>
+                                        {% if client.is_minor %}
+                                            <span class="badge bg-warning text-dark ms-1">Menor</span>
+                                        {% endif %}
                                         {% if client.nif %}
                                             <br><small class="text-muted">NIF: {{ client.nif }}</small>
                                         {% endif %}
@@ -145,46 +150,52 @@
                                 </div>
                             </td>
                             <td>
+                                {% if client.phone %}
+                                    <i class="fas fa-phone text-muted me-1 small"></i><a href="tel:{{ client.phone }}" class="text-decoration-none">{{ client.phone }}</a><br>
+                                {% endif %}
                                 {% if client.email %}
-                                    <a href="mailto:{{ client.email }}">{{ client.email }}</a>
-                                {% else %}
+                                    <i class="fas fa-envelope text-muted me-1 small"></i><a href="mailto:{{ client.email }}" class="text-muted small text-decoration-none">{{ client.email }}</a>
+                                {% elif not client.phone %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if client.phone %}
-                                    <a href="tel:{{ client.phone }}">{{ client.phone }}</a>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
+                                <span class="badge {{ client.insurance_status.badge }}">
+                                    {{ client.insurance_status.label }}
+                                </span>
                             </td>
                             <td>
                                 {% if client.status == 'active' %}
                                     <span class="badge bg-success">Ativo</span>
                                 {% elif client.status == 'suspended' %}
-                                    <span class="badge bg-warning">Suspenso</span>
+                                    <span class="badge bg-warning text-dark">Suspenso</span>
                                 {% else %}
                                     <span class="badge bg-secondary">Inativo</span>
                                 {% endif %}
+                                <br><small class="text-muted">{{ client.get_entity_affiliation_display }}</small>
                             </td>
                             <td>
                                 <small class="text-muted">{{ client.created_at|date:"d/m/Y" }}</small>
                             </td>
                             <td>
                                 <div class="d-flex align-items-center gap-1">
+                                    <a href="{% url 'core:client_pay' client.pk %}"
+                                       class="btn btn-outline-success btn-sm" title="Cobrar / Registar Pagamento">
+                                        <i class="fas fa-cash-register"></i>
+                                    </a>
                                     <a href="{% url 'core:client_detail' client.pk %}"
-                                       class="btn btn-outline-primary btn-sm" title="Ver detalhes">
-                                        <i class="bi bi-eye"></i>
+                                       class="btn btn-outline-primary btn-sm" title="Ver ficha completa">
+                                        <i class="fas fa-eye"></i>
                                     </a>
                                     <a href="{% url 'core:client_edit' client.pk %}"
                                        class="btn btn-outline-secondary btn-sm" title="Editar">
-                                        <i class="bi bi-pencil"></i>
+                                        <i class="fas fa-pencil-alt"></i>
                                     </a>
                                     <form method="post" action="{% url 'core:client_delete' client.pk %}" class="d-inline"
-                                          onsubmit="return confirm('Tem a certeza que pretende eliminar este cliente?');">
+                                          onsubmit="return confirm('Tem a certeza que pretende eliminar este atleta?');">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
-                                            <i class="bi bi-trash"></i>
+                                            <i class="fas fa-trash"></i>
                                         </button>
                                     </form>
                                 </div>

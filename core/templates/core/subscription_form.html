@@ -1,0 +1,109 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - ACR & Proform SC{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:client_list' %}">Atletas</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:client_detail' client.pk %}">{{ client.full_name }}</a></li>
+        <li class="breadcrumb-item active">Subscrever Plano</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h4 class="mb-0 fw-bold text-primary">
+                    <i class="fas fa-id-card me-2"></i>Subscrever Plano de Treinos
+                </h4>
+                <p class="text-muted small mb-0">Atribuir mensalidade ou pacote de créditos para {{ client.full_name }}</p>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-light border d-flex align-items-center mb-4">
+                    <i class="fas fa-user-circle fs-2 me-3 text-primary"></i>
+                    <div>
+                        <div class="fw-bold">{{ client.full_name }}</div>
+                        <small class="text-muted">
+                            NIF: {{ client.nif|default:'-' }} &bull;
+                            Afiliação: {{ client.get_entity_affiliation_display }} &bull;
+                            Seguro: {{ client.insurance_status.label }}
+                        </small>
+                    </div>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-12">
+                            <label for="{{ form.payment_plan.id_for_label }}" class="form-label fw-semibold">
+                                Plano Desportivo <span class="text-danger">*</span>
+                            </label>
+                            {{ form.payment_plan }}
+                            {% if form.payment_plan.errors %}
+                                <div class="invalid-feedback d-block">{{ form.payment_plan.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.start_date.id_for_label }}" class="form-label fw-semibold">
+                                Data de Início <span class="text-danger">*</span>
+                            </label>
+                            {{ form.start_date }}
+                            {% if form.start_date.errors %}
+                                <div class="invalid-feedback d-block">{{ form.start_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.end_date.id_for_label }}" class="form-label fw-semibold">
+                                Data de Fim (opcional)
+                            </label>
+                            {{ form.end_date }}
+                            <small class="text-muted d-block">Deixar em branco para cálculo automático pela validade do plano</small>
+                            {% if form.end_date.errors %}
+                                <div class="invalid-feedback d-block">{{ form.end_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch p-3 bg-light rounded">
+                                {{ form.is_paid }}
+                                <label class="form-check-label fw-semibold ms-2" for="{{ form.is_paid.id_for_label }}">
+                                    Marcar imediatamente como Pago
+                                </label>
+                                <small class="text-muted d-block ms-4">Se não marcar, o plano fica pendente de liquidação no Caixa.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold">
+                                Observações
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">{{ form.notes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between pt-3 border-top">
+                        <a href="{% url 'core:client_detail' client.pk %}" class="btn btn-outline-secondary px-4">
+                            <i class="fas fa-times me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                            <i class="fas fa-check me-1"></i>Confirmar Subscrição
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

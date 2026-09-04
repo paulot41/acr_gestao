@@ -1,0 +1,129 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Recibo #{{ payment.pk }} - {{ client.full_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printableReceipt, #printableReceipt * {
+            visibility: visible;
+        }
+        #printableReceipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3 no-print">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:cashier_dashboard' %}">Caixa</a></li>
+        <li class="breadcrumb-item active">Recibo #{{ payment.pk }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <!-- Ações do Topo -->
+        <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+            <a href="{% url 'core:cashier_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar ao Caixa
+            </a>
+            <div class="d-flex gap-2">
+                <a href="{% url 'core:client_detail' client.pk %}" class="btn btn-outline-primary">
+                    <i class="fas fa-user me-1"></i>Ver Ficha do Atleta
+                </a>
+                <button onclick="window.print()" class="btn btn-dark">
+                    <i class="fas fa-print me-1"></i>Imprimir Recibo
+                </button>
+            </div>
+        </div>
+
+        <!-- Recibo Impresso -->
+        <div class="card border shadow-sm p-4 p-md-5" id="printableReceipt">
+            <!-- Cabeçalho Institucional -->
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+                <div>
+                    <h3 class="fw-bold text-primary mb-0">{{ organization.name }}</h3>
+                    <small class="text-muted d-block">Protocolo Desportivo: ACR & Proform SC</small>
+                    <small class="text-muted d-block">Desportos de Combate & Artes Marciais</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-success fs-6 mb-1">RECIBO / COMPROVATIVO</span>
+                    <div class="fw-bold fs-5 text-dark">N.º #{{ payment.pk }}</div>
+                    <small class="text-muted">Data: {{ payment.paid_date|date:"d/m/Y"|default:today|date:"d/m/Y" }}</small>
+                </div>
+            </div>
+
+            <!-- Dados do Membro e Operação -->
+            <div class="row mb-4">
+                <div class="col-6">
+                    <small class="text-muted text-uppercase fw-bold d-block mb-1">Emitido a:</small>
+                    <h5 class="fw-bold mb-1">{{ client.full_name }}</h5>
+                    {% if client.nif %}<div class="small text-muted">NIF: {{ client.nif }}</div>{% endif %}
+                    {% if client.phone %}<div class="small text-muted">Tel: {{ client.phone }}</div>{% endif %}
+                    {% if client.guardian_name %}<div class="small text-muted">Enc. Ed.: {{ client.guardian_name }}</div>{% endif %}
+                </div>
+                <div class="col-6 text-end">
+                    <small class="text-muted text-uppercase fw-bold d-block mb-1">Modo de Liquidação:</small>
+                    <div class="fw-semibold text-dark fs-6">{{ payment.get_method_display }}</div>
+                    <small class="text-muted">Estado: <span class="text-success fw-bold">{{ payment.get_status_display }}</span></small>
+                </div>
+            </div>
+
+            <!-- Tabela de Valores -->
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Descrição dos Serviços / Atividades</th>
+                            <th width="140" class="text-end">Valor Liquidado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <strong>{{ payment.description|default:'Pagamento de Mensalidade / Atividades Desportivas' }}</strong>
+                                {% if payment.notes %}
+                                    <div class="small text-muted mt-1">{{ payment.notes }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold fs-5 text-success">
+                                €{{ payment.amount|floatformat:2 }}
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <th class="text-end">TOTAL RECEBIDO:</th>
+                            <th class="text-end fs-5 fw-bold text-dark">€{{ payment.amount|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Rodapé Institucional -->
+            <div class="border-top pt-4 mt-2 text-center text-muted small">
+                <p class="mb-1">Comprovativo de pagamento emitido para efeitos de registo nas atividades desportivas da ACR / Proform SC.</p>
+                <p class="mb-0">Processado informaticamente por <strong>ACR Gestão</strong> em {{ today|date:"d/m/Y" }}.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

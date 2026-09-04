@@ -1,0 +1,145 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Registar Pagamento - Balcão de Caixa{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:cashier_dashboard' %}">Caixa</a></li>
+        <li class="breadcrumb-item active">Registar Pagamento</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h4 class="mb-0 fw-bold text-success">
+                    <i class="fas fa-cash-register me-2"></i>Registar Pagamento no Balcão
+                </h4>
+                <p class="text-muted small mb-0">Cobrança de mensalidades, compra de créditos para aulas ou pagamentos avulsos</p>
+            </div>
+            <div class="card-body p-4">
+                {% if selected_client %}
+                <div class="alert alert-info d-flex align-items-center mb-4">
+                    <i class="fas fa-user-check fs-3 me-3 text-primary"></i>
+                    <div>
+                        <div class="fw-bold">{{ selected_client.full_name }}</div>
+                        <small class="text-muted">
+                            NIF: {{ selected_client.nif|default:'-' }} &bull; 
+                            Afiliação: {{ selected_client.get_entity_affiliation_display }} &bull;
+                            Seguro: {{ selected_client.insurance_status.label }}
+                        </small>
+                    </div>
+                </div>
+                {% endif %}
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="{{ form.person.id_for_label }}" class="form-label fw-semibold">
+                                Atleta / Membro <span class="text-danger">*</span>
+                            </label>
+                            {{ form.person }}
+                            {% if form.person.errors %}
+                                <div class="invalid-feedback d-block">{{ form.person.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.payment_plan.id_for_label }}" class="form-label fw-semibold">
+                                Plano Associado
+                            </label>
+                            {{ form.payment_plan }}
+                            <small class="text-muted d-block">Selecione para carregar créditos ou renovar mensalidade</small>
+                            {% if form.payment_plan.errors %}
+                                <div class="invalid-feedback d-block">{{ form.payment_plan.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label fw-semibold">
+                                Valor a Cobrar (€) <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">€</span>
+                                {{ form.amount }}
+                            </div>
+                            {% if form.amount.errors %}
+                                <div class="invalid-feedback d-block">{{ form.amount.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="{{ form.method.id_for_label }}" class="form-label fw-semibold">
+                                Método de Pagamento <span class="text-danger">*</span>
+                            </label>
+                            {{ form.method }}
+                            {% if form.method.errors %}
+                                <div class="invalid-feedback d-block">{{ form.method.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="{{ form.paid_date.id_for_label }}" class="form-label fw-semibold">
+                                Data do Pagamento <span class="text-danger">*</span>
+                            </label>
+                            {{ form.paid_date }}
+                            {% if form.paid_date.errors %}
+                                <div class="invalid-feedback d-block">{{ form.paid_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12">
+                            <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">
+                                Descrição do Pagamento
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold">
+                                Notas Internas (Opcional)
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">{{ form.notes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check p-3 bg-light rounded border">
+                                {{ form.auto_activate }}
+                                <label class="form-check-label fw-semibold ms-2" for="{{ form.auto_activate.id_for_label }}">
+                                    {{ form.auto_activate.label }}
+                                </label>
+                                <small class="text-muted d-block ms-4">
+                                    Se selecionado um plano de créditos, os créditos são imediatamente somados à conta do atleta. Se for mensalidade, a vigência é atualizada para o mês seguinte.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{% if selected_client %}{% url 'core:client_detail' selected_client.pk %}{% else %}{% url 'core:cashier_dashboard' %}{% endif %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm">
+                            <i class="fas fa-check-circle me-1"></i>Confirmar Recebimento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

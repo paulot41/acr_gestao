@@ -187,6 +187,85 @@
                         </div>
                     </div>
 
+                    <!-- Seguro Desportivo e Exame Médico (Artes Marciais & Desporto) -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-danger mb-3">
+                                <i class="bi bi-shield-check me-2"></i>Seguro Desportivo e Atestado Médico
+                            </h6>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.insurance_policy.id_for_label }}" class="form-label">
+                                N.º da Apólice de Seguro
+                            </label>
+                            {{ form.insurance_policy }}
+                            {% if form.insurance_policy.errors %}
+                                <div class="invalid-feedback d-block">{{ form.insurance_policy.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.insurance_expiry.id_for_label }}" class="form-label">
+                                Validade do Seguro
+                            </label>
+                            {{ form.insurance_expiry }}
+                            {% if form.insurance_expiry.errors %}
+                                <div class="invalid-feedback d-block">{{ form.insurance_expiry.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.medical_certificate_expiry.id_for_label }}" class="form-label">
+                                Validade do Atestado Médico
+                            </label>
+                            {{ form.medical_certificate_expiry }}
+                            {% if form.medical_certificate_expiry.errors %}
+                                <div class="invalid-feedback d-block">{{ form.medical_certificate_expiry.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Encarregado de Educação (Praticantes Menores) -->
+                    <div class="row mb-4" id="guardianSection">
+                        <div class="col-12">
+                            <h6 class="text-warning text-dark mb-1">
+                                <i class="bi bi-person-heart me-2"></i>Encarregado de Educação (Menores de Idade)
+                            </h6>
+                            <small class="text-muted d-block mb-3">Preenchimento obrigatório para praticantes com menos de 18 anos.</small>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.guardian_name.id_for_label }}" class="form-label">
+                                Nome do Encarregado
+                            </label>
+                            {{ form.guardian_name }}
+                            {% if form.guardian_name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.guardian_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.guardian_phone.id_for_label }}" class="form-label">
+                                Contacto Telefónico
+                            </label>
+                            {{ form.guardian_phone }}
+                            {% if form.guardian_phone.errors %}
+                                <div class="invalid-feedback d-block">{{ form.guardian_phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.guardian_nif.id_for_label }}" class="form-label">
+                                NIF do Encarregado
+                            </label>
+                            {{ form.guardian_nif }}
+                            {% if form.guardian_nif.errors %}
+                                <div class="invalid-feedback d-block">{{ form.guardian_nif.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
                     <!-- Estado e Observações -->
                     <div class="row mb-4">
                         <div class="col-12">
@@ -208,27 +287,12 @@
                         </div>
 
                         <div class="col-12 mb-3">
-                            <label for="{{ form.medical_conditions.id_for_label }}" class="form-label">
-                                Condições Médicas/Alergias
-                            </label>
-                            {{ form.medical_conditions }}
-                            <small class="form-text text-muted">
-                                Informações importantes para a prática de exercício
-                            </small>
-                            {% if form.medical_conditions.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.medical_conditions.errors.0 }}
-                                </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-12 mb-3">
                             <label for="{{ form.notes.id_for_label }}" class="form-label">
                                 Notas Adicionais
                             </label>
                             {{ form.notes }}
                             <small class="form-text text-muted">
-                                Observações gerais sobre o cliente
+                                Observações internas da associação ou ginásio
                             </small>
                             {% if form.notes.errors %}
                                 <div class="invalid-feedback d-block">

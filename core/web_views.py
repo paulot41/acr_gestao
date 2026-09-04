@@ -1,12 +1,13 @@
 import csv
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.shortcuts import render, get_object_or_404, redirect
 from .auth_views import role_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import DatabaseError
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
@@ -14,8 +15,14 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods
 
-from .models import Person, Instructor, Modality, Event, Resource, Payment, Booking
-from .forms import PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm
+from .models import (
+    Person, Instructor, Modality, Event, Resource, Payment, Booking,
+    PaymentPlan, ClientSubscription, CreditHistory
+)
+from .forms import (
+    PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm,
+    PaymentRegistrationForm, ClientSubscriptionForm
+)
 
 
 @role_required(["admin", "staff"])
@@ -155,54 +162,66 @@ def client_list(request):
 
 @role_required(["admin", "staff"])
 def client_detail(request, pk):
-    """Detalhes de um cliente específico."""
-    client = get_object_or_404(Person, pk=pk, organization=request.organization)
-    recent_bookings = client.bookings.order_by('-created_at')[:5]
-    recent_payments = client.payments.order_by('-created_at')[:5]
+    """Ficha 360º do cliente/atleta com seguros, subscrições e histórico financeiro."""
+    org = request.organization
+    client = get_object_or_404(Person, pk=pk, organization=org)
+    subscriptions = client.subscriptions.select_related('payment_plan').order_by('-start_date')
+    active_sub = client.active_subscription
+    recent_bookings = client.bookings.select_related('event', 'event__modality', 'event__resource').order_by('-created_at')[:10]
+    recent_payments = client.payments.order_by('-paid_date', '-created_at')[:10]
+    credit_history = client.credit_history.order_by('-created_at')[:10]
 
     context = {
         'client': client,
+        'subscriptions': subscriptions,
+        'active_sub': active_sub,
         'recent_bookings': recent_bookings,
         'recent_payments': recent_payments,
+        'credit_history': credit_history,
+        'insurance_status': client.insurance_status,
+        'medical_status': client.medical_status,
+        'is_minor': client.is_minor,
     }
     return render(request, 'core/client_detail.html', context)
 
 
 @role_required(["admin", "staff"])
 def client_create(request):
-    """Criar novo cliente."""
+    """Criar novo cliente/atleta."""
+    org = request.organization
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES, organization=request.organization)
+        form = PersonForm(request.POST, request.FILES, organization=org)
         if form.is_valid():
             client = form.save(commit=False)
-            client.organization = request.organization
+            client.organization = org
             client.save()
-            messages.success(request, f'Cliente {client.full_name} criado com sucesso!')
-            return redirect('client_detail', pk=client.pk)
+            messages.success(request, f'Atleta {client.full_name} registado com sucesso!')
+            return redirect('core:client_detail', pk=client.pk)
     else:
-        form = PersonForm(organization=request.organization)
+        form = PersonForm(organization=org)
 
-    return render(request, 'core/client_form.html', {'form': form, 'title': 'Novo Cliente'})
+    return render(request, 'core/client_form.html', {'form': form, 'title': 'Novo Atleta / Cliente'})
 
 
 @role_required(["admin", "staff"])
 def client_edit(request, pk):
-    """Editar cliente existente."""
-    client = get_object_or_404(Person, pk=pk, organization=request.organization)
+    """Editar atleta/cliente existente."""
+    org = request.organization
+    client = get_object_or_404(Person, pk=pk, organization=org)
 
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES, instance=client, organization=request.organization)
+        form = PersonForm(request.POST, request.FILES, instance=client, organization=org)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Cliente {client.full_name} atualizado com sucesso!')
-            return redirect('client_detail', pk=client.pk)
+            messages.success(request, f'Ficha de {client.full_name} atualizada com sucesso!')
+            return redirect('core:client_detail', pk=client.pk)
     else:
-        form = PersonForm(instance=client, organization=request.organization)
+        form = PersonForm(instance=client, organization=org)
 
     return render(request, 'core/client_form.html', {
         'form': form,
         'client': client,
-        'title': 'Editar Cliente'
+        'title': f'Editar Atleta: {client.full_name}'
     })
 
 
@@ -920,3 +939,248 @@ def schedule_view(request):
         'events': events,
         'selected_date': selected_date
     })
+
+
+# ==========================================
+# MÓDULO DE CAIXA E BALCÃO DE PAGAMENTOS
+# ==========================================
+
+@role_required(["admin", "staff"])
+def cashier_dashboard(request):
+    """Balcão de caixa: resumo diário, cobranças e histórico recente."""
+    org = request.organization
+    today = timezone.now().date()
+
+    # Métricas do dia de hoje
+    today_payments = Payment.objects.filter(
+        organization=org,
+        paid_date=today,
+        status=Payment.Status.COMPLETED
+    )
+    total_today = today_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    cash_today = today_payments.filter(method=Payment.Method.CASH).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    mbway_today = today_payments.filter(method=Payment.Method.MBWAY).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    card_today = today_payments.filter(method__in=[Payment.Method.CARD, Payment.Method.TRANSFER]).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+    # Filtros e pesquisa
+    search = request.GET.get('search', '').strip()
+    method_filter = request.GET.get('method', '').strip()
+    date_filter = request.GET.get('date', '').strip()
+
+    payments_qs = Payment.objects.filter(organization=org).select_related('person').order_by('-paid_date', '-created_at')
+
+    if search:
+        payments_qs = payments_qs.filter(
+            Q(person__first_name__icontains=search) |
+            Q(person__last_name__icontains=search) |
+            Q(person__nif__icontains=search) |
+            Q(description__icontains=search)
+        )
+    if method_filter:
+        payments_qs = payments_qs.filter(method=method_filter)
+    if date_filter:
+        try:
+            d = datetime.strptime(date_filter, '%Y-%m-%d').date()
+            payments_qs = payments_qs.filter(paid_date=d)
+        except ValueError:
+            pass
+
+    paginator = Paginator(payments_qs, 20)
+    page_number = request.GET.get('page')
+    payments_page = paginator.get_page(page_number)
+
+    # Clientes ativos para atalho de pesquisa rápida
+    active_clients = Person.objects.filter(organization=org, status='active').order_by('first_name', 'last_name')[:15]
+
+    context = {
+        'total_today': total_today,
+        'cash_today': cash_today,
+        'mbway_today': mbway_today,
+        'card_today': card_today,
+        'count_today': today_payments.count(),
+        'payments': payments_page,
+        'search': search,
+        'method_filter': method_filter,
+        'date_filter': date_filter,
+        'method_choices': Payment.Method.choices,
+        'active_clients': active_clients,
+        'today': today,
+    }
+    return render(request, 'core/cashier.html', context)
+
+
+@role_required(["admin", "staff"])
+def payment_create(request):
+    """Registo de novo pagamento no balcão de caixa."""
+    org = request.organization
+    initial_data = {}
+    client_id = request.GET.get('client_id')
+    selected_client = None
+
+    if client_id and client_id.isdigit():
+        selected_client = Person.objects.filter(organization=org, pk=int(client_id)).first()
+        if selected_client:
+            initial_data['person'] = selected_client
+            active_sub = selected_client.active_subscription
+            if active_sub:
+                initial_data['payment_plan'] = active_sub.payment_plan
+                initial_data['amount'] = active_sub.payment_plan.price
+                initial_data['description'] = f"Mensalidade - {active_sub.payment_plan.name}"
+
+    if request.method == 'POST':
+        form = PaymentRegistrationForm(request.POST, organization=org)
+        if form.is_valid():
+            person = form.cleaned_data['person']
+            payment_plan = form.cleaned_data['payment_plan']
+            amount = form.cleaned_data['amount']
+            method = form.cleaned_data['method']
+            paid_date = form.cleaned_data['paid_date']
+            description = form.cleaned_data['description'] or (f"Pagamento - {payment_plan.name}" if payment_plan else "Pagamento Avulso")
+            notes = form.cleaned_data['notes']
+            auto_activate = form.cleaned_data['auto_activate']
+
+            payment = Payment.objects.create(
+                organization=org,
+                person=person,
+                amount=amount,
+                method=method,
+                status=Payment.Status.COMPLETED,
+                paid_date=paid_date,
+                description=description,
+                notes=notes
+            )
+
+            # Atualizar subscrição e créditos automaticamente
+            if payment_plan and auto_activate:
+                existing_sub = person.subscriptions.filter(payment_plan=payment_plan, status=ClientSubscription.Status.ACTIVE).first()
+
+                if payment_plan.plan_type == PaymentPlan.PlanType.CREDITS:
+                    credits_to_add = payment_plan.credits_included
+                    expire_date = paid_date + timedelta(days=payment_plan.credits_validity_days)
+
+                    if existing_sub:
+                        credits_before = existing_sub.remaining_credits
+                        existing_sub.remaining_credits += credits_to_add
+                        existing_sub.credits_expire_date = expire_date
+                        existing_sub.is_paid = True
+                        existing_sub.payment_date = paid_date
+                        existing_sub.save()
+                        sub_for_history = existing_sub
+                        credits_after = existing_sub.remaining_credits
+                    else:
+                        credits_before = 0
+                        new_sub = ClientSubscription.objects.create(
+                            organization=org,
+                            person=person,
+                            payment_plan=payment_plan,
+                            status=ClientSubscription.Status.ACTIVE,
+                            start_date=paid_date,
+                            end_date=expire_date,
+                            remaining_credits=credits_to_add,
+                            credits_expire_date=expire_date,
+                            is_paid=True,
+                            payment_date=paid_date,
+                            notes=f"Criada no pagamento #{payment.pk}"
+                        )
+                        sub_for_history = new_sub
+                        credits_after = credits_to_add
+
+                    CreditHistory.objects.create(
+                        organization=org,
+                        person=person,
+                        subscription=sub_for_history,
+                        action=CreditHistory.Action.PURCHASE,
+                        credits_amount=credits_to_add,
+                        credits_before=credits_before,
+                        credits_after=credits_after,
+                        description=f"Compra pack {credits_to_add} créditos (Pagamento #{payment.pk})"
+                    )
+
+                elif payment_plan.plan_type == PaymentPlan.PlanType.MONTHLY:
+                    end_date = paid_date + timedelta(days=30 * payment_plan.duration_months)
+                    if existing_sub:
+                        existing_sub.start_date = paid_date
+                        existing_sub.end_date = end_date
+                        existing_sub.is_paid = True
+                        existing_sub.payment_date = paid_date
+                        existing_sub.save()
+                    else:
+                        ClientSubscription.objects.create(
+                            organization=org,
+                            person=person,
+                            payment_plan=payment_plan,
+                            status=ClientSubscription.Status.ACTIVE,
+                            start_date=paid_date,
+                            end_date=end_date,
+                            is_paid=True,
+                            payment_date=paid_date,
+                            notes=f"Criada no pagamento #{payment.pk}"
+                        )
+
+            messages.success(request, f"Pagamento de €{payment.amount:.2f} ({payment.get_method_display()}) registado com sucesso para {person.full_name}!")
+            return redirect('core:payment_receipt', payment_id=payment.pk)
+    else:
+        form = PaymentRegistrationForm(initial=initial_data, organization=org)
+
+    context = {
+        'form': form,
+        'selected_client': selected_client,
+        'title': 'Registar Pagamento no Caixa'
+    }
+    return render(request, 'core/payment_form.html', context)
+
+
+@role_required(["admin", "staff"])
+def client_pay(request, client_id):
+    """Atalho para pagar diretamente na ficha de um cliente."""
+    return redirect(f"{reverse('core:payment_add')}?client_id={client_id}")
+
+
+@role_required(["admin", "staff"])
+def payment_receipt(request, payment_id):
+    """Comprovativo / Recibo de pagamento pronto para impressão ou consulta."""
+    org = request.organization
+    payment = get_object_or_404(Payment, pk=payment_id, organization=org)
+
+    context = {
+        'payment': payment,
+        'client': payment.person,
+        'organization': org,
+        'today': timezone.now().date(),
+    }
+    return render(request, 'core/payment_receipt.html', context)
+
+
+@role_required(["admin", "staff"])
+def client_subscribe(request, client_id):
+    """Associar um plano de mensalidade ou créditos diretamente ao atleta."""
+    org = request.organization
+    client = get_object_or_404(Person, pk=client_id, organization=org)
+
+    if request.method == 'POST':
+        form = ClientSubscriptionForm(request.POST, organization=org)
+        if form.is_valid():
+            sub = form.save(commit=False)
+            sub.organization = org
+            sub.person = client
+            if sub.payment_plan.plan_type == PaymentPlan.PlanType.CREDITS:
+                sub.remaining_credits = sub.payment_plan.credits_included
+                if not sub.end_date:
+                    sub.end_date = sub.start_date + timedelta(days=sub.payment_plan.credits_validity_days)
+                sub.credits_expire_date = sub.end_date
+            elif sub.payment_plan.plan_type == PaymentPlan.PlanType.MONTHLY:
+                if not sub.end_date:
+                    sub.end_date = sub.start_date + timedelta(days=30 * sub.payment_plan.duration_months)
+            sub.save()
+            messages.success(request, f"Plano {sub.payment_plan.name} atribuído a {client.full_name} com sucesso!")
+            return redirect('core:client_detail', pk=client.pk)
+    else:
+        form = ClientSubscriptionForm(organization=org)
+
+    context = {
+        'form': form,
+        'client': client,
+        'title': f"Subscrever Plano - {client.full_name}"
+    }
+    return render(request, 'core/subscription_form.html', context)
+

@@ -1,139 +1,252 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}{{ client.full_name }} - ACR Gestão{% endblock %}
+{% block title %}{{ client.full_name }} - Ficha de Atleta{% endblock %}
 
 {% block breadcrumbs %}
 <nav aria-label="breadcrumb" class="container mt-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'core:client_list' %}">Clientes</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:client_list' %}">Atletas</a></li>
         <li class="breadcrumb-item active">{{ client.full_name }}</li>
     </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
+<div class="row mb-4 align-items-center">
+    <div class="col-md-7">
         <div class="d-flex align-items-center">
             {% if client.photo %}
-                <img src="{{ client.photo.url }}" class="rounded-circle me-3"
-                     width="64" height="64" alt="{{ client.full_name }}">
+                <img src="{{ client.photo.url }}" class="rounded-circle me-3 border shadow-sm"
+                     width="72" height="72" alt="{{ client.full_name }}" style="object-fit: cover;">
             {% else %}
-                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3"
-                     style="width: 64px; height: 64px;">
-                    <span class="text-white fw-bold fs-3">{{ client.first_name|first }}</span>
+                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm text-white fw-bold fs-2"
+                     style="width: 72px; height: 72px;">
+                    {{ client.first_name|first }}
                 </div>
             {% endif %}
             <div>
-                <h1 class="mb-1">{{ client.full_name }}</h1>
-                <span class="badge bg-{{ client.status|yesno:'success,warning,secondary' }}">
-                    {{ client.get_status_display }}
-                </span>
+                <h2 class="mb-1 fw-bold">{{ client.full_name }}</h2>
+                <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+                    <span class="badge bg-{{ client.status|yesno:'success,danger,secondary' }}">
+                        {{ client.get_status_display }}
+                    </span>
+                    <span class="badge bg-dark">
+                        {{ client.get_entity_affiliation_display }}
+                    </span>
+                    <span class="badge {{ insurance_status.badge }}">
+                        <i class="fas fa-shield-alt me-1"></i>Seguro: {{ insurance_status.label }}
+                    </span>
+                    <span class="badge {{ medical_status.badge }}">
+                        <i class="fas fa-file-medical me-1"></i>Exame: {{ medical_status.label }}
+                    </span>
+                    {% if is_minor %}
+                    <span class="badge bg-info text-dark">
+                        <i class="fas fa-child me-1"></i>Menor de Idade
+                    </span>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4 text-end">
-        <a href="{% url 'core:client_edit' client.pk %}" class="btn btn-primary">
-            <i class="bi bi-pencil me-1"></i>Editar
+    <div class="col-md-5 text-md-end mt-3 mt-md-0 d-flex flex-wrap justify-content-md-end gap-2">
+        <a href="{% url 'core:client_pay' client.pk %}" class="btn btn-success shadow-sm">
+            <i class="fas fa-cash-register me-1"></i>Registar Pagamento
         </a>
-        <a href="{% url 'core:client_list' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Voltar
+        <a href="{% url 'core:client_subscribe' client.pk %}" class="btn btn-outline-primary">
+            <i class="fas fa-plus-circle me-1"></i>Subscrever Plano
+        </a>
+        <a href="{% url 'core:client_edit' client.pk %}" class="btn btn-outline-secondary">
+            <i class="fas fa-pencil-alt me-1"></i>Editar
+        </a>
+        <a href="{% url 'core:client_list' %}" class="btn btn-outline-dark">
+            <i class="fas fa-arrow-left me-1"></i>Voltar
         </a>
     </div>
 </div>
 
+{% if messages %}
+<div class="row mb-3">
+    <div class="col-12">
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
-    <!-- Informações Pessoais -->
+    <!-- Coluna Principal (Dados Pessoais, Seguro e Presenças) -->
     <div class="col-lg-8">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Informações Pessoais</h5>
+        <!-- Card de Informações Pessoais -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold text-primary">
+                    <i class="fas fa-id-card me-2"></i>Identificação e Contactos
+                </h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <dl class="row">
-                            <dt class="col-sm-4">Email:</dt>
-                            <dd class="col-sm-8">
-                                {% if client.email %}
-                                    <a href="mailto:{{ client.email }}">{{ client.email }}</a>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </dd>
-
-                            <dt class="col-sm-4">Telefone:</dt>
-                            <dd class="col-sm-8">
-                                {% if client.phone %}
-                                    <a href="tel:{{ client.phone }}">{{ client.phone }}</a>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </dd>
-
-                            <dt class="col-sm-4">NIF:</dt>
-                            <dd class="col-sm-8">{{ client.nif|default:'-' }}</dd>
-                        </dl>
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Email</small>
+                        <span class="fw-semibold">
+                            {% if client.email %}<a href="mailto:{{ client.email }}">{{ client.email }}</a>{% else %}-{% endif %}
+                        </span>
                     </div>
-                    <div class="col-md-6">
-                        <dl class="row">
-                            <dt class="col-sm-5">Data Nascimento:</dt>
-                            <dd class="col-sm-7">{{ client.date_of_birth|date:"d/m/Y"|default:'-' }}</dd>
-
-                            <dt class="col-sm-5">Contacto Emergência:</dt>
-                            <dd class="col-sm-7">{{ client.emergency_contact|default:'-' }}</dd>
-
-                            <dt class="col-sm-5">Cliente desde:</dt>
-                            <dd class="col-sm-7">{{ client.created_at|date:"d/m/Y" }}</dd>
-                        </dl>
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Telefone</small>
+                        <span class="fw-semibold">
+                            {% if client.phone %}<a href="tel:{{ client.phone }}">{{ client.phone }}</a>{% else %}-{% endif %}
+                        </span>
                     </div>
-                </div>
-
-                {% if client.address %}
-                <hr>
-                <div class="row">
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">NIF</small>
+                        <span class="fw-semibold">{{ client.nif|default:'-' }}</span>
+                    </div>
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Data de Nascimento</small>
+                        <span class="fw-semibold">
+                            {% if client.date_of_birth %}
+                                {{ client.date_of_birth|date:"d/m/Y" }}
+                                {% if is_minor %}<span class="badge bg-warning text-dark ms-1">Menor</span>{% endif %}
+                            {% else %}-{% endif %}
+                        </span>
+                    </div>
                     <div class="col-12">
-                        <dt>Morada:</dt>
-                        <dd>{{ client.address }}</dd>
+                        <small class="text-muted d-block">Morada</small>
+                        <span class="fw-semibold">{{ client.address|default:'-' }}</span>
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted d-block">Contacto de Emergência</small>
+                        <span class="fw-semibold text-danger">{{ client.emergency_contact|default:'-' }}</span>
                     </div>
                 </div>
-                {% endif %}
 
                 {% if client.notes %}
                 <hr>
-                <div class="row">
-                    <div class="col-12">
-                        <dt>Notas:</dt>
-                        <dd>{{ client.notes }}</dd>
-                    </div>
+                <div>
+                    <small class="text-muted d-block">Notas e Observações</small>
+                    <p class="mb-0 text-muted">{{ client.notes }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Reservas Recentes -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Reservas Recentes</h5>
-                <button class="btn btn-sm btn-primary">Nova Reserva</button>
+        <!-- Encarregado de Educação se menor -->
+        {% if is_minor or client.guardian_name %}
+        <div class="card mb-4 shadow-sm border-0 border-start border-4 border-warning">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-user-shield me-2 text-warning"></i>Encarregado de Educação
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <small class="text-muted d-block">Nome do Responsável</small>
+                        <span class="fw-bold">{{ client.guardian_name|default:'Não especificado' }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Telefone do Responsável</small>
+                        <span class="fw-semibold">
+                            {% if client.guardian_phone %}
+                                <a href="tel:{{ client.guardian_phone }}">{{ client.guardian_phone }}</a>
+                            {% else %}-{% endif %}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">NIF do Responsável</small>
+                        <span class="fw-semibold">{{ client.guardian_nif|default:'-' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Conformidade Desportiva: Seguro e Exame Médico -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold text-danger">
+                    <i class="fas fa-heartbeat me-2"></i>Seguro Desportivo e Atestado Médico
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold"><i class="fas fa-shield-alt text-primary me-2"></i>Seguro Desportivo</span>
+                                <span class="badge {{ insurance_status.badge }}">{{ insurance_status.label }}</span>
+                            </div>
+                            <small class="text-muted d-block">N.º da Apólice:</small>
+                            <span class="fw-semibold">{{ client.insurance_policy|default:'Não registada' }}</span>
+                            <small class="text-muted d-block mt-2">Data de Expiração:</small>
+                            <span class="fw-semibold">
+                                {% if client.insurance_expiry %}
+                                    {{ client.insurance_expiry|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-danger fw-bold">Sem data registada</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold"><i class="fas fa-stethoscope text-success me-2"></i>Atestado Médico</span>
+                                <span class="badge {{ medical_status.badge }}">{{ medical_status.label }}</span>
+                            </div>
+                            <small class="text-muted d-block">Validade do Exame / Robustez:</small>
+                            <span class="fw-semibold">
+                                {% if client.medical_certificate_expiry %}
+                                    {{ client.medical_certificate_expiry|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-danger fw-bold">Sem data registada</span>
+                                {% endif %}
+                            </span>
+                            <small class="text-muted d-block mt-2">Condição para o Tatami:</small>
+                            {% if medical_status.is_valid and insurance_status.is_valid %}
+                                <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Apto para treinar</span>
+                            {% else %}
+                                <span class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i>Pendente de regularização</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Presenças e Aulas Recentes -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-calendar-check me-2 text-primary"></i>Aulas e Presenças Recentes
+                </h5>
+                <a href="{% url 'core:gantt' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-calendar me-1"></i>Ver Calendário
+                </a>
             </div>
             <div class="card-body">
                 {% if recent_bookings %}
                     <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Aula</th>
-                                    <th>Data/Hora</th>
+                                    <th>Aula / Modalidade</th>
+                                    <th>Espaço</th>
+                                    <th>Data e Hora</th>
                                     <th>Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for booking in recent_bookings %}
                                 <tr>
-                                    <td>{{ booking.event.title }}</td>
+                                    <td class="fw-semibold">{{ booking.event.title }}</td>
+                                    <td>{{ booking.event.resource.name }}</td>
                                     <td>{{ booking.event.starts_at|date:"d/m/Y H:i" }}</td>
                                     <td>
                                         <span class="badge bg-{{ booking.status|yesno:'success,secondary' }}">
@@ -146,62 +259,99 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center py-3">
-                        <i class="bi bi-calendar-x fs-3 text-muted"></i>
-                        <p class="text-muted mt-2">Nenhuma reserva encontrada</p>
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-calendar-times fs-2 mb-2 d-block text-secondary"></i>
+                        Ainda não existem marcações ou presenças registadas para este atleta.
                     </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Sidebar -->
+    <!-- Barra Lateral (Subscrições, Saldo de Créditos e Pagamentos) -->
     <div class="col-lg-4">
-        <!-- Estatísticas Rápidas -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Estatísticas</h5>
+        <!-- Subscrição Atual -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-ticket-alt me-2 text-success"></i>Plano Ativo
+                </h5>
+                <a href="{% url 'core:client_subscribe' client.pk %}" class="btn btn-sm btn-outline-primary">
+                    Alterar
+                </a>
             </div>
             <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6">
-                        <div class="border-end">
-                            <h4 class="text-primary mb-0">{{ recent_bookings|length }}</h4>
-                            <small class="text-muted">Reservas</small>
+                {% if active_sub %}
+                    <div class="p-3 bg-light rounded border mb-3">
+                        <h5 class="fw-bold mb-1">{{ active_sub.payment_plan.name }}</h5>
+                        <div class="d-flex justify-content-between text-muted small mb-2">
+                            <span>Tipo: {{ active_sub.payment_plan.get_plan_type_display }}</span>
+                            <span class="fw-bold text-success">€{{ active_sub.payment_plan.price }}</span>
+                        </div>
+                        {% if active_sub.payment_plan.plan_type == 'credits' %}
+                        <div class="d-flex justify-content-between align-items-center bg-white p-2 rounded border">
+                            <span class="text-muted">Créditos Restantes:</span>
+                            <span class="badge bg-primary fs-6">{{ active_sub.remaining_credits }} aulas</span>
+                        </div>
+                        {% endif %}
+                        <div class="mt-2 small text-muted">
+                            <div>Início: {{ active_sub.start_date|date:"d/m/Y" }}</div>
+                            {% if active_sub.end_date %}<div>Fim: {{ active_sub.end_date|date:"d/m/Y" }}</div>{% endif %}
+                            <div>Estado Pagamento: 
+                                {% if active_sub.is_paid %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Pendente</span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-                    <div class="col-6">
-                        <h4 class="text-success mb-0">{{ recent_payments|length }}</h4>
-                        <small class="text-muted">Pagamentos</small>
+                {% else %}
+                    <div class="text-center py-3 text-muted">
+                        <p class="mb-2">Sem plano ou subscrição ativa.</p>
+                        <a href="{% url 'core:client_subscribe' client.pk %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus me-1"></i>Atribuir Plano Agora
+                        </a>
                     </div>
-                </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Pagamentos Recentes -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Pagamentos</h5>
-                <button class="btn btn-sm btn-success">Novo Pagamento</button>
+        <!-- Histórico de Pagamentos -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-receipt me-2 text-success"></i>Pagamentos
+                </h5>
+                <a href="{% url 'core:client_pay' client.pk %}" class="btn btn-sm btn-success">
+                    <i class="fas fa-plus me-1"></i>Cobrar
+                </a>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 {% if recent_payments %}
-                    {% for payment in recent_payments %}
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <strong>€{{ payment.amount }}</strong><br>
-                            <small class="text-muted">{{ payment.created_at|date:"d/m" }}</small>
+                    <div class="list-group list-group-flush">
+                        {% for payment in recent_payments %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <div class="fw-bold text-dark">€{{ payment.amount }}</div>
+                                <small class="text-muted d-block">{{ payment.get_method_display }} &bull; {{ payment.paid_date|date:"d/m/Y"|default:payment.created_at|date:"d/m/Y" }}</small>
+                                <small class="text-secondary">{{ payment.description|truncatechars:28 }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-{{ payment.status|yesno:'success,warning,secondary' }} mb-1 d-block">
+                                    {{ payment.get_status_display }}
+                                </span>
+                                <a href="{% url 'core:payment_receipt' payment.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Ver Comprovativo">
+                                    <i class="fas fa-print"></i>
+                                </a>
+                            </div>
                         </div>
-                        <span class="badge bg-{{ payment.status|yesno:'success,warning,secondary' }}">
-                            {{ payment.get_status_display }}
-                        </span>
+                        {% endfor %}
                     </div>
-                    {% if not forloop.last %}<hr>{% endif %}
-                    {% endfor %}
                 {% else %}
-                    <div class="text-center py-3">
-                        <i class="bi bi-wallet2 fs-3 text-muted"></i>
-                        <p class="text-muted mt-2">Nenhum pagamento encontrado</p>
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-wallet fs-2 mb-2 d-block text-secondary"></i>
+                        Sem pagamentos registados.
                     </div>
                 {% endif %}
             </div>
