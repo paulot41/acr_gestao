@@ -14,8 +14,10 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
-from googleapiclient.errors import HttpError
+try:
+    from googleapiclient.errors import HttpError
+except (ImportError, Exception):
+    HttpError = Exception
 
 from .models import Organization, Instructor, Event, GoogleCalendarConfig, InstructorGoogleCalendar, GoogleCalendarSyncLog
 from .services.google_calendar import get_google_calendar_service

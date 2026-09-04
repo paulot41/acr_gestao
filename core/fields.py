@@ -1,4 +1,7 @@
-from django.contrib.postgres.search import SearchVectorField
+try:
+    from django.contrib.postgres.search import SearchVectorField
+except (ImportError, Exception):
+    from django.db.models import TextField as SearchVectorField
 
 
 class OptionalSearchVectorField(SearchVectorField):

@@ -9,9 +9,23 @@ from django.contrib.auth.models import User
 from decimal import Decimal
 import logging
 
-# PostgreSQL search functionality
-from django.contrib.postgres.search import SearchVector
+# PostgreSQL search functionality (with fallback for SQLite/non-postgres environments)
+try:
+    from django.contrib.postgres.indexes import GinIndex
+    from django.contrib.postgres.search import SearchVectorField, SearchVector
+except (ImportError, Exception):
+    from django.db.models import TextField as SearchVectorField
+    from django.db.models import Index as GinIndex
+    SearchVector = None
+
 from .fields import OptionalSearchVectorField
+
+# Pillow check with FileField fallback for lightweight local dev
+try:
+    from PIL import Image  # noqa: F401
+    PhotoField = models.ImageField
+except (ImportError, Exception):
+    PhotoField = models.FileField
 
 # Import validations (safe: service uses lazy model getters; no circular import)
 from .services.scheduling import ensure_no_conflict, ensure_capacity
@@ -103,7 +117,7 @@ class Person(models.Model):
     def _person_upload_to(instance, filename):
         return f"clients/org_{instance.organization_id}/{filename}"
 
-    photo = models.ImageField("Foto", upload_to=_person_upload_to, null=True, blank=True)
+    photo = PhotoField("Foto", upload_to=_person_upload_to, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField("Criado em", auto_now_add=True)
     last_activity = models.DateTimeField("Última Atividade", null=True, blank=True)
@@ -139,15 +153,15 @@ class Person(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         from django.db import connection
-
-        if connection.vendor != "postgresql":
-            return
-        # Atualiza SearchVector (método simples; ideal usar trigger no Postgres)
-        try:
-            type(self).objects.filter(pk=self.pk).update(
-                search=SearchVector("first_name", "last_name", "email", "nif", config="portuguese"))
-        except DatabaseError as e:
-            logger.warning("Falha ao atualizar SearchVector para Person %s: %s", self.pk, e)
+        if SearchVector is not None and connection.vendor == "postgresql":
+            try:
+                type(self).objects.filter(pk=self.pk).update(
+                    search=SearchVector("first_name", "last_name", "email", "nif", config="portuguese")
+                )
+            except DatabaseError as e:
+                logger.warning("Falha ao atualizar SearchVector para Person %s: %s", self.pk, e)
+            except Exception:
+                pass
 
     @property
     def full_name(self) -> str:
@@ -180,7 +194,7 @@ class Instructor(models.Model):
     email = models.EmailField("Email", blank=True)
     phone = models.CharField("Telefone", max_length=50, blank=True)
     specialties = models.TextField("Especialidades", blank=True)
-    photo = models.ImageField("Foto", upload_to='instructors/', null=True, blank=True)
+    photo = PhotoField("Foto", upload_to='instructors/', null=True, blank=True)
     is_active = models.BooleanField("Ativo", default=True)
     created_at = models.DateTimeField("Criado em", auto_now_add=True)
 
@@ -453,7 +467,7 @@ class Event(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(ends_at__gt=models.F("starts_at")),
+                condition=models.Q(ends_at__gt=models.F("starts_at")),
                 name="event_ends_after_starts",
             )
         ]
@@ -478,13 +492,28 @@ class Event(models.Model):
                 raise ValidationError("Aulas individuais devem ter um cliente associado")
             self.capacity = 1
         else:  # OPEN_CLASS
-            if not self.capacity:
+            if not self.capacity and hasattr(self, 'resource') and self.resource:
                 self.capacity = self.resource.capacity
+
+        # Sincronizar capacity e max_capacity para evitar ambiguidade
+        if not self.capacity and self.max_capacity:
+            self.capacity = self.max_capacity
+        self.max_capacity = self.capacity
 
         from .services.scheduling import ensure_no_conflict
         ensure_no_conflict(self)
 
     def save(self, *args, **kwargs):
+        if not self.capacity:
+            if self.event_type == self.EventType.GROUP_CLASS and self.class_group:
+                self.capacity = self.class_group.max_students
+            elif self.event_type == self.EventType.INDIVIDUAL:
+                self.capacity = 1
+            elif hasattr(self, 'resource') and self.resource:
+                self.capacity = self.resource.capacity
+        if not self.capacity and self.max_capacity:
+            self.capacity = self.max_capacity
+        self.max_capacity = self.capacity
         self.full_clean()
         super().save(*args, **kwargs)
 

@@ -51,34 +51,36 @@ class OrganizationMiddleware:
             return response
 
         # Determinar organização baseada no domínio
-        host = request.get_host().split(':')[0]  # Remove porta se existir
+        try:
+            host = request.get_host().split(':')[0]  # Remove porta se existir
+        except Exception:
+            raw_host = request.META.get('HTTP_HOST', '') or request.META.get('SERVER_NAME', 'localhost')
+            host = raw_host.split(':')[0] if raw_host else 'localhost'
 
         organization = None
         try:
             if connection.introspection.table_names():
-                try:
-                    # Tentar encontrar organização por domínio exato
-                    organization = Organization.objects.get(domain=host)
-                except Organization.DoesNotExist:
+                # 1. Tentar encontrar por domínio exato
+                organization = Organization.objects.filter(domain=host).first()
+
+                # 2. Se não encontrou, obter organização padrão (primeira existente)
+                if not organization:
+                    organization = Organization.objects.first()
+
+                # 3. Se não existe nenhuma organização, criar a organização unificada
+                if not organization:
                     try:
-                        # Fallback: tentar encontrar por domínio similar (desenvolvimento)
-                        if 'localhost' in host or '127.0.0.1' in host:
-                            organization = Organization.objects.filter(domain__contains='local').first()
-                            if not organization:
-                                # Criar organização padrão para desenvolvimento
-                                organization = Organization.objects.create(
-                                    name="ACR Gestão - Desenvolvimento",
-                                    domain=host,
-                                    org_type="both"
-                                )
-                                logger.info(f"Organização de desenvolvimento criada: {host}")
-                        else:
-                            # Em produção, retornar 404 se não encontrar organização
-                            raise Http404(f"Organização não encontrada para domínio: {host}")
-                    except (IntegrityError, ValidationError) as e:
-                        logger.error(f"Erro ao determinar organização: {e}")
-                        raise Http404("Erro de configuração do sistema")
-        except (ProgrammingError, OperationalError):
+                        organization = Organization.objects.create(
+                            name="ACR & Proform SC",
+                            domain=host if host else "localhost",
+                            org_type="both"
+                        )
+                        logger.info("Organização unificada 'ACR & Proform SC' criada por defeito.")
+                    except (IntegrityError, ValidationError, DatabaseError) as e:
+                        logger.error(f"Erro ao criar organização padrão: {e}")
+                        organization = Organization.objects.first()
+        except (ProgrammingError, OperationalError, DatabaseError) as e:
+            logger.warning(f"Erro de base de dados na determinação da organização: {e}")
             organization = None
 
         # Anexar organização ao request
@@ -97,8 +99,8 @@ class OrganizationMiddleware:
 
         response = self.get_response(request)
 
-        # Adicionar headers de segurança
-        if organization:
+        # Adicionar headers informativos da organização
+        if organization and hasattr(response, '__setitem__'):
             response['X-Organization-Domain'] = organization.domain
             response['X-Organization-Type'] = organization.org_type
 
@@ -159,8 +161,15 @@ def get_current_organization(request):
     if hasattr(request, 'organization') and request.organization:
         return request.organization
 
-    # Fallback: retornar primeira organização disponível
+    # Fallback: retornar primeira organização disponível ou criar por defeito
     organization = Organization.objects.first()
     if organization is None:
-        raise Organization.DoesNotExist("Nenhuma organização configurada")
+        try:
+            organization = Organization.objects.create(
+                name="ACR & Proform SC",
+                domain="localhost",
+                org_type=Organization.Type.BOTH
+            )
+        except Exception:
+            raise Organization.DoesNotExist("Nenhuma organização configurada")
     return organization

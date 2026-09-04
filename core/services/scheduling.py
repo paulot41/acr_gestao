@@ -15,22 +15,39 @@ def ensure_no_conflict(event: "app_models.Event") -> None:
 
     Regras:
     - Um evento não pode sobrepor outro no mesmo recurso dentro da mesma organização.
+    - O mesmo instrutor não pode ter aulas sobrepostas (mesmo em salas distintas) dentro da mesma organização.
     - Ignora o próprio evento em edições.
     """
-    if not event.organization_id or not event.resource_id or not event.starts_at or not event.ends_at:
+    if not event.organization_id or not event.starts_at or not event.ends_at:
         return  # Campos incompletos; validações de presença ocorrem noutro sítio
 
-    qs = app_models.Event.objects.filter(
-        organization=event.organization,
-        resource=event.resource,
-        starts_at__lt=event.ends_at,
-        ends_at__gt=event.starts_at,
-    )
-    if event.pk:
-        qs = qs.exclude(pk=event.pk)
+    # 1. Validação de conflito de espaço/recurso
+    if event.resource_id:
+        qs = app_models.Event.objects.filter(
+            organization_id=event.organization_id,
+            resource_id=event.resource_id,
+            starts_at__lt=event.ends_at,
+            ends_at__gt=event.starts_at,
+        )
+        if event.pk:
+            qs = qs.exclude(pk=event.pk)
 
-    if qs.exists():
-        raise ValidationError("Conflito de horário: já existe um evento no mesmo espaço e intervalo.")
+        if qs.exists():
+            raise ValidationError("Conflito de horário: já existe um evento no mesmo espaço e intervalo.")
+
+    # 2. Validação de conflito de instrutor
+    if event.instructor_id:
+        inst_qs = app_models.Event.objects.filter(
+            organization_id=event.organization_id,
+            instructor_id=event.instructor_id,
+            starts_at__lt=event.ends_at,
+            ends_at__gt=event.starts_at,
+        )
+        if event.pk:
+            inst_qs = inst_qs.exclude(pk=event.pk)
+
+        if inst_qs.exists():
+            raise ValidationError("Conflito de instrutor: o instrutor já tem uma aula agendada neste horário.")
 
 
 def ensure_capacity(booking: "app_models.Booking") -> None:

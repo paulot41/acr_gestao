@@ -1,4 +1,13 @@
-from celery import shared_task
+try:
+    from celery import shared_task
+except (ImportError, Exception):
+    def shared_task(*args, **kwargs):
+        def decorator(func):
+            func.delay = func
+            return func
+        if args and callable(args[0]):
+            return decorator(args[0])
+        return decorator
 from django.core.exceptions import ObjectDoesNotExist
 
 from .models import Organization, Instructor, Event

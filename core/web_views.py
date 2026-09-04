@@ -106,32 +106,49 @@ def dashboard(request):
 def client_list(request):
     """Listagem de clientes com filtros e paginação."""
     org = request.organization
-    clients = Person.objects.filter(organization=org)
+    clients = Person.objects.filter(organization=org).order_by('first_name', 'last_name')
 
     # Filtros
-    search = request.GET.get('search')
-    status_filter = request.GET.get('status')
+    search = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    entity = request.GET.get('entity', '').strip()
 
     if search:
         clients = clients.filter(
             Q(first_name__icontains=search) |
             Q(last_name__icontains=search) |
-            Q(email__icontains=search)
+            Q(email__icontains=search) |
+            Q(phone__icontains=search)
         )
 
     if status_filter:
         clients = clients.filter(status=status_filter)
 
+    if entity:
+        clients = clients.filter(entity_affiliation=entity)
+
     # Paginação
-    paginator = Paginator(clients, 20)
+    paginator = Paginator(clients, 25)
     page_number = request.GET.get('page')
-    clients = paginator.get_page(page_number)
+    clients_page = paginator.get_page(page_number)
+
+    created = request.GET.get('created') == '1'
+    created_client = None
+    created_client_id = request.GET.get('client_id')
+    if created and created_client_id and created_client_id.isdigit():
+        created_client = Person.objects.filter(
+            organization=org, pk=int(created_client_id)
+        ).first()
 
     context = {
-        'clients': clients,
+        'clients': clients_page,
         'search': search,
         'status_filter': status_filter,
+        'status': status_filter,
+        'entity': entity,
         'status_choices': Person.Status.choices,
+        'created': created,
+        'created_client': created_client,
     }
     return render(request, 'core/client_list.html', context)
 
@@ -232,9 +249,9 @@ def client_delete(request, pk):
 def instructor_list(request):
     """Listagem de instrutores."""
     org = request.organization
-    instructors = Instructor.objects.filter(organization=org)
+    instructors = Instructor.objects.filter(organization=org, is_active=True).order_by('first_name', 'last_name')
 
-    search = request.GET.get('search')
+    search = request.GET.get('search', '').strip()
     if search:
         instructors = instructors.filter(
             Q(first_name__icontains=search) |
@@ -338,7 +355,7 @@ def instructor_add(request):
 def modality_list(request):
     """Listagem de modalidades."""
     org = request.organization
-    modalities = Modality.objects.filter(organization=org)
+    modalities = Modality.objects.filter(organization=org, is_active=True).order_by('entity_type', 'name')
 
     context = {'modalities': modalities}
     return render(request, 'core/modality_list.html', context)
@@ -877,74 +894,6 @@ def organization_settings(request):
 
     return render(request, 'core/settings.html', context)
 
-# Views adicionais para compatibilidade
-@role_required(["admin", "staff"])
-def client_list(request):
-    """Lista de clientes."""
-    org = request.organization
-    clients = Person.objects.filter(organization=org).order_by('first_name', 'last_name')
-
-    # Filtros
-    search = request.GET.get('search', '')
-    status_filter = request.GET.get('status', '')
-    entity = request.GET.get('entity', '')
-
-    if search:
-        clients = clients.filter(
-            Q(first_name__icontains=search) |
-            Q(last_name__icontains=search) |
-            Q(email__icontains=search) |
-            Q(phone__icontains=search)
-        )
-
-    if status_filter:
-        clients = clients.filter(status=status_filter)
-
-    if entity:
-        clients = clients.filter(entity_affiliation=entity)
-
-    paginator = Paginator(clients, 25)
-    page = request.GET.get('page')
-    clients = paginator.get_page(page)
-
-    created = request.GET.get('created') == '1'
-    created_client = None
-    created_client_id = request.GET.get('client_id')
-    if created and created_client_id and created_client_id.isdigit():
-        created_client = Person.objects.filter(
-            organization=org, pk=int(created_client_id)
-        ).first()
-
-    return render(request, 'core/client_list.html', {
-        'clients': clients,
-        'search': search,
-        'status': status_filter,
-        'status_filter': status_filter,
-        'status_choices': Person.Status.choices,
-        'entity': entity,
-        'created': created,
-        'created_client': created_client,
-    })
-
-@role_required(["admin", "staff"])
-def instructor_list(request):
-    """Lista de instrutores."""
-    org = request.organization
-    instructors = Instructor.objects.filter(organization=org, is_active=True).order_by('first_name', 'last_name')
-
-    return render(request, 'core/instructor_list.html', {
-        'instructors': instructors
-    })
-
-@role_required(["admin", "staff"])
-def modality_list(request):
-    """Lista de modalidades."""
-    org = request.organization
-    modalities = Modality.objects.filter(organization=org, is_active=True).order_by('entity_type', 'name')
-
-    return render(request, 'core/modality_list.html', {
-        'modalities': modalities
-    })
 
 @role_required(["admin", "staff"])
 def schedule_view(request):

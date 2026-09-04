@@ -167,7 +167,7 @@ def create_event_from_gantt(request):
         if ends_at <= starts_at:
             return JsonResponse({'error': 'Hora de fim deve ser posterior à hora de início'}, status=400)
 
-        # Verificar conflitos
+        # Verificar conflito de espaço/recurso
         conflicting_events = Event.objects.filter(
             organization=org,
             resource=resource,
@@ -178,24 +178,44 @@ def create_event_from_gantt(request):
         if conflicting_events.exists():
             return JsonResponse({'error': 'Já existe um evento neste horário e espaço'}, status=400)
 
+        # Se o utilizador não é admin ou passou instructor_id, determinar instrutor
+        instructor = None
+        instructor_id = data.get('instructor_id')
+        if instructor_id:
+            try:
+                instructor = Instructor.objects.get(id=instructor_id, organization=org)
+            except Instructor.DoesNotExist:
+                return JsonResponse({'error': 'Instrutor não encontrado'}, status=404)
+        elif not (request.user.is_staff or request.user.is_superuser):
+            try:
+                instructor = Instructor.objects.get(organization=org, email=request.user.email)
+            except Instructor.DoesNotExist:
+                pass
+
+        # Validar conflito de sobreposição do instrutor
+        if instructor:
+            instructor_conflicts = Event.objects.filter(
+                organization=org,
+                instructor=instructor,
+                starts_at__lt=ends_at,
+                ends_at__gt=starts_at
+            )
+            if instructor_conflicts.exists():
+                return JsonResponse({
+                    'error': f'O instrutor {instructor.full_name} já tem uma aula agendada neste horário'
+                }, status=400)
+
         # Criar evento preliminar
         event = Event(
             organization=org,
             resource=resource,
+            instructor=instructor,
             title=f"Nova Aula - {resource.name}",
             starts_at=starts_at,
             ends_at=ends_at,
             capacity=resource.capacity,
             event_type=Event.EventType.OPEN_CLASS
         )
-
-        # Se o utilizador não é admin, atribuir como instrutor
-        if not (request.user.is_staff or request.user.is_superuser):
-            try:
-                instructor = Instructor.objects.get(organization=org, email=request.user.email)
-                event.instructor = instructor
-            except Instructor.DoesNotExist:
-                pass
 
         event.save()
 
@@ -207,7 +227,10 @@ def create_event_from_gantt(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
-    except (ValidationError, IntegrityError) as e:
+    except ValidationError as e:
+        msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+        return JsonResponse({'error': msg}, status=400)
+    except IntegrityError as e:
         logger.error("Erro ao criar evento: %s", e)
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
@@ -243,12 +266,15 @@ def update_event_details(request):
             except Modality.DoesNotExist:
                 return JsonResponse({'error': 'Modalidade não encontrada'}, status=404)
 
-        if 'instructor_id' in data and data['instructor_id']:
-            try:
-                instructor = Instructor.objects.get(id=data['instructor_id'], organization=org)
-                event.instructor = instructor
-            except Instructor.DoesNotExist:
-                return JsonResponse({'error': 'Instrutor não encontrado'}, status=404)
+        if 'instructor_id' in data:
+            if data['instructor_id']:
+                try:
+                    instructor = Instructor.objects.get(id=data['instructor_id'], organization=org)
+                    event.instructor = instructor
+                except Instructor.DoesNotExist:
+                    return JsonResponse({'error': 'Instrutor não encontrado'}, status=404)
+            else:
+                event.instructor = None
 
         if 'event_type' in data:
             event.event_type = data['event_type']
@@ -330,21 +356,34 @@ def update_event_details(request):
             else:
                 new_resource = event.resource
 
-            # Verificar conflitos (excluir o próprio evento)
-            conflict_qs = Event.objects.filter(
-                organization=org,
-                resource=new_resource,
-                starts_at__lt=new_ends_at,
-                ends_at__gt=new_starts_at
-            ).exclude(id=event.id)
-
-            if conflict_qs.exists():
-                return JsonResponse({'error': 'Conflito de agenda no espaço selecionado'}, status=400)
-
-            # Aplicar alterações
             event.resource = new_resource
             event.starts_at = new_starts_at
             event.ends_at = new_ends_at
+
+        # Verificar conflitos de espaço (excluir o próprio evento)
+        conflict_qs = Event.objects.filter(
+            organization=org,
+            resource=event.resource,
+            starts_at__lt=event.ends_at,
+            ends_at__gt=event.starts_at
+        ).exclude(id=event.id)
+
+        if conflict_qs.exists():
+            return JsonResponse({'error': 'Conflito de agenda no espaço selecionado'}, status=400)
+
+        # Verificar conflito de instrutor (excluir o próprio evento)
+        if event.instructor:
+            inst_conflict_qs = Event.objects.filter(
+                organization=org,
+                instructor=event.instructor,
+                starts_at__lt=event.ends_at,
+                ends_at__gt=event.starts_at
+            ).exclude(id=event.id)
+
+            if inst_conflict_qs.exists():
+                return JsonResponse({
+                    'error': f'O instrutor {event.instructor.full_name} já tem uma aula agendada neste horário'
+                }, status=400)
 
         event.save()
 
@@ -360,7 +399,10 @@ def update_event_details(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
-    except (ValidationError, IntegrityError) as e:
+    except ValidationError as e:
+        msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+        return JsonResponse({'error': msg}, status=400)
+    except IntegrityError as e:
         logger.error("Erro ao atualizar evento: %s", e)
         return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
 
@@ -613,8 +655,13 @@ def validate_event_conflict(request):
         ends_at_str = data.get('ends_at')
         exclude_event_id = data.get('exclude_event_id')  # Para edições
 
-        if not all([resource_id, starts_at_str, ends_at_str]):
+        instructor_id = data.get('instructor_id')
+
+        if not all([starts_at_str, ends_at_str]):
             return JsonResponse({'error': 'Dados obrigatórios em falta'}, status=400)
+
+        if not resource_id and not instructor_id:
+            return JsonResponse({'error': 'Recurso ou Instrutor obrigatório para validação'}, status=400)
 
         try:
             starts_at = datetime.fromisoformat(starts_at_str.replace('Z', ''))
@@ -624,30 +671,63 @@ def validate_event_conflict(request):
         except ValueError:
             return JsonResponse({'error': 'Formato de data/hora inválido'}, status=400)
 
-        # Verificar conflitos
-        conflicts = Event.objects.filter(
-            organization=org,
-            resource_id=resource_id,
-            starts_at__lt=ends_at,
-            ends_at__gt=starts_at
-        )
+        if ends_at <= starts_at:
+            return JsonResponse({'error': 'Hora de fim deve ser posterior à hora de início'}, status=400)
 
-        if exclude_event_id:
-            conflicts = conflicts.exclude(id=exclude_event_id)
+        # 1. Verificar conflitos de espaço/recurso
+        if resource_id:
+            conflicts = Event.objects.filter(
+                organization=org,
+                resource_id=resource_id,
+                starts_at__lt=ends_at,
+                ends_at__gt=starts_at
+            )
+            if exclude_event_id:
+                conflicts = conflicts.exclude(id=exclude_event_id)
 
-        if conflicts.exists():
-            conflict_list = [
-                {
-                    'id': c.id,
-                    'title': c.title,
-                    'starts_at': c.starts_at.isoformat(),
-                    'ends_at': c.ends_at.isoformat()
-                } for c in conflicts
-            ]
-            return JsonResponse({
-                'has_conflict': True,
-                'conflicts': conflict_list
-            })
+            if conflicts.exists():
+                conflict_list = [
+                    {
+                        'id': c.id,
+                        'title': c.title,
+                        'starts_at': c.starts_at.isoformat(),
+                        'ends_at': c.ends_at.isoformat()
+                    } for c in conflicts
+                ]
+                return JsonResponse({
+                    'has_conflict': True,
+                    'conflict_type': 'resource',
+                    'message': 'Já existe um evento neste horário e espaço',
+                    'conflicts': conflict_list
+                })
+
+        # 2. Verificar conflitos de instrutor
+        if instructor_id:
+            inst_conflicts = Event.objects.filter(
+                organization=org,
+                instructor_id=instructor_id,
+                starts_at__lt=ends_at,
+                ends_at__gt=starts_at
+            )
+            if exclude_event_id:
+                inst_conflicts = inst_conflicts.exclude(id=exclude_event_id)
+
+            if inst_conflicts.exists():
+                inst_conflict_list = [
+                    {
+                        'id': c.id,
+                        'title': c.title,
+                        'resource_name': c.resource.name if c.resource else '',
+                        'starts_at': c.starts_at.isoformat(),
+                        'ends_at': c.ends_at.isoformat()
+                    } for c in inst_conflicts
+                ]
+                return JsonResponse({
+                    'has_conflict': True,
+                    'conflict_type': 'instructor',
+                    'message': 'O instrutor já tem uma aula agendada neste horário',
+                    'conflicts': inst_conflict_list
+                })
 
         return JsonResponse({'has_conflict': False})
 

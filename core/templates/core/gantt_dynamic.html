@@ -375,6 +375,7 @@
             </div>
             <div class="modal-body">
                 <form id="event-form">
+                    {% csrf_token %}
                     <input type="hidden" id="event-id" name="event_id">
 
                     <div class="row">
@@ -1132,7 +1133,13 @@ class GanttDynamic {
 
     getCSRFToken() {
         const input = document.querySelector('[name=csrfmiddlewaretoken]');
-        return input ? input.value : '';
+        if (input && input.value) {
+            return input.value;
+        }
+        const cookie = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrftoken='));
+        return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
     }
 
     // Converter deslocamento dentro da célula em minutos (arredonda a 5 em 5)

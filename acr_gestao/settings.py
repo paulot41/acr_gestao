@@ -1,6 +1,7 @@
 from pathlib import Path
 from django.urls import reverse_lazy
 import os
+import sys
 import secrets
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,8 +39,10 @@ if DEBUG:
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+TESTING = len(sys.argv) > 1 and sys.argv[1] == "test"
+
 # Configurações de segurança HTTPS (controladas por variáveis de ambiente)
-SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "1") in {"1", "true", "True"} and not DEBUG
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "1") in {"1", "true", "True"} and not DEBUG and not TESTING
 SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000")) if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv("SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") in {"1", "true", "True"} and not DEBUG
 SECURE_HSTS_PRELOAD = os.getenv("SECURE_HSTS_PRELOAD", "1") in {"1", "true", "True"} and not DEBUG
@@ -89,6 +92,7 @@ TEMPLATES = [{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
+        "core.context_processors.organization_context",
     ]},
 }]
 

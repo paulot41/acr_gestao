@@ -1,13 +1,16 @@
 import os
-from celery import Celery
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "acr_gestao.settings")
+try:
+    from celery import Celery
 
-app = Celery("acr_gestao")
-app.config_from_object("django.conf:settings", namespace="CELERY")
-app.autodiscover_tasks()
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "acr_gestao.settings")
 
+    app = Celery("acr_gestao")
+    app.config_from_object("django.conf:settings", namespace="CELERY")
+    app.autodiscover_tasks()
 
-@app.task(bind=True)
-def debug_task(self):  # pragma: no cover
-    print(f"Request: {self.request!r}")
+    @app.task(bind=True)
+    def debug_task(self):  # pragma: no cover
+        print(f"Request: {self.request!r}")
+except (ImportError, Exception):
+    app = None
