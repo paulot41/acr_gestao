@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from .models import (
     Person, Instructor, Modality, Event, Resource, ClassGroup, Booking,
-    Payment, PaymentPlan, ClientSubscription
+    Payment, PaymentPlan, ClientSubscription, ProtocolConfiguration
 )
 
 
@@ -25,10 +25,11 @@ class PersonForm(forms.ModelForm):
         model = Person
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'nif',
-            'date_of_birth', 'address', 'emergency_contact',
-            'insurance_policy', 'insurance_expiry', 'medical_certificate_expiry',
+            'date_of_birth', 'address', 'emergency_contact', 'emergency_relationship',
+            'member_category', 'insurance_policy', 'insurance_expiry', 'medical_certificate_expiry',
             'guardian_name', 'guardian_phone', 'guardian_nif',
-            'entity_affiliation', 'status', 'notes', 'consent_rgpd', 'photo'
+            'entity_affiliation', 'status', 'notes',
+            'consent_rgpd', 'image_consent', 'regulation_accepted', 'photo'
         ]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome próprio'}),
@@ -38,8 +39,10 @@ class PersonForm(forms.ModelForm):
             'nif': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NIF'}),
             'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Morada completa'}),
-            'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome e contacto de emergência'}),
-            'insurance_policy': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: APÓLICE-FID-12345'}),
+            'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome e telefone de emergência'}),
+            'emergency_relationship': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Pai, Mãe, Cônjuge'}),
+            'member_category': forms.Select(attrs={'class': 'form-select'}),
+            'insurance_policy': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 0010189147'}),
             'insurance_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'medical_certificate_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'guardian_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do Encarregado de Educação'}),
@@ -49,6 +52,8 @@ class PersonForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': 'form-select'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Notas e observações...'}),
             'consent_rgpd': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'image_consent': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'regulation_accepted': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
 
@@ -102,6 +107,7 @@ class InstructorForm(forms.ModelForm):
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'specialties',
             'entity_affiliation', 'acr_commission_rate', 'proform_commission_rate',
+            'is_technical_director', 'ipdj_license_number', 'ipdj_license_expiry', 'ipdj_project_name',
             'is_active', 'photo'
         ]
         widgets = {
@@ -113,6 +119,10 @@ class InstructorForm(forms.ModelForm):
             'entity_affiliation': forms.Select(attrs={'class': 'form-select'}),
             'acr_commission_rate': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'max': '100', 'step': '0.01'}),
             'proform_commission_rate': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'max': '100', 'step': '0.01'}),
+            'is_technical_director': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'ipdj_license_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Cédula nº 97575 do IPDJ'}),
+            'ipdj_license_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'ipdj_project_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Protocolo ACR-Proform / Projeto IPDJ Desporto para Todos'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
@@ -281,6 +291,7 @@ class ResourceForm(forms.ModelForm):
         model = Resource
         fields = [
             'name', 'description', 'entity_type', 'capacity',
+            'facility_type', 'cession_entity', 'address',
             'is_available', 'equipment_list', 'special_features'
         ]
         widgets = {
@@ -288,6 +299,9 @@ class ResourceForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Descrição do espaço...'}),
             'entity_type': forms.Select(attrs={'class': 'form-select'}),
             'capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '200'}),
+            'facility_type': forms.Select(attrs={'class': 'form-select'}),
+            'cession_entity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Município de Celorico de Basto'}),
+            'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Pavilhão da Antiga C+S, Celorico de Basto'}),
             'is_available': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'equipment_list': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Lista de equipamentos disponíveis...'}),
             'special_features': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Características especiais...'}),
@@ -453,4 +467,77 @@ class ClientSubscriptionForm(forms.ModelForm):
             self.fields['payment_plan'].queryset = PaymentPlan.objects.filter(
                 organization=organization, is_active=True
             ).order_by('entity_type', 'name')
+
+
+class ProtocolConfigurationForm(forms.ModelForm):
+    """Formulário para parametrização completa e dinâmica do Protocolo ACR & Proform SC."""
+
+    def __init__(self, *args, **kwargs):
+        organization = kwargs.pop("organization", None)
+        super().__init__(*args, **kwargs)
+        if organization:
+            self.fields['active_technical_director'].queryset = Instructor.objects.filter(
+                organization=organization, is_active=True
+            ).order_by('first_name', 'last_name')
+
+    class Meta:
+        model = ProtocolConfiguration
+        fields = [
+            # ACR
+            'acr_official_name', 'acr_nipc', 'acr_address',
+            'acr_representative_name', 'acr_representative_role',
+            # Proform
+            'proform_official_name', 'proform_nipc', 'proform_address',
+            'proform_representative_name', 'proform_representative_role',
+            # Direção Técnica & IPDJ
+            'active_technical_director', 'active_ipdj_project',
+            # Seguro
+            'insurance_company', 'insurance_policy_number', 'insurance_product_name',
+            'insurance_policy_start', 'insurance_policy_expiry', 'insurance_annual_premium',
+            'insurance_base_insured_count', 'insurance_claim_deadline_days',
+            # Capitais
+            'capital_death_disability', 'capital_treatment', 'treatment_deductible', 'capital_funeral',
+            # Mediador
+            'broker_name', 'broker_asf_number', 'broker_phone', 'broker_address',
+            # Regras Financeiras
+            'acr_admin_fee_per_athlete', 'insurance_split_mode'
+        ]
+        widgets = {
+            'acr_official_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'acr_nipc': forms.TextInput(attrs={'class': 'form-control'}),
+            'acr_address': forms.TextInput(attrs={'class': 'form-control'}),
+            'acr_representative_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'acr_representative_role': forms.TextInput(attrs={'class': 'form-control'}),
+
+            'proform_official_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'proform_nipc': forms.TextInput(attrs={'class': 'form-control'}),
+            'proform_address': forms.TextInput(attrs={'class': 'form-control'}),
+            'proform_representative_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'proform_representative_role': forms.TextInput(attrs={'class': 'form-control'}),
+
+            'active_technical_director': forms.Select(attrs={'class': 'form-select'}),
+            'active_ipdj_project': forms.TextInput(attrs={'class': 'form-control'}),
+
+            'insurance_company': forms.TextInput(attrs={'class': 'form-control'}),
+            'insurance_policy_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'insurance_product_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'insurance_policy_start': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'insurance_policy_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'insurance_annual_premium': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'insurance_base_insured_count': forms.NumberInput(attrs={'class': 'form-control'}),
+            'insurance_claim_deadline_days': forms.NumberInput(attrs={'class': 'form-control'}),
+
+            'capital_death_disability': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'capital_treatment': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'treatment_deductible': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'capital_funeral': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+
+            'broker_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'broker_asf_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'broker_phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'broker_address': forms.TextInput(attrs={'class': 'form-control'}),
+
+            'acr_admin_fee_per_athlete': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'insurance_split_mode': forms.Select(attrs={'class': 'form-select'}),
+        }
 

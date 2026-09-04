@@ -112,21 +112,21 @@
                         </div>
                     </div>
 
-                    <!-- Configurações Profissionais -->
+                    <!-- Configurações Profissionais e Comissões -->
                     <div class="row mb-4">
                         <div class="col-12">
                             <h6 class="text-success mb-3">
-                                <i class="bi bi-briefcase me-2"></i>Configurações Profissionais
+                                <i class="bi bi-briefcase me-2"></i>Afiliação e Comissões Contratuais
                             </h6>
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="{{ form.entity_affiliation.id_for_label }}" class="form-label">
                                 Entidade <span class="text-danger">*</span>
                             </label>
                             {{ form.entity_affiliation }}
                             <small class="form-text text-muted">
-                                Selecione para que entidade(s) o instrutor trabalhará
+                                Afiliação institucional do instrutor
                             </small>
                             {% if form.entity_affiliation.errors %}
                                 <div class="invalid-feedback d-block">
@@ -135,73 +135,121 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.commission_percentage.id_for_label }}" class="form-label">
-                                Percentagem de Comissão <span class="text-danger">*</span>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.acr_commission_rate.id_for_label }}" class="form-label">
+                                Comissão Aulas ACR (%)
                             </label>
                             <div class="input-group">
-                                {{ form.commission_percentage }}
+                                {{ form.acr_commission_rate }}
                                 <span class="input-group-text">%</span>
                             </div>
-                            <small class="form-text text-muted">
-                                Percentagem que o instrutor recebe por cada aula
-                            </small>
-                            {% if form.commission_percentage.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.commission_percentage.errors.0 }}
-                                </div>
+                            <small class="form-text text-muted">Ex: 60.00%</small>
+                            {% if form.acr_commission_rate.errors %}
+                                <div class="invalid-feedback d-block">{{ form.acr_commission_rate.errors.0 }}</div>
                             {% endif %}
                         </div>
 
-                        <div class="col-12 mb-3">
-                            <label for="{{ form.modalities.id_for_label }}" class="form-label">
-                                Especialidades/Modalidades
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.proform_commission_rate.id_for_label }}" class="form-label">
+                                Comissão Aulas Proform (%)
                             </label>
-                            {{ form.modalities }}
-                            <small class="form-text text-muted">
-                                Selecione as modalidades que o instrutor pode lecionar (Ctrl+clique para múltiplas)
-                            </small>
-                            {% if form.modalities.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.modalities.errors.0 }}
-                                </div>
+                            <div class="input-group">
+                                {{ form.proform_commission_rate }}
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="form-text text-muted">Ex: 70.00%</small>
+                            {% if form.proform_commission_rate.errors %}
+                                <div class="invalid-feedback d-block">{{ form.proform_commission_rate.errors.0 }}</div>
                             {% endif %}
                         </div>
 
                         <div class="col-12 mb-3">
-                            <div class="form-check">
-                                {{ form.is_active }}
-                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
-                                    Instrutor Ativo
-                                </label>
-                                <small class="form-text text-muted d-block">
-                                    Instrutores inativos não poderão ter novas aulas agendadas
-                                </small>
-                            </div>
+                            <label for="{{ form.specialties.id_for_label }}" class="form-label">
+                                Especialidades / Modalidades Lecionadas
+                            </label>
+                            {{ form.specialties }}
+                            <small class="form-text text-muted">
+                                Modalidades lecionadas, graduações, cinturões e certificações
+                            </small>
+                            {% if form.specialties.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.specialties.errors.0 }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
-                    <!-- Notas Adicionais -->
-                    <div class="row mb-4">
+                    <!-- Direção Técnica e Cédula IPDJ -->
+                    <div class="row mb-4 p-3 bg-light rounded border">
                         <div class="col-12">
-                            <h6 class="text-info mb-3">
-                                <i class="bi bi-chat-text me-2"></i>Informações Adicionais
+                            <h6 class="text-primary mb-2">
+                                <i class="bi bi-award me-2"></i>Direção Técnica & Habilitação IPDJ
                             </h6>
+                            <small class="text-muted d-block mb-3">
+                                Configurações essenciais para cumprimento do protocolo, projetos IPDJ e termos de responsabilidade técnica.
+                            </small>
                         </div>
 
                         <div class="col-12 mb-3">
-                            <label for="{{ form.notes.id_for_label }}" class="form-label">
-                                Notas/Observações
-                            </label>
-                            {{ form.notes }}
-                            <small class="form-text text-muted">
-                                Informações adicionais sobre o instrutor, certificações, etc.
-                            </small>
-                            {% if form.notes.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.notes.errors.0 }}
-                                </div>
+                            <div class="form-check form-switch">
+                                {{ form.is_technical_director }}
+                                <label class="form-check-label fw-bold text-dark" for="{{ form.is_technical_director.id_for_label }}">
+                                    Designar como Diretor Técnico do Protocolo / Instalação
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Identificado como responsável técnico nas declarações de fecho, candidaturas a projetos IPDJ e seguros.
+                                </small>
+                            </div>
+                            {% if form.is_technical_director.errors %}
+                                <div class="invalid-feedback d-block">{{ form.is_technical_director.errors.0 }}</div>
                             {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.ipdj_license_number.id_for_label }}" class="form-label">
+                                N.º da Cédula de Treinador IPDJ
+                            </label>
+                            {{ form.ipdj_license_number }}
+                            <small class="form-text text-muted">Ex: 97575</small>
+                            {% if form.ipdj_license_number.errors %}
+                                <div class="invalid-feedback d-block">{{ form.ipdj_license_number.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.ipdj_license_expiry.id_for_label }}" class="form-label">
+                                Validade da Cédula IPDJ
+                            </label>
+                            {{ form.ipdj_license_expiry }}
+                            {% if form.ipdj_license_expiry.errors %}
+                                <div class="invalid-feedback d-block">{{ form.ipdj_license_expiry.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="{{ form.ipdj_project_name.id_for_label }}" class="form-label">
+                                Projeto / Candidatura IPDJ Associada
+                            </label>
+                            {{ form.ipdj_project_name }}
+                            <small class="form-text text-muted">Nome do projeto IPDJ (ex: Candidatura Desporto para Todos)</small>
+                            {% if form.ipdj_project_name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.ipdj_project_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Estado no Sistema -->
+                    <div class="row mb-4">
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch">
+                                {{ form.is_active }}
+                                <label class="form-check-label fw-bold" for="{{ form.is_active.id_for_label }}">
+                                    Instrutor Ativo no Sistema
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Instrutores inativos não poderão ser alocados a novas aulas ou eventos.
+                                </small>
+                            </div>
                         </div>
                     </div>
 

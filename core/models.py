@@ -72,6 +72,11 @@ class Organization(models.Model):
     def __str__(self) -> str:
         return f"{self.name} ({self.get_org_type_display()})"
 
+    def get_protocol_config(self):
+        """Retorna a configuração dinâmica do protocolo, criando com valores padrão se não existir."""
+        config, _ = ProtocolConfiguration.objects.get_or_create(organization=self)
+        return config
+
 
 class Person(models.Model):
     """Customer/athlete stored under a specific organization."""
@@ -136,6 +141,34 @@ class Person(models.Model):
     entity_affiliation = models.CharField(
         "Afiliação", max_length=20, choices=EntityAffiliation.choices, default=EntityAffiliation.ACR_ONLY,
         help_text="A que entidade(s) o cliente está inscrito"
+    )
+
+    class MemberCategory(models.TextChoices):
+        SOCIO = "socio", "Sócio Praticante (ACR)"
+        NAO_SOCIO = "nao_socio", "Não Sócio Praticante"
+
+    member_category = models.CharField(
+        "Categoria de Praticante",
+        max_length=20,
+        choices=MemberCategory.choices,
+        default=MemberCategory.NAO_SOCIO,
+        help_text="Enquadramento associativo do praticante na ACR"
+    )
+    emergency_relationship = models.CharField(
+        "Parentesco do Contacto de Emergência",
+        max_length=60,
+        blank=True,
+        help_text="Ex: Pai, Mãe, Cônjuge"
+    )
+    image_consent = models.BooleanField(
+        "Consentimento de Uso de Imagem",
+        default=False,
+        help_text="Autorização para captação e divulgação de fotos/vídeos em treinos"
+    )
+    regulation_accepted = models.BooleanField(
+        "Regulamento Interno Aceite",
+        default=True,
+        help_text="Declaração de conhecimento e aceitação do regulamento da ACR"
     )
 
     class Meta:
@@ -264,6 +297,31 @@ class Instructor(models.Model):
     proform_commission_rate = models.DecimalField(
         "Comissão Proform (%)", max_digits=5, decimal_places=2, default=70.00,
         help_text="Percentagem que o instrutor recebe por aulas Proform"
+    )
+
+    # Direção Técnica e Credenciação IPDJ
+    is_technical_director = models.BooleanField(
+        "Diretor Técnico",
+        default=False,
+        help_text="Indica se o instrutor exerce funções de Diretor Técnico do protocolo ou projeto"
+    )
+    ipdj_license_number = models.CharField(
+        "N.º Cédula / Título Profissional IPDJ",
+        max_length=50,
+        blank=True,
+        help_text="Ex: Cédula n.º 97575 emitida pelo IPDJ"
+    )
+    ipdj_license_expiry = models.DateField(
+        "Validade da Cédula IPDJ",
+        null=True,
+        blank=True,
+        help_text="Data de validade do título profissional"
+    )
+    ipdj_project_name = models.CharField(
+        "Projeto / Enquadramento IPDJ",
+        max_length=150,
+        blank=True,
+        help_text="Ex: Protocolo ACR-Proform, Projeto IPDJ Desporto para Todos"
     )
 
     class Meta:
@@ -407,6 +465,32 @@ class Resource(models.Model):
     is_available = models.BooleanField("Disponível", default=True, help_text="Se o espaço está disponível para uso")
     equipment_list = models.TextField("Equipamentos", blank=True, help_text="Lista de equipamentos disponíveis")
     special_features = models.TextField("Características Especiais", blank=True, help_text="Ar condicionado, espelhos, etc.")
+
+    class FacilityType(models.TextChoices):
+        MUNICIPAL_CESSION = "municipal_cession", "Cedência Municipal Gratuita"
+        RENTED = "rented", "Arrendado / Alugado"
+        OWNED = "owned", "Instalações Próprias"
+
+    facility_type = models.CharField(
+        "Regime de Instalações",
+        max_length=30,
+        choices=FacilityType.choices,
+        default=FacilityType.MUNICIPAL_CESSION,
+        help_text="Regime jurídico de utilização deste espaço"
+    )
+    cession_entity = models.CharField(
+        "Entidade Cedente / Proprietário",
+        max_length=150,
+        blank=True,
+        default="Município de Celorico de Basto",
+        help_text="Ex: Município de Celorico de Basto, Junta de Freguesia, etc."
+    )
+    address = models.CharField(
+        "Morada / Localização do Espaço",
+        max_length=255,
+        blank=True,
+        help_text="Localização física do pavilhão ou sala"
+    )
 
     # Campos de gestão
     created_at = models.DateTimeField("Criado em", auto_now_add=True)
@@ -848,6 +932,111 @@ class ProtocolPeriodSettlement(models.Model):
         if not self.title:
             self.title = f"Fecho de Contas ({self.period_start.strftime('%m/%Y')})"
         super().save(*args, **kwargs)
+
+
+class ProtocolConfiguration(models.Model):
+    """
+    Parametrização institucional, seguradora, mediação e regras financeiras do Protocolo.
+    100% editável e dinâmico, permitindo mudar de seguradora, mediador, projeto IPDJ ou quota.
+    """
+    class InsuranceSplitMode(models.TextChoices):
+        ANNUAL_DONATION = "annual_donation", "Doação Anual Integral (Proform doa prémio à ACR)"
+        MONTHLY_AMORTIZATION = "monthly_amortization", "Amortização Mensal Fracionada (1/12 por mês)"
+
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name="protocol_config")
+
+    # 1. Dados Institucionais ACR
+    acr_official_name = models.CharField(
+        "Nome Oficial da Associação",
+        max_length=200,
+        default="ACR - Associação Cultural e Recreativa de Basto (Santa Tecla)"
+    )
+    acr_nipc = models.CharField("NIPC da ACR", max_length=20, default="510695744")
+    acr_address = models.CharField("Sede da ACR", max_length=255, default="Lugar da Igreja, 4890-526 Basto (Santa Tecla)")
+    acr_representative_name = models.CharField("Presidente da Direção da ACR", max_length=150, default="Paulo Sérgio da Cunha Teixeira")
+    acr_representative_role = models.CharField("Cargo do Representante ACR", max_length=100, default="Presidente da Direção")
+
+    # 2. Dados Parceiro Proform SC
+    proform_official_name = models.CharField(
+        "Designação do Ginásio Parceiro",
+        max_length=200,
+        default="PROFORM - Strength & Conditioning"
+    )
+    proform_nipc = models.CharField("NIPC do Parceiro", max_length=20, default="210263601")
+    proform_address = models.CharField("Sede do Parceiro", max_length=255, default="Rua Senhora da Conceição 24, 4890-223 Celorico de Basto")
+    proform_representative_name = models.CharField("Representante do Parceiro", max_length=150, default="Daniel Silvério Leite Coelho")
+    proform_representative_role = models.CharField("Cargo do Representante Parceiro", max_length=100, default="Diretor Técnico")
+
+    # 3. Direção Técnica e Projetos IPDJ
+    active_technical_director = models.ForeignKey(
+        "Instructor",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="headed_protocol_configs",
+        verbose_name="Diretor Técnico Ativo"
+    )
+    active_ipdj_project = models.CharField(
+        "Projeto / Enquadramento IPDJ Vigente",
+        max_length=200,
+        default="Protocolo de Desportos de Combate e Artes Marciais (ACR & Proform SC)",
+        help_text="Designação do projeto ou candidatura ao IPDJ"
+    )
+
+    # 4. Apólice de Seguro Desportivo
+    insurance_company = models.CharField("Companhia Seguradora", max_length=120, default="Generali Seguros, S.A.")
+    insurance_policy_number = models.CharField("N.º da Apólice", max_length=60, default="0010189147")
+    insurance_product_name = models.CharField("Produto / Opção da Apólice", max_length=150, default="AP DESP CULT RECREIO - Ginásios com artes marciais")
+    insurance_policy_start = models.DateField("Início da Vigência", null=True, blank=True)
+    insurance_policy_expiry = models.DateField("Renovação Anual / Fim", null=True, blank=True)
+    insurance_annual_premium = models.DecimalField(
+        "Prémio Anual do Seguro (€)",
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("362.82"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Custo total anual do seguro a ser comparticipado pelo Proform à ACR"
+    )
+    insurance_base_insured_count = models.PositiveIntegerField("Número Base de Praticantes Segurados", default=25)
+    insurance_claim_deadline_days = models.PositiveIntegerField("Prazo para Participação de Sinistros (dias)", default=3)
+
+    # Capitais Segurados
+    capital_death_disability = models.DecimalField("Capital Morte / Invalidez Permanente (€)", max_digits=10, decimal_places=2, default=Decimal("33500.00"))
+    capital_treatment = models.DecimalField("Capital Despesas de Tratamento (€)", max_digits=10, decimal_places=2, default=Decimal("5500.00"))
+    treatment_deductible = models.DecimalField("Franquia Despesas Tratamento (€)", max_digits=10, decimal_places=2, default=Decimal("75.00"))
+    capital_funeral = models.DecimalField("Capital Despesas de Funeral (€)", max_digits=10, decimal_places=2, default=Decimal("3000.00"))
+
+    # 5. Mediador / Ponto de Venda de Seguros
+    broker_name = models.CharField("Mediador de Seguros", max_length=150, default="SPR AGENTE SEGUROS LDA")
+    broker_asf_number = models.CharField("N.º Registo ASF do Mediador", max_length=50, default="4195560913")
+    broker_phone = models.CharField("Telefone do Mediador", max_length=50, default="963 958 018")
+    broker_address = models.CharField("Morada do Mediador", max_length=255, default="Av. João Pinto Ribeiro 98 Fracção A, 4890-221 Celorico de Basto")
+
+    # 6. Regras Financeiras do Protocolo
+    acr_admin_fee_per_athlete = models.DecimalField(
+        "Quota Administrativa ACR por Atleta (€/mês)",
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal("1.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Valor fixo mensal a transferir para a ACR por cada praticante ativo nas modalidades"
+    )
+    insurance_split_mode = models.CharField(
+        "Modo de Repartição do Seguro",
+        max_length=30,
+        choices=InsuranceSplitMode.choices,
+        default=InsuranceSplitMode.MONTHLY_AMORTIZATION,
+        help_text="Como o custo da apólice é computado nos fechos periódicos"
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Parametrização do Protocolo"
+        verbose_name_plural = "Parametrizações do Protocolo"
+
+    def __str__(self) -> str:
+        return f"Configuração Protocolo ({self.organization.name})"
 
 
 class GoogleCalendarConfig(models.Model):

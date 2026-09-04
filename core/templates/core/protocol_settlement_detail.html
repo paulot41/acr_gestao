@@ -91,9 +91,14 @@
         <!-- Cabeçalho Oficial -->
         <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
             <div>
-                <h3 class="fw-bold text-primary mb-1">Associação Cultural e Recreativa & Proform SC</h3>
-                <h5 class="text-secondary fw-semibold mb-1">Protocolo de Cooperação Desportiva</h5>
-                <small class="text-muted d-block">Desportos de Combate, Artes Marciais e Bem-Estar</small>
+                <h3 class="fw-bold text-primary mb-1">{{ split_data.protocol_config.acr_official_name|default:'Associação Cultural e Recreativa de Basto (Santa Tecla)' }}</h3>
+                <h5 class="text-secondary fw-semibold mb-1">Parceria Técnica: {{ split_data.protocol_config.proform_official_name|default:'PROFORM - Strength & Conditioning' }}</h5>
+                <small class="text-muted d-block">
+                    Protocolo de Cooperação Desportiva: {{ split_data.protocol_config.active_ipdj_project|default:'Desportos de Combate & Artes Marciais' }}
+                    {% if split_data.protocol_config.active_technical_director %}
+                    • Direção Técnica: <strong>{{ split_data.protocol_config.active_technical_director.full_name }}</strong> (Cédula IPDJ n.º {{ split_data.protocol_config.active_technical_director.ipdj_license_number|default:'97575' }})
+                    {% endif %}
+                </small>
             </div>
             <div class="text-end">
                 <span class="badge bg-dark fs-6 mb-1 text-uppercase">Declaração de Fecho de Contas</span>
@@ -233,12 +238,24 @@
                 <div class="col-6">
                     <div style="border-bottom: 1px solid #000; width: 80%; margin: 40px auto 10px auto;"></div>
                     <div class="fw-bold text-dark">Pela Associação Cultural e Recreativa (ACR)</div>
-                    <small class="text-muted d-block">Direção Executiva / Tesouraria</small>
+                    <div class="text-dark fw-semibold">
+                        {{ split_data.protocol_config.acr_representative_name|default:"Direção Executiva / Tesouraria" }}
+                    </div>
+                    <small class="text-muted d-block">
+                        {{ split_data.protocol_config.acr_representative_role|default:"Presidente da Direção" }}
+                    </small>
+                    <small class="text-secondary d-block">{{ split_data.protocol_config.acr_official_name|default:"ACR" }}</small>
                 </div>
                 <div class="col-6">
                     <div style="border-bottom: 1px solid #000; width: 80%; margin: 40px auto 10px auto;"></div>
                     <div class="fw-bold text-dark">Pelo Ginásio Proform SC</div>
-                    <small class="text-muted d-block">Gerência / Administração</small>
+                    <div class="text-dark fw-semibold">
+                        {{ split_data.protocol_config.proform_representative_name|default:"Gerência / Administração" }}
+                    </div>
+                    <small class="text-muted d-block">
+                        {{ split_data.protocol_config.proform_representative_role|default:"Diretor Técnico" }}
+                    </small>
+                    <small class="text-secondary d-block">{{ split_data.protocol_config.proform_official_name|default:"Proform SC" }}</small>
                 </div>
             </div>
         </div>

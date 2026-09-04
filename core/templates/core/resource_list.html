@@ -37,14 +37,25 @@
                     </div>
                     <div class="flex-grow-1">
                         <h5 class="card-title mb-1">{{ res.name }}</h5>
-                        <span class="badge bg-{{ res.is_available|yesno:'success,secondary' }}">
-                            {{ res.is_available|yesno:'Disponível,Indisponível' }}
-                        </span>
+                        <div class="d-flex flex-wrap gap-1">
+                            <span class="badge bg-{{ res.is_available|yesno:'success,secondary' }}">
+                                {{ res.is_available|yesno:'Disponível,Indisponível' }}
+                            </span>
+                            {% if res.facility_type == 'municipal_cession' %}
+                                <span class="badge bg-info text-dark" title="Cedência Municipal"><i class="bi bi-bank me-1"></i>Cedência Mun.</span>
+                            {% elif res.facility_type == 'rented' %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-key me-1"></i>Arrendado</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
+                {% if res.address %}
+                <small class="text-muted d-block mb-2"><i class="bi bi-geo-alt me-1"></i>{{ res.address }}</small>
+                {% endif %}
+
                 {% if res.description %}
-                <p class="card-text small text-muted">{{ res.description|truncatechars:120 }}</p>
+                <p class="card-text small text-muted mb-2">{{ res.description|truncatechars:120 }}</p>
                 {% endif %}
 
                 <div class="row text-center">

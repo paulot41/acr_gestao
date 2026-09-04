@@ -35,6 +35,15 @@
                     <span class="badge bg-dark">
                         {{ client.get_entity_affiliation_display }}
                     </span>
+                    {% if client.member_category == 'socio' %}
+                    <span class="badge bg-primary" title="Sócio Oficial da ACR">
+                        <i class="fas fa-id-badge me-1"></i>Sócio ACR
+                    </span>
+                    {% else %}
+                    <span class="badge bg-secondary" title="Praticante Não Sócio">
+                        <i class="fas fa-user me-1"></i>Não Sócio
+                    </span>
+                    {% endif %}
                     <span class="badge {{ insurance_status.badge }}">
                         <i class="fas fa-shield-alt me-1"></i>Seguro: {{ insurance_status.label }}
                     </span>
@@ -148,9 +157,13 @@
                         <small class="text-muted d-block">Morada</small>
                         <span class="fw-semibold">{{ client.address|default:'-' }}</span>
                     </div>
-                    <div class="col-12">
+                    <div class="col-sm-6">
                         <small class="text-muted d-block">Contacto de Emergência</small>
                         <span class="fw-semibold text-danger">{{ client.emergency_contact|default:'-' }}</span>
+                    </div>
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Grau de Parentesco</small>
+                        <span class="fw-semibold">{{ client.emergency_relationship|default:'Não especificado' }}</span>
                     </div>
                 </div>
 
@@ -161,6 +174,49 @@
                     <p class="mb-0 text-muted">{{ client.notes }}</p>
                 </div>
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Consentimentos Legais e Regulamentares -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-file-contract me-2 text-primary"></i>Consentimentos & Regulamento Oficial
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light text-center">
+                            <small class="text-muted d-block mb-1">Proteção de Dados (RGPD)</small>
+                            {% if client.consent_rgpd %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Autorizado</span>
+                            {% else %}
+                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Pendente</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light text-center">
+                            <small class="text-muted d-block mb-1">Direitos de Imagem</small>
+                            {% if client.image_consent %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Autorizado</span>
+                            {% else %}
+                                <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>Não Autorizado</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light text-center">
+                            <small class="text-muted d-block mb-1">Regulamento Interno</small>
+                            {% if client.regulation_accepted %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Aceite</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i>Não Aceite</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

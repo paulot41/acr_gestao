@@ -1,0 +1,529 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Parametrização do Protocolo e Entidades - ACR & Proform SC{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3 no-print">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:protocol_supervision' %}">Supervisão ACR</a></li>
+        <li class="breadcrumb-item active">Definições e Parametrização</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <!-- Cabeçalho Principal -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <h2 class="fw-bold mb-0 text-dark">
+                    <i class="fas fa-sliders-h text-primary me-2"></i>Parametrização Geral do Protocolo
+                </h2>
+                <span class="badge bg-primary fs-6">100% Configurável</span>
+            </div>
+            <p class="text-muted mb-0 mt-1">
+                Gestão dinâmica de dados institucionais, seguradora e mediador, espaços/pavilhões, direção técnica e projetos IPDJ.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'core:protocol_supervision' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Supervisão ACR
+            </a>
+            <button type="submit" form="settingsForm" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i>Guardar Alterações
+            </button>
+        </div>
+    </div>
+
+    <!-- Mensagens de Alerta Django -->
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Formulário Principal -->
+    <form method="post" id="settingsForm">
+        {% csrf_token %}
+
+        <!-- Navegação por Separadores (Tabs) -->
+        <ul class="nav nav-tabs nav-fill mb-4 bg-white p-2 rounded shadow-sm" id="settingsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-semibold" id="tab-institutional-btn" data-bs-toggle="tab" data-bs-target="#tab-institutional" type="button" role="tab">
+                    <i class="fas fa-landmark me-2 text-primary"></i>Entidades & Representantes
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-insurance-btn" data-bs-toggle="tab" data-bs-target="#tab-insurance" type="button" role="tab">
+                    <i class="fas fa-shield-alt me-2 text-success"></i>Seguradora & Mediador
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-ipdj-btn" data-bs-toggle="tab" data-bs-target="#tab-ipdj" type="button" role="tab">
+                    <i class="fas fa-id-card-alt me-2 text-info"></i>Direção Técnica & IPDJ
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-resources-btn" data-bs-toggle="tab" data-bs-target="#tab-resources" type="button" role="tab">
+                    <i class="fas fa-building me-2 text-warning"></i>Espaços & Pavilhões
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-finance-btn" data-bs-toggle="tab" data-bs-target="#tab-finance" type="button" role="tab">
+                    <i class="fas fa-euro-sign me-2 text-purple" style="color: #6f42c1;"></i>Regras Financeiras
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="settingsTabsContent">
+            <!-- TAB 1: Entidades & Representantes -->
+            <div class="tab-pane fade show active" id="tab-institutional" role="tabpanel">
+                <div class="row g-4">
+                    <!-- ACR -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                                <span class="badge bg-primary">ACR</span>
+                                <h5 class="fw-bold mb-0 text-dark">Associação Cultural e Recreativa</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Nome Oficial da Associação:</label>
+                                    {{ form.acr_official_name }}
+                                </div>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">NIPC / NIF:</label>
+                                        {{ form.acr_nipc }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">Mensalidade Base ACR (€):</label>
+                                        <input type="number" step="0.01" name="gym_monthly_fee" class="form-control" value="{{ organization.gym_monthly_fee }}">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Sede / Morada Oficial:</label>
+                                    {{ form.acr_address }}
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-7">
+                                        <label class="form-label fw-bold small">Representante Legal (Assinante):</label>
+                                        {{ form.acr_representative_name }}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-bold small">Cargo:</label>
+                                        {{ form.acr_representative_role }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PROFORM SC -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                                <span class="badge bg-warning text-dark">PROFORM SC</span>
+                                <h5 class="fw-bold mb-0 text-dark">Ginásio e Parceiro Técnico</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Designação Oficial do Ginásio:</label>
+                                    {{ form.proform_official_name }}
+                                </div>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">NIPC / NIF:</label>
+                                        {{ form.proform_nipc }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">Mensalidade Pilates/Proform (€):</label>
+                                        <input type="number" step="0.01" name="wellness_monthly_fee" class="form-control" value="{{ organization.wellness_monthly_fee }}">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Sede / Morada do Estabelecimento:</label>
+                                    {{ form.proform_address }}
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-7">
+                                        <label class="form-label fw-bold small">Representante / Gerente:</label>
+                                        {{ form.proform_representative_name }}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-bold small">Cargo:</label>
+                                        {{ form.proform_representative_role }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Seguradora & Mediador -->
+            <div class="tab-pane fade" id="tab-insurance" role="tabpanel">
+                <div class="row g-4">
+                    <!-- Apólice de Seguro -->
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="fw-bold mb-0 text-dark">
+                                    <i class="fas fa-shield-alt text-success me-2"></i>Contrato de Seguro Desportivo Obrigatório
+                                </h5>
+                                <small class="text-muted">Editável a qualquer momento se a associação mudar de seguradora ou de apólice.</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">Companhia Seguradora:</label>
+                                        {{ form.insurance_company }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">N.º da Apólice:</label>
+                                        {{ form.insurance_policy_number }}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Produto / Opção Contratada:</label>
+                                    {{ form.insurance_product_name }}
+                                </div>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">Início da Vigência:</label>
+                                        {{ form.insurance_policy_start }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small">Data de Renovação Anual:</label>
+                                        {{ form.insurance_policy_expiry }}
+                                    </div>
+                                </div>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small">Prémio Anual Total (€):</label>
+                                        {{ form.insurance_annual_premium }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small">Pessoas Seguras Base:</label>
+                                        {{ form.insurance_base_insured_count }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small">Prazo Sinistro (Dias):</label>
+                                        {{ form.insurance_claim_deadline_days }}
+                                    </div>
+                                </div>
+
+                                <h6 class="fw-bold text-dark mt-4 mb-2">Capitais Segurados por Pessoa:</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Morte / Invalidez Permanente (€):</label>
+                                        {{ form.capital_death_disability }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Despesas de Tratamento (€):</label>
+                                        {{ form.capital_treatment }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Franquia de Tratamento (€):</label>
+                                        {{ form.treatment_deductible }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Despesas de Funeral (€):</label>
+                                        {{ form.capital_funeral }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mediador de Seguros -->
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="fw-bold mb-0 text-dark">
+                                    <i class="fas fa-user-tie text-secondary me-2"></i>Mediador / Ponto de Venda
+                                </h5>
+                                <small class="text-muted">Agente responsável pela gestão de apólices e sinistros.</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Nome do Mediador / Agência:</label>
+                                    {{ form.broker_name }}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">N.º de Registo na ASF:</label>
+                                    {{ form.broker_asf_number }}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Telefone do Mediador:</label>
+                                    {{ form.broker_phone }}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Morada do Mediador:</label>
+                                    {{ form.broker_address }}
+                                </div>
+                                <div class="alert alert-light border small text-muted mt-4">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Estes dados são automaticamente impressos nos comprovativos, anexados aos e-mails de boas-vindas e incluídos nas minutas de sinistros.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Direção Técnica & IPDJ -->
+            <div class="tab-pane fade" id="tab-ipdj" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="fw-bold mb-0 text-dark">
+                                    <i class="fas fa-id-card-alt text-info me-2"></i>Direção Técnica Ativa & Candidaturas IPDJ
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Diretor Técnico Designado:</label>
+                                    {{ form.active_technical_director }}
+                                    <small class="text-muted d-block mt-1">
+                                        Pode alternar facilmente o técnico responsável ou nomear outro instrutor para novos projetos.
+                                    </small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Projeto / Candidatura IPDJ Vigente:</label>
+                                    {{ form.active_ipdj_project }}
+                                    <small class="text-muted d-block mt-1">
+                                        Ex: "Protocolo ACR-Proform", "Candidatura IPDJ Desporto para Todos", etc.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0 text-dark">
+                                    <i class="fas fa-chalkboard-teacher text-primary me-2"></i>Instrutores com Cédula IPDJ
+                                </h5>
+                                <a href="{% url 'core:instructor_add' %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-plus me-1"></i>Novo Técnico
+                                </a>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Técnico</th>
+                                            <th>Cédula IPDJ</th>
+                                            <th>Função</th>
+                                            <th class="text-end">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for inst in instructors %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ inst.full_name }}</strong>
+                                                {% if inst == protocol_config.active_technical_director %}
+                                                <span class="badge bg-success ms-1">Diretor Ativo</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if inst.ipdj_license_number %}
+                                                <span class="badge bg-light text-dark border">{{ inst.ipdj_license_number }}</span>
+                                                {% else %}
+                                                <span class="text-muted small">Sem cédula</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {% if inst.is_technical_director %}Diretor Técnico{% else %}Instrutor{% endif %}
+                                                </small>
+                                            </td>
+                                            <td class="text-end">
+                                                <a href="{% url 'core:instructor_edit' inst.pk %}" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center py-3 text-muted">Sem instrutores registados.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: Espaços & Pavilhões -->
+            <div class="tab-pane fade" id="tab-resources" role="tabpanel">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">
+                                <i class="fas fa-building text-warning me-2"></i>Espaços e Instalações Desportivas
+                            </h5>
+                            <small class="text-muted">Regime de cessão municipal, aluguer ou instalações próprias para as atividades.</small>
+                        </div>
+                        <a href="{% url 'core:resource_add' %}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Adicionar Novo Espaço
+                        </a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nome do Espaço</th>
+                                    <th>Regime Jurídico</th>
+                                    <th>Entidade Cedente / Proprietário</th>
+                                    <th>Localização</th>
+                                    <th class="text-center">Capacidade</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for res in resources %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ res.name }}</div>
+                                        <small class="text-muted">{{ res.get_entity_type_display }}</small>
+                                    </td>
+                                    <td>
+                                        {% if res.facility_type == 'municipal_cession' %}
+                                        <span class="badge bg-success-subtle text-success border border-success">
+                                            <i class="fas fa-handshake me-1"></i>Cedência Municipal
+                                        </span>
+                                        {% elif res.facility_type == 'rented' %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning">
+                                            <i class="fas fa-file-contract me-1"></i>Arrendado
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-primary-subtle text-primary border border-primary">
+                                            <i class="fas fa-home me-1"></i>Próprio
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ res.cession_entity|default:"-" }}</td>
+                                    <td>{{ res.address|default:"Celorico de Basto" }}</td>
+                                    <td class="text-center fw-semibold">{{ res.capacity }} atletas</td>
+                                    <td class="text-end">
+                                        <a href="{% url 'core:resource_edit' res.pk %}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-edit me-1"></i>Editar
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        Nenhum espaço configurado até ao momento.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: Regras Financeiras -->
+            <div class="tab-pane fade" id="tab-finance" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="fw-bold mb-0 text-dark">
+                                    <i class="fas fa-calculator text-primary me-2"></i>Fórmulas de Repartição do Protocolo
+                                </h5>
+                                <small class="text-muted">Parâmetros financeiros que alimentam o motor de cálculo e os fechos periódicos.</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold small">
+                                        Quota Administrativa da ACR por Praticante Ativo (€/mês):
+                                    </label>
+                                    <div class="input-group" style="max-width: 250px;">
+                                        <span class="input-group-text">€</span>
+                                        {{ form.acr_admin_fee_per_athlete }}
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        Valor definido nos Artigos 5.º h) e 9.º 3 do protocolo (padrão: 1,00 €/mês).
+                                    </small>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold small">
+                                        Modo de Comparticipação do Seguro Desportivo pelo Proform:
+                                    </label>
+                                    {{ form.insurance_split_mode }}
+                                    <small class="text-muted d-block mt-1">
+                                        Define se o prémio anual ({{ protocol_config.insurance_annual_premium }} €) é imputado de forma integral ou fracionado a 1/12 nos fechos mensais (~{{ protocol_config.insurance_annual_premium|floatformat:2 }} € / 12 = ~30,24 €/mês).
+                                    </small>
+                                </div>
+
+                                <div class="p-3 bg-light rounded border">
+                                    <h6 class="fw-bold text-dark mb-2">Cláusula Contratual Aplicada:</h6>
+                                    <p class="small text-muted mb-0">
+                                        <em>"O PROFORM transfere para a ACR a quantia referente às despesas administrativas (1€/mês por praticante inscrito) e a quantia necessária à cobertura integral do seguro desportivo através de doação direta."</em> (Artigos 5.º, 9.º e 10.º).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm bg-light">
+                            <div class="card-body">
+                                <h6 class="fw-bold text-dark mb-3">Resumo da Configuração Ativa</h6>
+                                <ul class="list-group list-group-flush small">
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between">
+                                        <span class="text-muted">Seguradora Atual:</span>
+                                        <strong>{{ protocol_config.insurance_company }}</strong>
+                                    </li>
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between">
+                                        <span class="text-muted">Apólice N.º:</span>
+                                        <strong>{{ protocol_config.insurance_policy_number }}</strong>
+                                    </li>
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between">
+                                        <span class="text-muted">Mediador:</span>
+                                        <strong>{{ protocol_config.broker_name }}</strong>
+                                    </li>
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between">
+                                        <span class="text-muted">Diretor Técnico:</span>
+                                        <strong>{{ protocol_config.active_technical_director.full_name|default:"Não definido" }}</strong>
+                                    </li>
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between">
+                                        <span class="text-muted">Cédula IPDJ:</span>
+                                        <strong>{{ protocol_config.active_technical_director.ipdj_license_number|default:"-" }}</strong>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra Inferior de Gravação -->
+        <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
+            <a href="{% url 'core:protocol_supervision' %}" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary px-4">
+                <i class="fas fa-save me-1"></i>Guardar Todas as Alterações
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

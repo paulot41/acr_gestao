@@ -26,9 +26,13 @@ def send_athlete_welcome_email(person, request=None) -> bool:
         return False
 
     subject = f"Bem-vindo(a) à ACR & Proform SC - Inscrição e Apólice de Seguro Desportivo"
+    config = getattr(person.organization, 'get_protocol_config', None)
+    protocol_config = config() if config else None
+
     context = {
         'person': person,
         'organization': person.organization,
+        'protocol_config': protocol_config,
         'today': timezone.now().date(),
     }
 

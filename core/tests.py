@@ -15,7 +15,7 @@ from .models import (
     Organization, Person, Event, Resource, Booking,
     Instructor, Modality, ClassGroup, PaymentPlan,
     ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog,
-    InstructorCommission, ProtocolPeriodSettlement
+    InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration
 )
 from .middleware import OrganizationMiddleware
 from .context_processors import organization_context
@@ -1100,5 +1100,187 @@ class ProtocolFinanceTestCase(TestCase):
         comm.refresh_from_db()
         self.assertFalse(comm.is_paid)
         self.assertIsNone(comm.payment_date)
+
+
+class DynamicProtocolConfigurationTestCase(TestCase):
+    """
+    Testes de cobertura abrangentes para a parametrização 100% dinâmica do protocolo:
+    - Seguradoras, mediadores, contactos e apólices dinâmicas
+    - Diretores técnicos e projetos IPDJ alternáveis
+    - Espaços e regimes de cedência municipal vs arrendamento
+    - Fichas de atletas com sócio vs não sócio, parentesco de emergência e consentimentos legais
+    - Impacto dinâmico no cálculo das quotas e apuramentos mensais do protocolo
+    """
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="acr.local",
+            org_type=Organization.Type.BOTH
+        )
+        self.user = User.objects.create_superuser(
+            username="admin_dynamic",
+            email="admin_dynamic@test.local",
+            password="testpassword123"
+        )
+        self.client.login(username="admin_dynamic", password="testpassword123")
+
+        self.director_daniel = Instructor.objects.create(
+            organization=self.org,
+            first_name="Daniel",
+            last_name="Coelho",
+            email="daniel.coelho@proform.pt",
+            is_technical_director=True,
+            ipdj_license_number="97575",
+            ipdj_project_name="Protocolo Artes Marciais ACR-Proform"
+        )
+
+        self.director_novo = Instructor.objects.create(
+            organization=self.org,
+            first_name="Rui",
+            last_name="Menezes",
+            email="rui.menezes@ipdj.pt",
+            is_technical_director=False,
+            ipdj_license_number="105820",
+            ipdj_project_name="Novo Projeto IPDJ 2026"
+        )
+
+    def test_default_config_creation(self):
+        """Verifica criação automática de configuração com dados padrão ao invocar get_protocol_config."""
+        config = self.org.get_protocol_config()
+        self.assertIsNotNone(config)
+        self.assertEqual(config.insurance_company, "Generali Seguros, S.A.")
+        self.assertEqual(config.insurance_policy_number, "0010189147")
+        self.assertEqual(config.acr_admin_fee_per_athlete, Decimal("1.00"))
+        self.assertEqual(config.insurance_annual_premium, Decimal("362.82"))
+
+    def test_settings_view_post_updates_configuration(self):
+        """Valida que o POST na view de definições atualiza dinamicamente seguradora, mediador e projeto IPDJ."""
+        config = self.org.get_protocol_config()
+        data = {
+            # Tab 1: Entidades
+            "acr_official_name": "ACR de Basto",
+            "acr_nipc": "510695744",
+            "acr_address": "Lugar da Igreja, Basto",
+            "acr_representative_name": "Paulo Sérgio",
+            "acr_representative_role": "Presidente",
+            "proform_official_name": "Proform SC",
+            "proform_nipc": "210263601",
+            "proform_address": "Rua Senhora da Conceição 24",
+            "proform_representative_name": "Daniel Coelho",
+            "proform_representative_role": "Diretor Técnico",
+            # Tab 2: Seguradora & Mediador
+            "insurance_company": "Fidelidade - Companhia de Seguros, S.A.",
+            "insurance_policy_number": "9988776655",
+            "insurance_product_name": "Seguro Desportivo Fidelidade",
+            "insurance_annual_premium": "420.00",
+            "insurance_base_insured_count": 25,
+            "insurance_claim_deadline_days": 3,
+            "capital_death_disability": "35000.00",
+            "capital_treatment": "6000.00",
+            "treatment_deductible": "50.00",
+            "capital_funeral": "3500.00",
+            "broker_name": "Novo Mediador Seguros Lda",
+            "broker_asf_number": "987654321",
+            "broker_phone": "+351 919 999 888",
+            "broker_address": "Celorico de Basto",
+            # Tab 3: Direção Técnica & IPDJ
+            "active_technical_director": self.director_novo.pk,
+            "active_ipdj_project": "Candidatura IPDJ - Artes Marciais Inclusivas 2026",
+            # Tab 5: Regras Financeiras
+            "acr_admin_fee_per_athlete": "2.00",
+            "insurance_split_mode": ProtocolConfiguration.InsuranceSplitMode.ANNUAL_DONATION,
+        }
+
+        response = self.client.post("/settings/", data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        config.refresh_from_db()
+        self.assertEqual(config.insurance_company, "Fidelidade - Companhia de Seguros, S.A.")
+        self.assertEqual(config.insurance_policy_number, "9988776655")
+        self.assertEqual(config.insurance_annual_premium, Decimal("420.00"))
+        self.assertEqual(config.broker_name, "Novo Mediador Seguros Lda")
+        self.assertEqual(config.active_technical_director, self.director_novo)
+        self.assertEqual(config.active_ipdj_project, "Candidatura IPDJ - Artes Marciais Inclusivas 2026")
+        self.assertEqual(config.acr_admin_fee_per_athlete, Decimal("2.00"))
+
+    def test_athlete_creation_with_member_category_and_consents(self):
+        """Valida que atletas podem ser criados com categoria associativa (Sócio vs Não Sócio) e consentimentos legais."""
+        person = Person.objects.create(
+            organization=self.org,
+            first_name="Diogo",
+            last_name="Fernandes",
+            email="diogo.fernandes@example.local",
+            member_category=Person.MemberCategory.SOCIO,
+            emergency_contact="Maria Fernandes 912345678",
+            emergency_relationship="Mãe",
+            consent_rgpd=True,
+            image_consent=True,
+            regulation_accepted=True,
+            status=Person.Status.ACTIVE
+        )
+        self.assertEqual(person.member_category, Person.MemberCategory.SOCIO)
+        self.assertEqual(person.emergency_relationship, "Mãe")
+        self.assertTrue(person.consent_rgpd)
+        self.assertTrue(person.image_consent)
+        self.assertTrue(person.regulation_accepted)
+
+        # Verificar renderização na ficha de detalhe
+        res = self.client.get(f"/clients/{person.pk}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Sócio ACR")
+        self.assertContains(res, "Maria Fernandes 912345678")
+        self.assertContains(res, "Mãe")
+        self.assertContains(res, "Autorizado")
+        self.assertContains(res, "Aceite")
+
+    def test_resource_facility_type_and_cession(self):
+        """Valida o registo de espaços com regime de cedência municipal ou arrendamento."""
+        pavilhao = Resource.objects.create(
+            organization=self.org,
+            name="Pavilhão da Antiga C+S",
+            facility_type=Resource.FacilityType.MUNICIPAL_CESSION,
+            cession_entity="Município de Celorico de Basto",
+            address="C+S Celorico de Basto",
+            capacity=30
+        )
+        self.assertEqual(pavilhao.facility_type, Resource.FacilityType.MUNICIPAL_CESSION)
+        self.assertEqual(pavilhao.cession_entity, "Município de Celorico de Basto")
+
+        res_list = self.client.get("/resources/")
+        self.assertEqual(res_list.status_code, 200)
+        self.assertContains(res_list, "Pavilhão da Antiga C+S")
+        self.assertContains(res_list, "Cedência Mun.")
+
+    def test_calculate_period_protocol_split_with_dynamic_rules(self):
+        """Valida que o apuramento financeiro reflete dinamicamente a parametrização atual."""
+        from core.services.protocol_finance import calculate_period_protocol_split
+
+        config = self.org.get_protocol_config()
+        config.acr_admin_fee_per_athlete = Decimal("2.50")
+        config.insurance_annual_premium = Decimal("480.00")
+        config.save()
+
+        # Criar 10 atletas ativos
+        for i in range(10):
+            Person.objects.create(
+                organization=self.org,
+                first_name=f"Atleta{i}",
+                last_name="Teste",
+                email=f"atleta{i}@test.local",
+                status=Person.Status.ACTIVE
+            )
+
+        start = timezone.now().date()
+        end = start + timedelta(days=30)
+
+        split = calculate_period_protocol_split(self.org, start, end)
+
+        # 10 atletas * 2.50€ = 25.00€
+        self.assertEqual(split["active_athletes_count"], 10)
+        self.assertEqual(split["contractual_acr_admin"], Decimal("25.00"))
+        # 480.00€ / 12 = 40.00€
+        self.assertEqual(split["monthly_insurance_share"], Decimal("40.00"))
+        self.assertEqual(split["protocol_config"].acr_admin_fee_per_athlete, Decimal("2.50"))
+
 
 

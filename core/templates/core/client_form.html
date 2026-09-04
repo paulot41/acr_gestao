@@ -172,6 +172,21 @@
                         </div>
 
                         <div class="col-md-6 mb-3">
+                            <label for="{{ form.emergency_relationship.id_for_label }}" class="form-label">
+                                Grau de Parentesco
+                            </label>
+                            {{ form.emergency_relationship }}
+                            <small class="form-text text-muted">
+                                Ex: Pai, Mãe, Cônjuge, Irmão
+                            </small>
+                            {% if form.emergency_relationship.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.emergency_relationship.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
                             <label for="{{ form.entity_affiliation.id_for_label }}" class="form-label">
                                 Entidade <span class="text-danger">*</span>
                             </label>
@@ -182,6 +197,21 @@
                             {% if form.entity_affiliation.errors %}
                                 <div class="invalid-feedback d-block">
                                     {{ form.entity_affiliation.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.member_category.id_for_label }}" class="form-label">
+                                Categoria Associativa (ACR) <span class="text-danger">*</span>
+                            </label>
+                            {{ form.member_category }}
+                            <small class="form-text text-muted">
+                                Sócio ACR ou Não Sócio
+                            </small>
+                            {% if form.member_category.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.member_category.errors.0 }}
                                 </div>
                             {% endif %}
                         </div>
@@ -298,6 +328,60 @@
                                 <div class="invalid-feedback d-block">
                                     {{ form.notes.errors.0 }}
                                 </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Consentimentos e Regulamento Oficial -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-dark mb-3">
+                                <i class="bi bi-file-earmark-check me-2"></i>Consentimentos e Regulamento Oficial
+                            </h6>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch">
+                                {{ form.consent_rgpd }}
+                                <label class="form-check-label fw-semibold" for="{{ form.consent_rgpd.id_for_label }}">
+                                    Consentimento de Proteção de Dados (RGPD)
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Autorizo o tratamento dos dados pessoais para efeitos de gestão administrativa e desportiva da ACR e do Proform SC.
+                                </small>
+                            </div>
+                            {% if form.consent_rgpd.errors %}
+                                <div class="invalid-feedback d-block">{{ form.consent_rgpd.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch">
+                                {{ form.image_consent }}
+                                <label class="form-check-label fw-semibold" for="{{ form.image_consent.id_for_label }}">
+                                    Autorização de Captação e Divulgação de Imagem
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Autorizo a captação e divulgação de imagem/vídeo para efeitos de comunicação institucional e redes sociais da ACR / Proform SC.
+                                </small>
+                            </div>
+                            {% if form.image_consent.errors %}
+                                <div class="invalid-feedback d-block">{{ form.image_consent.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch">
+                                {{ form.regulation_accepted }}
+                                <label class="form-check-label fw-semibold" for="{{ form.regulation_accepted.id_for_label }}">
+                                    Declaração de Aceitação do Regulamento Interno
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Declaro ter tomado conhecimento do regulamento interno do espaço e das modalidades e aceito as suas condições.
+                                </small>
+                            </div>
+                            {% if form.regulation_accepted.errors %}
+                                <div class="invalid-feedback d-block">{{ form.regulation_accepted.errors.0 }}</div>
                             {% endif %}
                         </div>
                     </div>

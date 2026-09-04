@@ -161,6 +161,16 @@
                         <td class="label">Afiliação Protocolar:</td>
                         <td class="value">{{ person.get_entity_affiliation_display }}</td>
                     </tr>
+                    <tr>
+                        <td class="label">Categoria Associativa:</td>
+                        <td class="value">{{ person.get_member_category_display }}</td>
+                    </tr>
+                    {% if person.emergency_relationship %}
+                    <tr>
+                        <td class="label">Parentesco Emergência:</td>
+                        <td class="value">{{ person.emergency_relationship }} ({{ person.emergency_contact|default:'-' }})</td>
+                    </tr>
+                    {% endif %}
                     {% if person.date_of_birth %}
                     <tr>
                         <td class="label">Data de Nascimento:</td>
@@ -199,18 +209,34 @@
                     Apólice de Seguro Desportivo & Aptidão Médica
                 </div>
                 <p style="font-size: 13px; margin: 0 0 10px 0; color: #2b6e40;">
-                    Em conformidade com a legislação desportiva e o protocolo institucional, a prática de atividades desportivas está salvaguardada por seguro obrigatório.
+                    Em conformidade com a legislação desportiva e o protocolo institucional, a prática de atividades desportivas amadoras está salvaguardada por seguro obrigatório.
                 </p>
                 <table class="details-table">
                     <tr>
+                        <td class="label">Companhia Seguradora:</td>
+                        <td class="value">{{ protocol_config.insurance_company|default:'Generali Seguros, S.A.' }}</td>
+                    </tr>
+                    <tr>
                         <td class="label">N.º da Apólice:</td>
-                        <td class="value">{{ person.insurance_policy|default:'Apólice Coletiva ACR / Proform SC' }}</td>
+                        <td class="value"><strong>{{ person.insurance_policy|default:protocol_config.insurance_policy_number|default:'0010189147' }}</strong></td>
+                    </tr>
+                    {% if protocol_config.broker_name %}
+                    <tr>
+                        <td class="label">Mediador Oficial:</td>
+                        <td class="value">{{ protocol_config.broker_name }} (Tel: {{ protocol_config.broker_phone }})</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="label">Capitais de Cobertura:</td>
+                        <td class="value">Morte/Invalidez: €{{ protocol_config.capital_death_disability|floatformat:0|default:'33.500' }} | Tratamento: €{{ protocol_config.capital_treatment|floatformat:0|default:'5.500' }} (Franquia: €{{ protocol_config.treatment_deductible|floatformat:0|default:'75' }})</td>
                     </tr>
                     <tr>
                         <td class="label">Validade do Seguro:</td>
                         <td class="value">
                             {% if person.insurance_expiry %}
                                 {{ person.insurance_expiry|date:'d/m/Y' }} ({{ person.insurance_status.label }})
+                            {% elif protocol_config.insurance_policy_expiry %}
+                                Válida até {{ protocol_config.insurance_policy_expiry|date:'d/m/Y' }} (Apólice Coletiva ACR)
                             {% else %}
                                 Em regularização na secretaria
                             {% endif %}

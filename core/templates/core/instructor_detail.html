@@ -34,6 +34,11 @@
                     <span class="entity-badge {% if instructor.entity_affiliation == 'acr_only' %}acr{% elif instructor.entity_affiliation == 'proform_only' %}proform{% else %}both{% endif %}">
                         {% if instructor.entity_affiliation == 'acr_only' %}ACR{% elif instructor.entity_affiliation == 'proform_only' %}Proform{% else %}ACR+Proform{% endif %}
                     </span>
+                    {% if instructor.is_technical_director %}
+                        <span class="badge bg-primary text-white shadow-sm">
+                            <i class="bi bi-award me-1"></i>Diretor Técnico
+                        </span>
+                    {% endif %}
                     {% if instructor.is_active %}
                         <span class="badge bg-success">Ativo</span>
                     {% else %}
@@ -86,8 +91,8 @@
     <div class="col-md-3">
         <div class="card modern-card border-left-warning">
             <div class="card-body text-center">
-                <h4 class="text-warning mb-1">{{ instructor.commission_percentage|floatformat:0 }}%</h4>
-                <small class="text-muted">Comissão</small>
+                <h4 class="text-warning mb-1">{{ instructor.acr_commission_rate|default:'60'|floatformat:0 }}% / {{ instructor.proform_commission_rate|default:'70'|floatformat:0 }}%</h4>
+                <small class="text-muted">Comissão (ACR / Proform)</small>
             </div>
         </div>
     </div>
@@ -166,8 +171,13 @@
                 </div>
 
                 <div class="row mb-3">
-                    <div class="col-sm-6"><strong>Comissão:</strong></div>
-                    <div class="col-sm-6">{{ instructor.commission_percentage|floatformat:0 }}%</div>
+                    <div class="col-sm-6"><strong>Comissão Aulas ACR:</strong></div>
+                    <div class="col-sm-6">{{ instructor.acr_commission_rate|default:'60.00' }}%</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-6"><strong>Comissão Aulas Proform:</strong></div>
+                    <div class="col-sm-6">{{ instructor.proform_commission_rate|default:'70.00' }}%</div>
                 </div>
 
                 <div class="row mb-3">
@@ -179,6 +189,13 @@
                     </div>
                 </div>
 
+                {% if instructor.specialties %}
+                <div class="row mb-3">
+                    <div class="col-sm-6"><strong>Especialidades:</strong></div>
+                    <div class="col-sm-8">{{ instructor.specialties }}</div>
+                </div>
+                {% endif %}
+
                 <div class="row mb-3">
                     <div class="col-sm-6"><strong>Estado:</strong></div>
                     <div class="col-sm-6">
@@ -187,6 +204,49 @@
                         {% else %}
                             <span class="badge bg-secondary">Inativo</span>
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direção Técnica & IPDJ -->
+    <div class="col-12 mb-4">
+        <div class="card modern-card border-start border-4 border-primary">
+            <div class="card-header bg-white">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-award me-2"></i>Direção Técnica & Habilitação IPDJ
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Diretor Técnico Oficial</small>
+                        <span class="fw-bold">
+                            {% if instructor.is_technical_director %}
+                                <span class="badge bg-primary"><i class="fas fa-check me-1"></i>Sim (Designado)</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Não</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Cédula de Treinador IPDJ</small>
+                        <span class="fw-bold">{{ instructor.ipdj_license_number|default:'Não registada' }}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Validade da Cédula</small>
+                        <span class="fw-semibold">
+                            {% if instructor.ipdj_license_expiry %}
+                                {{ instructor.ipdj_license_expiry|date:"d/m/Y" }}
+                            {% else %}
+                                <span class="text-muted">Vitalícia / Sem data</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Projeto IPDJ Associado</small>
+                        <span class="fw-semibold">{{ instructor.ipdj_project_name|default:'Protocolo Desportos de Combate' }}</span>
                     </div>
                 </div>
             </div>

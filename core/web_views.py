@@ -18,12 +18,12 @@ from django.views.decorators.http import require_http_methods
 from .models import (
     Person, Instructor, Modality, Event, Resource, Payment, Booking,
     PaymentPlan, ClientSubscription, CreditHistory, GoogleDriveSyncLog,
-    InstructorCommission, ProtocolPeriodSettlement
+    InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration
 )
 from notifications.models import NotificationLog
 from .forms import (
     PersonForm, InstructorForm, ModalityForm, EventForm, BookingForm, ResourceForm,
-    PaymentRegistrationForm, ClientSubscriptionForm
+    PaymentRegistrationForm, ClientSubscriptionForm, ProtocolConfigurationForm
 )
 from .services.communications import send_athlete_welcome_email, get_whatsapp_url
 from .services.protocol_finance import calculate_period_protocol_split, create_or_update_period_settlement
@@ -932,22 +932,51 @@ def booking_add(request):
 
 @role_required(["admin", "staff"])
 def organization_settings(request):
-    """Vista para configurações da organização."""
+    """
+    Painel Central de Parametrização do Protocolo ACR & Proform SC.
+    Permite editar dados institucionais, seguradora, mediador, projeto/candidatura IPDJ,
+    direção técnica, espaços/instalações e regras de transferência financeira.
+    """
     org = request.organization
+    protocol_config = org.get_protocol_config()
 
     if request.method == 'POST':
-        # Atualizar configurações básicas
-        org.gym_monthly_fee = request.POST.get('gym_monthly_fee', org.gym_monthly_fee)
-        org.wellness_monthly_fee = request.POST.get('wellness_monthly_fee', org.wellness_monthly_fee)
-        org.save()
-        messages.success(request, 'Configurações atualizadas com sucesso!')
-        return redirect('core:settings')
+        form = ProtocolConfigurationForm(request.POST, instance=protocol_config, organization=org)
+        # Atualizar também campos da organização se presentes
+        gym_fee = request.POST.get('gym_monthly_fee')
+        wellness_fee = request.POST.get('wellness_monthly_fee')
+        if gym_fee is not None:
+            try:
+                org.gym_monthly_fee = Decimal(str(gym_fee))
+            except Exception:
+                pass
+        if wellness_fee is not None:
+            try:
+                org.wellness_monthly_fee = Decimal(str(wellness_fee))
+            except Exception:
+                pass
+        org.save(update_fields=['gym_monthly_fee', 'wellness_monthly_fee'])
+
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Parametrização do Protocolo e Seguros atualizada com sucesso!')
+            return redirect('core:settings')
+        else:
+            messages.error(request, 'Existem erros no formulário de parametrização. Por favor verifique os campos.')
+    else:
+        form = ProtocolConfigurationForm(instance=protocol_config, organization=org)
+
+    resources = Resource.objects.filter(organization=org).order_by('name')
+    instructors = Instructor.objects.filter(organization=org).order_by('first_name')
 
     context = {
         'organization': org,
-        'title': 'Configurações da Organização'
+        'protocol_config': protocol_config,
+        'form': form,
+        'resources': resources,
+        'instructors': instructors,
+        'title': 'Parametrização Geral do Protocolo e Entidades',
     }
-
     return render(request, 'core/settings.html', context)
 
 

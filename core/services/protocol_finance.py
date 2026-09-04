@@ -159,6 +159,19 @@ def calculate_period_protocol_split(
             'entity_type': mod.get_entity_type_display(),
         })
 
+    # 5. Parâmetros Contratuais da Configuração Dinâmica
+    config = getattr(organization, 'get_protocol_config', None)
+    protocol_config = config() if config else None
+
+    active_athletes_count = Person.objects.filter(
+        organization=organization, status=Person.Status.ACTIVE
+    ).count()
+
+    admin_fee_rate = protocol_config.acr_admin_fee_per_athlete if protocol_config else Decimal('1.00')
+    contractual_acr_admin = (Decimal(active_athletes_count) * admin_fee_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    annual_insurance = protocol_config.insurance_annual_premium if protocol_config else Decimal('362.82')
+    monthly_insurance_share = (annual_insurance / Decimal('12.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
     return {
         'start_date': start_date,
         'end_date': end_date,
@@ -174,6 +187,10 @@ def calculate_period_protocol_split(
         'modality_breakdown': modality_breakdown,
         'total_payments_count': payments.count(),
         'total_classes_period': total_classes_period,
+        'protocol_config': protocol_config,
+        'active_athletes_count': active_athletes_count,
+        'contractual_acr_admin': contractual_acr_admin,
+        'monthly_insurance_share': monthly_insurance_share,
     }
 
 
