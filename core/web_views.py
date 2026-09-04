@@ -18,7 +18,8 @@ from django.views.decorators.http import require_http_methods
 from .models import (
     Person, Instructor, Modality, Event, Resource, Payment, Booking,
     PaymentPlan, ClientSubscription, CreditHistory, GoogleDriveSyncLog,
-    InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration
+    InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration,
+    AthleteGraduation, GoverningBody, GoverningBodyMember
 )
 from notifications.models import NotificationLog
 from .forms import (
@@ -27,6 +28,8 @@ from .forms import (
 )
 from .services.communications import send_athlete_welcome_email, get_whatsapp_url
 from .services.protocol_finance import calculate_period_protocol_split, create_or_update_period_settlement
+from .services.membership_card import get_membership_card_data
+from .services.kiosk import resolve_person, get_active_event_for_facility, process_kiosk_checkin
 
 
 
@@ -124,13 +127,16 @@ def client_list(request):
     search = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '').strip()
     entity = request.GET.get('entity', '').strip()
+    member_category = request.GET.get('member_category', '').strip()
+    fee_status = request.GET.get('membership_fee_status', '').strip()
 
     if search:
         clients = clients.filter(
             Q(first_name__icontains=search) |
             Q(last_name__icontains=search) |
             Q(email__icontains=search) |
-            Q(phone__icontains=search)
+            Q(phone__icontains=search) |
+            Q(nif__icontains=search)
         )
 
     if status_filter:
@@ -138,6 +144,12 @@ def client_list(request):
 
     if entity:
         clients = clients.filter(entity_affiliation=entity)
+
+    if member_category:
+        clients = clients.filter(member_category=member_category)
+
+    if fee_status:
+        clients = clients.filter(membership_fee_status=fee_status)
 
     # Paginação
     paginator = Paginator(clients, 25)
@@ -158,7 +170,11 @@ def client_list(request):
         'status_filter': status_filter,
         'status': status_filter,
         'entity': entity,
+        'member_category': member_category,
+        'fee_status': fee_status,
         'status_choices': Person.Status.choices,
+        'member_category_choices': Person.MemberCategory.choices,
+        'fee_status_choices': Person.MembershipFeeStatus.choices,
         'created': created,
         'created_client': created_client,
     }
@@ -175,6 +191,11 @@ def client_detail(request, pk):
     recent_bookings = client.bookings.select_related('event', 'event__modality', 'event__resource').order_by('-created_at')[:10]
     recent_payments = client.payments.order_by('-paid_date', '-created_at')[:10]
     credit_history = client.credit_history.order_by('-created_at')[:10]
+
+    # Graduações e Exames de Cinto
+    graduations = client.graduations.select_related('modality', 'examiner').order_by('-awarded_date')
+    modalities = Modality.objects.filter(organization=org, is_active=True)
+    instructors = Instructor.objects.filter(organization=org, is_active=True)
 
     # Comunicações e WhatsApp
     recent_notifications = NotificationLog.objects.filter(person=client).order_by('-sent_at', '-id')[:5]
@@ -193,6 +214,9 @@ def client_detail(request, pk):
         'insurance_status': client.insurance_status,
         'medical_status': client.medical_status,
         'is_minor': client.is_minor,
+        'graduations': graduations,
+        'modalities': modalities,
+        'instructors': instructors,
         'recent_notifications': recent_notifications,
         'whatsapp_welcome': whatsapp_welcome,
         'whatsapp_insurance': whatsapp_insurance,
@@ -538,38 +562,16 @@ def resource_edit(request, pk):
 
 
 # GANTT E EVENTOS
-@role_required(["admin", "staff"])
+@role_required(["admin", "staff", "instructor"])
 def gantt_system(request):
-    """Vista do Sistema Gantt completo para gestão de espaços."""
-    org = request.organization
-
-    # Carregar dados necessários para o Sistema Gantt
-    resources = Resource.objects.filter(organization=org).order_by('name')
-    instructors = Instructor.objects.filter(organization=org, is_active=True).order_by('first_name', 'last_name')
-    modalities = Modality.objects.filter(organization=org, is_active=True).order_by('entity_type', 'name')
-
-    # Estatísticas rápidas para o dashboard do Gantt
-    today = timezone.now().date()
-    today_events = Event.objects.filter(
-        organization=org,
-        starts_at__date=today
-    ).count()
-
-    context = {
-        'resources': resources,
-        'instructors': instructors,
-        'modalities': modalities,
-        'today_events': today_events,
-        'page_title': 'Sistema Gantt - Gestão de Espaços',
-    }
-
-    return render(request, 'core/gantt_system.html', context)
+    """Redirecionar para a vista moderna e unificada do Gantt."""
+    return redirect('core:gantt')
 
 
-@role_required(["admin", "staff"])
+@role_required(["admin", "staff", "instructor"])
 def gantt_view(request):
-    """Manter compatibilidade com URL antiga, redirecionar para o novo Sistema Gantt."""
-    return redirect('gantt_system')
+    """Redirecionar para a vista moderna e unificada do Gantt."""
+    return redirect('core:gantt')
 
 
 @role_required(["admin", "staff"])
@@ -1617,5 +1619,191 @@ def instructor_commission_toggle_paid(request, commission_id):
         f"Comissão de {commission.instructor.full_name} marcada como {'Paga' if commission.is_paid else 'Pendente'}."
     )
     return redirect(request.META.get('HTTP_REFERER', 'core:protocol_supervision'))
+
+
+# ==============================================================================
+# GESTÃO DA ASSOCIAÇÃO ACR, QUIOSQUE DE TAPETE & CARTÃO DIGITAL
+# ==============================================================================
+
+@role_required(["admin", "staff"])
+def member_card_view(request, pk):
+    """Exibe o Cartão Digital oficial de Sócio e Praticante da ACR."""
+    org = request.organization
+    person = get_object_or_404(Person, pk=pk, organization=org)
+    card_data = get_membership_card_data(person)
+    return render(request, "core/membership_card.html", card_data)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def athlete_graduation_add(request, pk):
+    """Regista um novo exame/graduação de cinto para o atleta."""
+    org = request.organization
+    person = get_object_or_404(Person, pk=pk, organization=org)
+
+    modality_id = request.POST.get("modality")
+    rank_name = request.POST.get("rank_name", "").strip()
+    rank_order = request.POST.get("rank_order", "1").strip()
+    awarded_date_str = request.POST.get("awarded_date", "").strip()
+    examiner_id = request.POST.get("examiner")
+    examiner_name = request.POST.get("examiner_name", "").strip()
+    certificate_number = request.POST.get("certificate_number", "").strip()
+    classes_attended_count = request.POST.get("classes_attended_count", "").strip()
+    notes = request.POST.get("notes", "").strip()
+
+    if not rank_name or not modality_id:
+        messages.error(request, "Modalidade e nome da graduação/cinto são obrigatórios.")
+        return redirect("core:client_detail", pk=person.pk)
+
+    modality = get_object_or_404(Modality, pk=modality_id, organization=org)
+
+    examiner = None
+    if examiner_id:
+        examiner = Instructor.objects.filter(pk=examiner_id, organization=org).first()
+        if examiner and not examiner_name:
+            examiner_name = examiner.full_name
+
+    awarded_date = parse_date(awarded_date_str) if awarded_date_str else timezone.now().date()
+
+    try:
+        rank_order_int = int(rank_order)
+    except ValueError:
+        rank_order_int = 1
+
+    # Contabilização automática de presenças nos treinos no tapete se não for preenchido
+    if classes_attended_count and classes_attended_count.isdigit():
+        attended_count = int(classes_attended_count)
+    else:
+        attended_count = Booking.objects.filter(
+            organization=org,
+            person=person,
+            event__modality=modality,
+            status=Booking.Status.CHECKED_IN
+        ).count()
+
+    graduation = AthleteGraduation.objects.create(
+        organization=org,
+        person=person,
+        modality=modality,
+        rank_name=rank_name,
+        rank_order=rank_order_int,
+        awarded_date=awarded_date,
+        examiner=examiner,
+        examiner_name=examiner_name,
+        certificate_number=certificate_number,
+        classes_attended_count=attended_count,
+        notes=notes,
+    )
+
+    messages.success(request, f"Graduação '{rank_name}' em {modality.name} atribuída a {person.full_name} com sucesso ({attended_count} treinos contabilizados).")
+    return redirect("core:client_detail", pk=person.pk)
+
+
+@role_required(["admin", "staff"])
+def kiosk_view(request):
+    """Interface Quiosque em ecrã inteiro para tablet na entrada do pavilhão/tapete."""
+    org = request.organization
+    active_event = get_active_event_for_facility(org)
+
+    # Próximas aulas de hoje
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    todays_events = Event.objects.filter(
+        organization=org,
+        starts_at__gte=timezone.now() - timedelta(hours=1),
+        starts_at__lte=today_end
+    ).select_related('resource', 'modality', 'instructor').order_by('starts_at')[:8]
+
+    context = {
+        "organization": org,
+        "active_event": active_event,
+        "todays_events": todays_events,
+        "protocol_config": org.get_protocol_config(),
+    }
+    return render(request, "core/kiosk.html", context)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def kiosk_checkin_api(request):
+    """Endpoint de validação e check-in imediato para o Quiosque do Pavilhão."""
+    import json
+    org = request.organization
+
+    identifier = ""
+    event_id = None
+
+    if request.content_type == "application/json":
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+            identifier = payload.get("identifier", "").strip()
+            event_id = payload.get("event_id")
+        except Exception:
+            return JsonResponse({"success": False, "status": "red", "message": "JSON inválido."}, status=400)
+    else:
+        identifier = request.POST.get("identifier", "").strip()
+        event_id = request.POST.get("event_id")
+
+    if not identifier:
+        return JsonResponse({
+            "success": False,
+            "status": "red",
+            "title": "Código Ausente",
+            "message": "Por favor aproxime o QR Code ou digite o Número de Sócio / NIF."
+        })
+
+    try:
+        specific_event_id = int(event_id) if event_id else None
+    except (ValueError, TypeError):
+        specific_event_id = None
+
+    result = process_kiosk_checkin(org, identifier, specific_event_id=specific_event_id)
+    return JsonResponse(result)
+
+
+@role_required(["admin", "staff"])
+def association_governance_view(request):
+    """Painel institucional da Associação ACR: Órgãos Sociais, Mandatos e Caderno de Sócios."""
+    org = request.organization
+    bodies = GoverningBody.objects.filter(organization=org).prefetch_related('members__person')
+
+    # Estatísticas de Sócios da ACR
+    total_members = Person.objects.filter(organization=org, member_category=Person.MemberCategory.SOCIO).count()
+    fees_up_to_date = Person.objects.filter(
+        organization=org,
+        member_category=Person.MemberCategory.SOCIO,
+        membership_fee_status=Person.MembershipFeeStatus.UP_TO_DATE
+    ).count()
+    fees_overdue = Person.objects.filter(
+        organization=org,
+        member_category=Person.MemberCategory.SOCIO,
+        membership_fee_status=Person.MembershipFeeStatus.OVERDUE
+    ).count()
+    fees_exempt = Person.objects.filter(
+        organization=org,
+        member_category=Person.MemberCategory.SOCIO,
+        membership_fee_status=Person.MembershipFeeStatus.EXEMPT
+    ).count()
+
+    active_bodies = bodies.filter(is_active=True)
+    board = active_bodies.filter(body_type=GoverningBody.BodyType.BOARD).first()
+    general_assembly = active_bodies.filter(body_type=GoverningBody.BodyType.GENERAL_ASSEMBLY).first()
+    fiscal_council = active_bodies.filter(body_type=GoverningBody.BodyType.FISCAL_COUNCIL).first()
+
+    context = {
+        "organization": org,
+        "bodies": bodies,
+        "active_bodies": active_bodies,
+        "board": board,
+        "general_assembly": general_assembly,
+        "fiscal_council": fiscal_council,
+        "total_members": total_members,
+        "fees_up_to_date": fees_up_to_date,
+        "fees_overdue": fees_overdue,
+        "fees_exempt": fees_exempt,
+        "protocol_config": org.get_protocol_config(),
+    }
+    return render(request, "core/association_governance.html", context)
+
 
 

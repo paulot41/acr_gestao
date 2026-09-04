@@ -9,8 +9,10 @@ import json
 import logging
 from django.db import IntegrityError, DatabaseError
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from .auth_views import role_required
 from .services.bookings import cancel_booking
+from .services.scheduling import create_recurring_event_series
 from .models import Person, Event, Booking, Resource, Modality, Instructor, ClassGroup
 
 logger = logging.getLogger(__name__)
@@ -46,9 +48,10 @@ def gantt_view(request):
 
 @role_required(["admin", "staff", "instructor"])
 def gantt_data(request):
-    """API endpoint para dados do Gantt com otimizações."""
+    """API endpoint para dados do Gantt com suporte a vista diária ou semanal e filtros."""
     org = request.organization
     date_param = request.GET.get('date')
+    view_type = request.GET.get('view_type', request.GET.get('view', 'day'))  # 'day' ou 'week'
 
     try:
         if date_param:
@@ -58,16 +61,39 @@ def gantt_data(request):
     except ValueError:
         selected_date = timezone.now().date()
 
-    # Calcular início e fim do dia
-    start_datetime = timezone.make_aware(datetime.combine(selected_date, datetime.min.time()))
-    end_datetime = start_datetime + timedelta(days=1)
+    if view_type == 'week':
+        # Segunda-feira da semana de selected_date até Domingo
+        week_start = selected_date - timedelta(days=selected_date.weekday())
+        week_end = week_start + timedelta(days=6)
+        start_datetime = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
+        end_datetime = timezone.make_aware(datetime.combine(week_end + timedelta(days=1), datetime.min.time()))
+    else:
+        week_start = selected_date
+        week_end = selected_date
+        start_datetime = timezone.make_aware(datetime.combine(selected_date, datetime.min.time()))
+        end_datetime = start_datetime + timedelta(days=1)
 
-    # Obter eventos do dia com otimizações
-    events = Event.objects.filter(
+    # Obter eventos com otimizações
+    events_qs = Event.objects.filter(
         organization=org,
         starts_at__gte=start_datetime,
         starts_at__lt=end_datetime
-    ).select_related(
+    )
+
+    # Filtros opcionais
+    resource_id = request.GET.get('resource_id')
+    if resource_id and resource_id.isdigit():
+        events_qs = events_qs.filter(resource_id=int(resource_id))
+
+    modality_id = request.GET.get('modality_id')
+    if modality_id and modality_id.isdigit():
+        events_qs = events_qs.filter(modality_id=int(modality_id))
+
+    instructor_id = request.GET.get('instructor_id')
+    if instructor_id and instructor_id.isdigit():
+        events_qs = events_qs.filter(instructor_id=int(instructor_id))
+
+    events = events_qs.select_related(
         'resource', 'modality', 'instructor', 'class_group', 'individual_client'
     ).annotate(
         confirmed_bookings_count=Count('bookings', filter=Q(bookings__status=Booking.Status.CONFIRMED))
@@ -76,11 +102,18 @@ def gantt_data(request):
     # Serializar eventos para o Gantt
     events_data = []
     for event in events:
+        cap = event.capacity or (event.resource.capacity if event.resource else 0)
+        confirmed = event.confirmed_bookings_count
+        occ_pct = round((confirmed / cap * 100) if cap else 0, 1)
+        checkin_url = reverse('core:event_checkin', kwargs={'event_id': event.id})
+
         events_data.append({
             'id': event.id,
             'title': event.display_title,
             'resource_id': event.resource.id,
             'resource_name': event.resource.name,
+            'date': event.starts_at.date().isoformat(),
+            'weekday': event.starts_at.weekday(),  # 0=Segunda, ..., 6=Domingo
             'start_time': event.starts_at.strftime('%H:%M'),
             'end_time': event.ends_at.strftime('%H:%M'),
             'start_hour': event.starts_at.hour,
@@ -96,9 +129,13 @@ def gantt_data(request):
                 'name': event.instructor.full_name if event.instructor else 'Sem instrutor'
             },
             'event_type': event.event_type,
-            'capacity': event.capacity,
-            'bookings_count': event.confirmed_bookings_count,
-            'is_full': event.confirmed_bookings_count >= event.capacity,
+            'capacity': cap,
+            'bookings_count': confirmed,
+            'occupancy_pct': occ_pct,
+            'is_full': confirmed >= cap if cap else False,
+            'recurrence_group_id': str(event.recurrence_group_id) if event.recurrence_group_id else None,
+            'is_recurring': bool(event.recurrence_group_id),
+            'checkin_url': checkin_url,
             'class_group': {
                 'id': event.class_group.id if event.class_group else None,
                 'name': event.class_group.name if event.class_group else None
@@ -124,6 +161,9 @@ def gantt_data(request):
         'events': events_data,
         'resources': resources_data,
         'date': selected_date.isoformat(),
+        'view_type': view_type,
+        'week_start': week_start.isoformat(),
+        'week_end': week_end.isoformat(),
         'current_time': timezone.now().strftime('%H:%M')
     })
 
@@ -131,7 +171,7 @@ def gantt_data(request):
 @role_required(["admin", "staff", "instructor"])
 @require_http_methods(["POST"])
 def create_event_from_gantt(request):
-    """Criar evento a partir do drag & drop no Gantt."""
+    """Criar evento ou série recorrente a partir do Gantt."""
     try:
         data = json.loads(request.body)
         org = request.organization
@@ -141,9 +181,10 @@ def create_event_from_gantt(request):
         start_time = data.get('start_time')  # formato: 'HH:MM'
         end_time = data.get('end_time')      # formato: 'HH:MM'
         date_str = data.get('date')          # formato: 'YYYY-MM-DD'
+        is_recurring = bool(data.get('is_recurring', False))
 
         if not all([resource_id, start_time, end_time, date_str]):
-            return JsonResponse({'error': 'Dados obrigatórios em falta'}, status=400)
+            return JsonResponse({'error': 'Dados obrigatórios em falta (espaço, horário e data)'}, status=400)
 
         # Validar recurso
         try:
@@ -151,34 +192,13 @@ def create_event_from_gantt(request):
         except Resource.DoesNotExist:
             return JsonResponse({'error': 'Recurso não encontrado'}, status=404)
 
-        # Parsear data e horas
+        # Parsear data
         try:
             event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            start_hour, start_minute = map(int, start_time.split(':'))
-            end_hour, end_minute = map(int, end_time.split(':'))
-
-            starts_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=start_hour, minute=start_minute)))
-            ends_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=end_hour, minute=end_minute)))
-
         except ValueError as e:
-            return JsonResponse({'error': f'Formato de data/hora inválido: {str(e)}'}, status=400)
+            return JsonResponse({'error': f'Formato de data inválido: {str(e)}'}, status=400)
 
-        # Validar que end > start
-        if ends_at <= starts_at:
-            return JsonResponse({'error': 'Hora de fim deve ser posterior à hora de início'}, status=400)
-
-        # Verificar conflito de espaço/recurso
-        conflicting_events = Event.objects.filter(
-            organization=org,
-            resource=resource,
-            starts_at__lt=ends_at,
-            ends_at__gt=starts_at
-        )
-
-        if conflicting_events.exists():
-            return JsonResponse({'error': 'Já existe um evento neste horário e espaço'}, status=400)
-
-        # Se o utilizador não é admin ou passou instructor_id, determinar instrutor
+        # Determinar instrutor se especificado ou atribuir padrão
         instructor = None
         instructor_id = data.get('instructor_id')
         if instructor_id:
@@ -192,37 +212,135 @@ def create_event_from_gantt(request):
             except Instructor.DoesNotExist:
                 pass
 
-        # Validar conflito de sobreposição do instrutor
-        if instructor:
-            instructor_conflicts = Event.objects.filter(
+        # Modalidade
+        modality = None
+        modality_id = data.get('modality_id')
+        if modality_id:
+            try:
+                modality = Modality.objects.get(id=modality_id, organization=org)
+            except Modality.DoesNotExist:
+                return JsonResponse({'error': 'Modalidade não encontrada'}, status=404)
+
+        # Turma
+        class_group = None
+        class_group_id = data.get('class_group_id')
+        if class_group_id:
+            try:
+                class_group = ClassGroup.objects.get(id=class_group_id, organization=org)
+            except ClassGroup.DoesNotExist:
+                return JsonResponse({'error': 'Turma não encontrada'}, status=404)
+
+        # Cliente individual
+        individual_client = None
+        individual_client_id = data.get('individual_client_id')
+        if individual_client_id:
+            try:
+                individual_client = Person.objects.get(id=individual_client_id, organization=org)
+            except Person.DoesNotExist:
+                return JsonResponse({'error': 'Cliente não encontrado'}, status=404)
+
+        event_type = data.get('event_type', Event.EventType.OPEN_CLASS)
+        title = (data.get('title') or '').strip() or f"Aula - {resource.name}"
+        description = data.get('description', '')
+        capacity = int(data.get('capacity')) if data.get('capacity') else None
+
+        # CASO 1: Série Recorrente
+        if is_recurring:
+            recurrence_end_str = data.get('recurrence_end_date')
+            weekdays = data.get('recurrence_weekdays', [])
+
+            if not recurrence_end_str:
+                return JsonResponse({'error': 'Data final da série recorrente é obrigatória.'}, status=400)
+
+            try:
+                rec_end_date = datetime.strptime(recurrence_end_str, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({'error': 'Formato da data final da série inválido (YYYY-MM-DD).'}, status=400)
+
+            if not weekdays or not isinstance(weekdays, list):
+                # Se não especificado explicitamente, usa o dia da semana do evento inicial
+                weekdays = [event_date.weekday()]
+            else:
+                weekdays = [int(w) for w in weekdays]
+
+            series_result = create_recurring_event_series(
                 organization=org,
+                resource=resource,
+                start_time=start_time,
+                end_time=end_time,
+                start_date=event_date,
+                end_date=rec_end_date,
+                weekdays=weekdays,
+                title=title,
+                event_type=event_type,
+                capacity=capacity,
+                description=description,
+                modality=modality,
                 instructor=instructor,
-                starts_at__lt=ends_at,
-                ends_at__gt=starts_at
+                class_group=class_group,
+                individual_client=individual_client,
             )
-            if instructor_conflicts.exists():
+
+            if series_result['created_count'] == 0:
+                reasons = "; ".join([d['reason'] for d in series_result['skipped_dates'][:3]])
                 return JsonResponse({
-                    'error': f'O instrutor {instructor.full_name} já tem uma aula agendada neste horário'
+                    'error': f"Não foi possível criar nenhuma aula na série devido a conflitos: {reasons}"
                 }, status=400)
 
-        # Criar evento preliminar
+            msg = f"Série criada: {series_result['created_count']} aulas agendadas com sucesso."
+            if series_result['skipped_count'] > 0:
+                msg += f" ({series_result['skipped_count']} ocorrências ignoradas devido a conflitos pré-existentes)."
+
+            return JsonResponse({
+                'success': True,
+                'is_recurring': True,
+                'recurrence_group_id': series_result['recurrence_group_id'],
+                'created_count': series_result['created_count'],
+                'created_ids': series_result['created_ids'],
+                'skipped_count': series_result['skipped_count'],
+                'skipped_dates': series_result['skipped_dates'],
+                'event_id': series_result['created_ids'][0] if series_result['created_ids'] else None,
+                'message': msg
+            })
+
+        # CASO 2: Evento Individual
+        try:
+            start_hour, start_minute = map(int, start_time.split(':')[:2])
+            end_hour, end_minute = map(int, end_time.split(':')[:2])
+
+            starts_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=start_hour, minute=start_minute)))
+            ends_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=end_hour, minute=end_minute)))
+
+        except ValueError as e:
+            return JsonResponse({'error': f'Formato de hora inválido: {str(e)}'}, status=400)
+
+        if ends_at <= starts_at:
+            return JsonResponse({'error': 'Hora de fim deve ser posterior à hora de início'}, status=400)
+
+        # Criar evento
         event = Event(
             organization=org,
             resource=resource,
+            modality=modality,
             instructor=instructor,
-            title=f"Nova Aula - {resource.name}",
+            title=title,
+            description=description,
             starts_at=starts_at,
             ends_at=ends_at,
-            capacity=resource.capacity,
-            event_type=Event.EventType.OPEN_CLASS
+            event_type=event_type,
+            capacity=capacity or resource.capacity,
+            class_group=class_group,
+            individual_client=individual_client,
         )
 
+        event.clean()
         event.save()
 
         return JsonResponse({
             'success': True,
+            'is_recurring': False,
             'event_id': event.id,
-            'message': 'Evento criado com sucesso. Configure os detalhes no formulário.'
+            'message': 'Aula agendada com sucesso.'
         })
 
     except json.JSONDecodeError:
@@ -410,11 +528,13 @@ def update_event_details(request):
 @role_required(["admin", "staff", "instructor"])
 @require_http_methods(["POST"])
 def delete_event_api(request):
-    """Eliminar um evento via API do Gantt."""
+    """Eliminar um evento ou série recorrente via API do Gantt."""
     try:
         data = json.loads(request.body)
         org = request.organization
         event_id = data.get('event_id')
+        delete_series = bool(data.get('delete_series', False))
+
         if not event_id:
             return JsonResponse({'success': False, 'error': 'ID do evento obrigatório'}, status=400)
 
@@ -423,8 +543,24 @@ def delete_event_api(request):
         except Event.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Evento não encontrado'}, status=404)
 
+        if delete_series and event.recurrence_group_id:
+            deleted_count, _ = Event.objects.filter(
+                organization=org,
+                recurrence_group_id=event.recurrence_group_id
+            ).delete()
+            return JsonResponse({
+                'success': True,
+                'series_deleted': True,
+                'count': deleted_count,
+                'message': f'{deleted_count} aulas da série recorrente eliminadas com sucesso.'
+            })
+
         event.delete()
-        return JsonResponse({'success': True})
+        return JsonResponse({
+            'success': True,
+            'series_deleted': False,
+            'message': 'Aula eliminada com sucesso.'
+        })
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
     except DatabaseError as e:
@@ -434,12 +570,16 @@ def delete_event_api(request):
 
 @role_required(["admin", "staff", "instructor"])
 def get_event_details(request, event_id):
-    """Obter detalhes de um evento para edição."""
+    """Obter detalhes de um evento para visualização e edição."""
     try:
         org = request.organization
         event = Event.objects.select_related(
             'resource', 'modality', 'instructor', 'class_group', 'individual_client'
         ).get(id=event_id, organization=org)
+
+        confirmed_count = event.bookings.filter(status=Booking.Status.CONFIRMED).count()
+        eff_capacity = event.capacity or (event.resource.capacity if event.resource else 0)
+        occupancy_pct = round((confirmed_count / eff_capacity * 100) if eff_capacity else 0, 1)
 
         return JsonResponse({
             'id': event.id,
@@ -447,13 +587,24 @@ def get_event_details(request, event_id):
             'description': event.description,
             'event_type': event.event_type,
             'modality_id': event.modality.id if event.modality else None,
+            'modality_name': event.modality.name if event.modality else None,
             'instructor_id': event.instructor.id if event.instructor else None,
+            'instructor_name': event.instructor.full_name if event.instructor else None,
             'class_group_id': event.class_group.id if event.class_group else None,
             'individual_client_id': event.individual_client.id if event.individual_client else None,
-            'capacity': event.capacity,
+            'capacity': eff_capacity,
+            'bookings_count': confirmed_count,
+            'occupancy_pct': occupancy_pct,
             'resource_id': event.resource.id,
+            'resource_name': event.resource.name,
             'starts_at': event.starts_at.isoformat(),
-            'ends_at': event.ends_at.isoformat()
+            'ends_at': event.ends_at.isoformat(),
+            'start_time': event.starts_at.strftime('%H:%M'),
+            'end_time': event.ends_at.strftime('%H:%M'),
+            'date': event.starts_at.date().isoformat(),
+            'recurrence_group_id': str(event.recurrence_group_id) if event.recurrence_group_id else None,
+            'is_recurring': bool(event.recurrence_group_id),
+            'checkin_url': reverse('core:event_checkin', kwargs={'event_id': event.id})
         })
 
     except Event.DoesNotExist:

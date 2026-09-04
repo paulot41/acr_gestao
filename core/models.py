@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from decimal import Decimal
 import logging
+import uuid
 
 # PostgreSQL search functionality (with fallback for SQLite/non-postgres environments)
 try:
@@ -147,6 +148,11 @@ class Person(models.Model):
         SOCIO = "socio", "Sócio Praticante (ACR)"
         NAO_SOCIO = "nao_socio", "Não Sócio Praticante"
 
+    class MembershipFeeStatus(models.TextChoices):
+        UP_TO_DATE = "up_to_date", "Quotas em Dia"
+        OVERDUE = "overdue", "Quotas em Dívida"
+        EXEMPT = "exempt", "Isento de Quotas"
+
     member_category = models.CharField(
         "Categoria de Praticante",
         max_length=20,
@@ -171,10 +177,47 @@ class Person(models.Model):
         help_text="Declaração de conhecimento e aceitação do regulamento da ACR"
     )
 
+    # GESTÃO ASSOCIATIVA ACR (Sócios, Quotas e Cartão Digital)
+    member_number = models.PositiveIntegerField(
+        "Número de Sócio ACR",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Número sequencial oficial de associado da ACR"
+    )
+    admission_date = models.DateField(
+        "Data de Admissão de Sócio",
+        null=True,
+        blank=True,
+        help_text="Data em que foi admitido como sócio da ACR"
+    )
+    membership_fee_status = models.CharField(
+        "Estado das Quotas",
+        max_length=20,
+        choices=MembershipFeeStatus.choices,
+        default=MembershipFeeStatus.UP_TO_DATE
+    )
+    qr_code_token = models.CharField(
+        "Token QR Check-in",
+        max_length=64,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Token seguro único para leitura de QR Code no cartão e quiosque"
+    )
+    current_belt = models.CharField(
+        "Cinto / Graduação Atual",
+        max_length=60,
+        blank=True,
+        help_text="Ex: Cinto Branco, Cinto Amarelo (7º Kyu), Cinto Negro 1º Dan"
+    )
+
     class Meta:
         ordering = ["first_name", "last_name"]
         indexes = [
             models.Index(fields=["organization", "status"]),
+            models.Index(fields=["organization", "member_number"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -191,9 +234,20 @@ class Person(models.Model):
 
     def __str__(self) -> str:
         n = f"{self.first_name} {self.last_name}".strip()
-        return f"{n} ({self.get_entity_affiliation_display()})"
+        num_str = f" [Sócio #{self.member_number}]" if self.member_number else ""
+        return f"{n}{num_str} ({self.get_entity_affiliation_display()})"
 
     def save(self, *args, **kwargs):
+        if not self.qr_code_token:
+            self.qr_code_token = uuid.uuid4().hex
+
+        # Atribuição sequencial de número de sócio para sócios da ACR se ainda não atribuído
+        if self.member_category == self.MemberCategory.SOCIO and not self.member_number and self.organization_id:
+            max_num = Person.objects.filter(organization_id=self.organization_id).aggregate(
+                max_n=models.Max("member_number")
+            )["max_n"] or 0
+            self.member_number = max_num + 1
+
         super().save(*args, **kwargs)
         from django.db import connection
         if SearchVector is not None and connection.vendor == "postgresql":
@@ -205,6 +259,24 @@ class Person(models.Model):
                 logger.warning("Falha ao atualizar SearchVector para Person %s: %s", self.pk, e)
             except Exception:
                 pass
+
+    def ensure_qr_token(self) -> str:
+        """Garante que o praticante tem um token de QR Code gerado."""
+        if not self.qr_code_token:
+            self.qr_code_token = uuid.uuid4().hex
+            Person.objects.filter(pk=self.pk).update(qr_code_token=self.qr_code_token)
+        return self.qr_code_token
+
+    @property
+    def voting_eligible(self) -> bool:
+        """Verifica se o sócio tem direito de voto (maior de 18 anos, sócio ACR e quotas em dia)."""
+        if self.member_category != self.MemberCategory.SOCIO:
+            return False
+        if self.is_minor:
+            return False
+        if self.membership_fee_status == "overdue":
+            return False
+        return True
 
     @property
     def full_name(self) -> str:
@@ -583,6 +655,9 @@ class Event(models.Model):
     description = models.TextField("Descrição", blank=True)
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
+
+    # Recorrência
+    recurrence_group_id = models.UUIDField("Identificador de Série Recorrente", null=True, blank=True, db_index=True)
 
     # Campos do patch
     waitlist_enabled = models.BooleanField(default=True)
@@ -1460,3 +1535,91 @@ class MessageLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.campaign.name} -> {self.person.full_name} ({self.status})"
+
+
+# ==============================================================================
+# GESTÃO DESPORTIVA: GRADUAÇÕES & CINTOS DE ARTES MARCIAIS
+# ==============================================================================
+
+class AthleteGraduation(models.Model):
+    """Registo histórico de graduação / exame de cinto de um atleta."""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="graduations")
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="graduations")
+    modality = models.ForeignKey(Modality, on_delete=models.CASCADE, related_name="graduations")
+    rank_name = models.CharField("Graduação / Cinto", max_length=60, help_text="Ex: Cinto Branco, Cinto Amarelo (7º Kyu), Cinto Negro 1º Dan")
+    rank_order = models.PositiveIntegerField("Ordem do Cinto", default=1, help_text="1=Branco, 2=Amarelo, 3=Laranja, etc.")
+    awarded_date = models.DateField("Data do Exame / Atribuição")
+    examiner = models.ForeignKey(Instructor, on_delete=models.SET_NULL, null=True, blank=True, related_name="awarded_graduations")
+    examiner_name = models.CharField("Examinador / Mestre", max_length=120, blank=True)
+    certificate_number = models.CharField("N.º de Diploma / Certificado", max_length=60, blank=True)
+    classes_attended_count = models.PositiveIntegerField("Treinos Cumpridos", default=0, help_text="Aulas contabilizadas no tapete até a este exame")
+    notes = models.TextField("Notas de Avaliação Técnica", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-awarded_date", "-rank_order"]
+        verbose_name = "Graduação / Exame de Cinto"
+        verbose_name_plural = "Graduações / Exames de Cinto"
+        indexes = [
+            models.Index(fields=["organization", "person"]),
+            models.Index(fields=["person", "modality"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.person.full_name} - {self.rank_name} ({self.modality.name})"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Sincronizar graduação atual na ficha do atleta
+        if self.rank_name and self.person_id:
+            Person.objects.filter(pk=self.person_id).update(current_belt=self.rank_name)
+
+
+# ==============================================================================
+# GESTÃO DA ASSOCIAÇÃO ACR: GOVERNANÇA, ÓRGÃOS SOCIAIS & MANDATOS
+# ==============================================================================
+
+class GoverningBody(models.Model):
+    """Órgão Social estatutário da Associação ACR (Direção, Assembleia Geral, Conselho Fiscal)."""
+    class BodyType(models.TextChoices):
+        BOARD = "board", "Direção"
+        GENERAL_ASSEMBLY = "general_assembly", "Mesa da Assembleia Geral"
+        FISCAL_COUNCIL = "fiscal_council", "Conselho Fiscal"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="governing_bodies")
+    body_type = models.CharField("Órgão Social", max_length=30, choices=BodyType.choices, default=BodyType.BOARD)
+    term_label = models.CharField("Mandato", max_length=60, default="2024–2028")
+    start_date = models.DateField("Data de Início / Posse")
+    end_date = models.DateField("Data de Término do Mandato")
+    election_date = models.DateField("Data da Eleição", null=True, blank=True)
+    is_active = models.BooleanField("Mandato em Funções", default=True)
+    electoral_minutes_ref = models.CharField("Referência da Ata Eleitoral", max_length=120, blank=True, help_text="Ex: Ata n.º 12/2024 da Assembleia Eleitoral")
+    notes = models.TextField("Observações / Competências Estatutárias", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["body_type", "-start_date"]
+        verbose_name = "Órgão Social"
+        verbose_name_plural = "Órgãos Sociais"
+
+    def __str__(self) -> str:
+        return f"{self.get_body_type_display()} ({self.term_label})"
+
+
+class GoverningBodyMember(models.Model):
+    """Membro titular eleito para um Órgão Social da ACR."""
+    governing_body = models.ForeignKey(GoverningBody, on_delete=models.CASCADE, related_name="members")
+    person = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="governing_roles")
+    name = models.CharField("Nome do Titular", max_length=140)
+    role = models.CharField("Cargo", max_length=80)  # Presidente, Vice-Presidente, Tesoureiro, Secretário, Vogal, Relator
+    order = models.PositiveIntegerField("Ordem de Precedência", default=1)
+    notes = models.CharField("Observações", max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+        verbose_name = "Titular de Órgão Social"
+        verbose_name_plural = "Titulares de Órgãos Sociais"
+
+    def __str__(self) -> str:
+        return f"{self.role}: {self.name} ({self.governing_body.get_body_type_display()})"
+

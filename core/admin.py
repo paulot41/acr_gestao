@@ -222,6 +222,9 @@ admin.site.register(models.SystemAlert)
 admin.site.register(models.Invoice, InvoiceAdmin)
 admin.site.register(models.Campaign)
 admin.site.register(models.MessageLog)
+admin.site.register(models.AthleteGraduation)
+admin.site.register(models.GoverningBody)
+admin.site.register(models.GoverningBodyMember)
 
 
 # --- User management: Custom User admin with inline UserProfile ---

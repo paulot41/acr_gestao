@@ -107,10 +107,17 @@
                             <i class="fas fa-cash-register"></i> Caixa
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'protocol' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:protocol_supervision' %}">
-                            <i class="fas fa-handshake"></i> Supervisão ACR
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'association' in request.resolver_match.url_name or 'protocol' in request.resolver_match.url_name %}active{% endif %}" href="#" id="associationDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-landmark"></i> Associação ACR
                         </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'core:association_governance' %}"><i class="fas fa-sitemap me-2 text-primary"></i>Órgãos Sociais & Mandatos</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:protocol_supervision' %}"><i class="fas fa-handshake me-2 text-success"></i>Protocolo ACR & Proform SC</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:client_list' %}?member_category=socio"><i class="fas fa-id-card me-2 text-warning"></i>Caderno de Sócios</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'core:kiosk' %}" target="_blank"><i class="fas fa-tablet-alt me-2 text-info"></i>Quiosque Pavilhão / Tapete</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if 'client' in request.resolver_match.url_name %}active{% endif %}" href="#" id="clientsDropdown" role="button" data-bs-toggle="dropdown">

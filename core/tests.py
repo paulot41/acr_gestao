@@ -15,10 +15,13 @@ from .models import (
     Organization, Person, Event, Resource, Booking,
     Instructor, Modality, ClassGroup, PaymentPlan,
     ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog,
-    InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration
+    InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration,
+    AthleteGraduation, GoverningBody, GoverningBodyMember
 )
 from .middleware import OrganizationMiddleware
 from .context_processors import organization_context
+from .services.kiosk import resolve_person, process_kiosk_checkin, get_active_event_for_facility
+from .services.membership_card import get_membership_card_data
 
 
 class SchedulingRulesTestCase(TestCase):
@@ -1283,4 +1286,473 @@ class DynamicProtocolConfigurationTestCase(TestCase):
         self.assertEqual(split["protocol_config"].acr_admin_fee_per_athlete, Decimal("2.50"))
 
 
+class GanttModernizationTestCase(TestCase):
+    """Testes automatizados para a modernização do Gantt, grelha semanal e séries recorrentes."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="acr.local",
+            org_type=Organization.Type.BOTH
+        )
+        self.user = User.objects.create_superuser("admin_gantt", "admin_gantt@acr.local", "secret123")
+        self.client.force_login(self.user)
+
+        self.pavilhao = Resource.objects.create(
+            organization=self.org,
+            name="Pavilhão Central",
+            capacity=30,
+            entity_type=Resource.EntityType.ACR
+        )
+        self.sala_judo = Resource.objects.create(
+            organization=self.org,
+            name="Sala de Judo",
+            capacity=15,
+            entity_type=Resource.EntityType.PROFORM
+        )
+        self.judo = Modality.objects.create(
+            organization=self.org,
+            name="Judo",
+            color="#2563eb",
+            entity_type=Modality.EntityType.PROFORM
+        )
+        self.karate = Modality.objects.create(
+            organization=self.org,
+            name="Karaté",
+            color="#dc2626",
+            entity_type=Modality.EntityType.ACR
+        )
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Daniel",
+            last_name="Coelho",
+            email="daniel.coelho@acr.local"
+        )
+
+    def test_recurring_event_series_creation_and_conflict_avoidance(self):
+        """Testa criação de série recorrente e a prevenção atómica de conflitos por data."""
+        from core.services.scheduling import create_recurring_event_series
+
+        # Definir período: 2 semanas a partir de uma Segunda-feira futura
+        today = timezone.now().date()
+        # Encontrar a próxima segunda-feira
+        days_ahead = (7 - today.weekday()) % 7
+        if days_ahead == 0:
+            days_ahead = 7
+        start_date = today + timedelta(days=days_ahead)
+        end_date = start_date + timedelta(days=13)  # 2 semanas completas
+
+        # Pré-agendar um evento conflituoso na primeira Segunda-feira na Sala de Judo
+        conflict_start = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time().replace(hour=18, minute=0)))
+        conflict_end = conflict_start + timedelta(hours=1, minutes=30)
+        Event.objects.create(
+            organization=self.org,
+            resource=self.sala_judo,
+            title="Evento em Conflito Pré-existente",
+            starts_at=conflict_start,
+            ends_at=conflict_end,
+            capacity=15,
+        )
+
+        # Criar série recorrente para Segundas e Quartas (weekdays [0, 2]), 18:00 - 19:30
+        result = create_recurring_event_series(
+            organization=self.org,
+            resource=self.sala_judo,
+            start_time="18:00",
+            end_time="19:30",
+            start_date=start_date,
+            end_date=end_date,
+            weekdays=[0, 2],
+            title="Treino Judo Recorrente",
+            modality=self.judo,
+            instructor=self.instructor,
+            capacity=15,
+        )
+
+        # No período de 14 dias há 2 Segundas e 2 Quartas (4 ocorrências no total).
+        # A 1ª Segunda tem conflito e deve ser ignorada; 3 ocorrências devem ser criadas com sucesso.
+        self.assertEqual(result["created_count"], 3)
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertEqual(result["skipped_dates"][0]["date"], start_date.isoformat())
+        self.assertIsNotNone(result["recurrence_group_id"])
+
+        # Verificar se todos os eventos criados partilham o mesmo recurrence_group_id
+        events = Event.objects.filter(recurrence_group_id=result["recurrence_group_id"])
+        self.assertEqual(events.count(), 3)
+        for ev in events:
+            self.assertEqual(ev.title, "Treino Judo Recorrente")
+            self.assertEqual(ev.instructor, self.instructor)
+            self.assertEqual(ev.resource, self.sala_judo)
+
+    def test_gantt_data_daily_and_weekly_api(self):
+        """Testa endpoint gantt_data retornando dados com ocupação e suporte a vista semanal."""
+        # Criar evento com reservas para testar occupancy_pct
+        start_dt = timezone.now() + timedelta(days=1)
+        end_dt = start_dt + timedelta(hours=1)
+        ev = Event.objects.create(
+            organization=self.org,
+            resource=self.pavilhao,
+            modality=self.karate,
+            instructor=self.instructor,
+            title="Karaté Adultos",
+            starts_at=start_dt,
+            ends_at=end_dt,
+            capacity=20
+        )
+        athlete = Person.objects.create(organization=self.org, first_name="Atleta", last_name="1")
+        Booking.objects.create(
+            organization=self.org,
+            event=ev,
+            person=athlete,
+            status=Booking.Status.CONFIRMED
+        )
+
+        # 1. Testar vista diária
+        res_day = self.client.get(f"/gantt/data/?date={start_dt.date().isoformat()}&view_type=day")
+        self.assertEqual(res_day.status_code, 200)
+        data_day = res_day.json()
+        self.assertEqual(data_day["view_type"], "day")
+        self.assertTrue(len(data_day["events"]) >= 1)
+        found_ev = next(e for e in data_day["events"] if e["id"] == ev.id)
+        self.assertEqual(found_ev["bookings_count"], 1)
+        self.assertEqual(found_ev["capacity"], 20)
+        self.assertEqual(found_ev["occupancy_pct"], 5.0)
+        self.assertIn("/events/", found_ev["checkin_url"])
+        self.assertIn("/checkin/", found_ev["checkin_url"])
+
+        # 2. Testar vista semanal
+        res_week = self.client.get(f"/gantt/data/?date={start_dt.date().isoformat()}&view_type=week")
+        self.assertEqual(res_week.status_code, 200)
+        data_week = res_week.json()
+        self.assertEqual(data_week["view_type"], "week")
+        self.assertIn("week_start", data_week)
+        self.assertIn("week_end", data_week)
+
+        # 3. Testar filtros (filtro de recurso inexistente retorna vazio)
+        res_filtered = self.client.get(f"/gantt/data/?date={start_dt.date().isoformat()}&resource_id={self.sala_judo.id}")
+        self.assertEqual(res_filtered.status_code, 200)
+        data_filtered = res_filtered.json()
+        self.assertEqual(len(data_filtered["events"]), 0)
+
+    def test_create_event_from_gantt_endpoint_with_recurrence(self):
+        """Testa o endpoint POST /gantt/create-event/ para criação de série recorrente."""
+        today = timezone.now().date()
+        rec_end = today + timedelta(days=21)
+
+        payload = {
+            "resource_id": self.sala_judo.id,
+            "date": today.isoformat(),
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "title": "Aulas Judo Recorrentes API",
+            "event_type": "open_class",
+            "modality_id": self.judo.id,
+            "instructor_id": self.instructor.id,
+            "capacity": 12,
+            "is_recurring": True,
+            "recurrence_end_date": rec_end.isoformat(),
+            "recurrence_weekdays": [today.weekday()]  # apenas o dia da semana atual
+        }
+
+        res = self.client.post(
+            "/gantt/create-event/",
+            data=json.dumps(payload),
+            content_type="application/json"
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["success"])
+        self.assertTrue(data["is_recurring"])
+        self.assertGreater(data["created_count"], 0)
+        self.assertIsNotNone(data["recurrence_group_id"])
+
+        # Testar eliminação de toda a série
+        event_id = data["event_id"]
+        del_res = self.client.post(
+            "/gantt/delete-event/",
+            data=json.dumps({"event_id": event_id, "delete_series": True}),
+            content_type="application/json"
+        )
+        self.assertEqual(del_res.status_code, 200)
+        del_data = del_res.json()
+        self.assertTrue(del_data["success"])
+        self.assertTrue(del_data["series_deleted"])
+
+        # Confirmar que todos os eventos da série foram removidos
+        remaining = Event.objects.filter(recurrence_group_id=data["recurrence_group_id"]).count()
+        self.assertEqual(remaining, 0)
+
+    def test_gantt_system_redirects_to_unified_gantt(self):
+        """Testa o redirecionamento de compatibilidade de /gantt-system/ para /gantt/."""
+        res = self.client.get("/gantt-system/")
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.url, "/gantt/")
+
+
+class AssociationAndKioskTestCase(TestCase):
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.user = User.objects.create_user(username="admin_test", password="password", is_superuser=True)
+        self.client.login(username="admin_test", password="password")
+
+        # Configuração do Protocolo
+        self.config = ProtocolConfiguration.objects.create(
+            organization=self.org,
+            acr_official_name="ACR - Associação Cultural e Recreativa de Basto",
+            acr_nipc="510695744",
+            insurance_company="Generali Seguros, S.A.",
+            insurance_policy_number="0010189147",
+            insurance_policy_start=timezone.now().date() - timedelta(days=30),
+            insurance_policy_expiry=timezone.now().date() + timedelta(days=335),
+            insurance_annual_premium=Decimal("362.82"),
+        )
+
+        self.pavilhao = Resource.objects.create(
+            organization=self.org,
+            name="Pavilhão da Antiga C+S",
+            capacity=25,
+            facility_type=Resource.FacilityType.MUNICIPAL_CESSION,
+        )
+
+        self.judo = Modality.objects.create(
+            organization=self.org,
+            name="Judo",
+            entity_type=Modality.EntityType.BOTH,
+            default_duration_minutes=60,
+        )
+
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Paulo",
+            last_name="Teixeira",
+            email="paulo.teixeira@acr.pt",
+            is_active=True,
+        )
+
+    def test_automatic_sequential_member_numbering(self):
+        """Verifica se sócios recebem número sequencial automático da ACR e não-sócios não."""
+        s1 = Person.objects.create(
+            organization=self.org,
+            first_name="Mariana",
+            last_name="Silva",
+            member_category=Person.MemberCategory.SOCIO,
+        )
+        self.assertEqual(s1.member_number, 1)
+
+        s2 = Person.objects.create(
+            organization=self.org,
+            first_name="Leonardo",
+            last_name="Alves",
+            member_category=Person.MemberCategory.SOCIO,
+        )
+        self.assertEqual(s2.member_number, 2)
+
+        ns = Person.objects.create(
+            organization=self.org,
+            first_name="Carlos",
+            last_name="Visitante",
+            member_category=Person.MemberCategory.NAO_SOCIO,
+        )
+        self.assertIsNone(ns.member_number)
+
+        # Número manual pré-atribuído deve ser preservado
+        s_manual = Person.objects.create(
+            organization=self.org,
+            first_name="António",
+            last_name="Fundador",
+            member_category=Person.MemberCategory.SOCIO,
+            member_number=50,
+        )
+        self.assertEqual(s_manual.member_number, 50)
+
+        # Próximo deve ser 51
+        s3 = Person.objects.create(
+            organization=self.org,
+            first_name="Tiago",
+            last_name="Novo",
+            member_category=Person.MemberCategory.SOCIO,
+        )
+        self.assertEqual(s3.member_number, 51)
+
+    def test_qr_code_token_and_resolution(self):
+        """Verifica a geração do token QR e resolução por ACR:<org>:<id>:<token>, NIF e Sócio."""
+        atleta = Person.objects.create(
+            organization=self.org,
+            first_name="Mariana",
+            last_name="Silva",
+            nif="250123456",
+            member_category=Person.MemberCategory.SOCIO,
+            phone="912345678",
+        )
+        self.assertIsNotNone(atleta.qr_code_token)
+
+        # Resolução por payload oficial ACR
+        payload = f"ACR:{self.org.id}:{atleta.id}:{atleta.qr_code_token}"
+        resolved = resolve_person(self.org, payload)
+        self.assertEqual(resolved, atleta)
+
+        # Resolução por NIF
+        self.assertEqual(resolve_person(self.org, "250123456"), atleta)
+
+        # Resolução por Número de Sócio (#1 ou 1)
+        self.assertEqual(resolve_person(self.org, str(atleta.member_number)), atleta)
+        self.assertEqual(resolve_person(self.org, f"#{atleta.member_number}"), atleta)
+
+        # Resolução por Telefone
+        self.assertEqual(resolve_person(self.org, "912345678"), atleta)
+
+    def test_kiosk_checkin_with_valid_insurance(self):
+        """Verifica check-in no quiosque com semáforo verde para atleta com apólice e exame válidos."""
+        now = timezone.now()
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.pavilhao,
+            modality=self.judo,
+            instructor=self.instructor,
+            title="Treino de Judo",
+            starts_at=now - timedelta(minutes=10),
+            ends_at=now + timedelta(minutes=50),
+            capacity=20,
+        )
+
+        atleta = Person.objects.create(
+            organization=self.org,
+            first_name="João",
+            last_name="Santos",
+            member_category=Person.MemberCategory.SOCIO,
+            insurance_policy="0010189147",
+            insurance_expiry=now.date() + timedelta(days=120),
+            medical_certificate_expiry=now.date() + timedelta(days=180),
+            membership_fee_status=Person.MembershipFeeStatus.UP_TO_DATE,
+        )
+
+        result = process_kiosk_checkin(self.org, f"ACR:{self.org.id}:{atleta.id}:{atleta.qr_code_token}")
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "green")
+        self.assertTrue(result["checked_in"])
+        self.assertIsNotNone(result["event"])
+        self.assertEqual(result["event"]["id"], event.id)
+
+        # Confirma registo da presença
+        booking = Booking.objects.filter(person=atleta, event=event).first()
+        self.assertIsNotNone(booking)
+        self.assertEqual(booking.status, Booking.Status.CHECKED_IN)
+
+    def test_kiosk_checkin_blocks_expired_insurance(self):
+        """Verifica semáforo vermelho e bloqueio se o seguro estiver expirado."""
+        now = timezone.now()
+        atleta = Person.objects.create(
+            organization=self.org,
+            first_name="Inês",
+            last_name="Ferreira",
+            member_category=Person.MemberCategory.SOCIO,
+            insurance_policy="0010189147",
+            insurance_expiry=now.date() - timedelta(days=5),  # Vencido!
+            medical_certificate_expiry=now.date() + timedelta(days=90),
+        )
+
+        result = process_kiosk_checkin(self.org, str(atleta.member_number))
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "red")
+        self.assertFalse(result["checked_in"])
+        self.assertIn("Seguro desportivo vencido", result["blocking_reasons"][0])
+
+    def test_athlete_graduation_and_belt_sync(self):
+        """Verifica registo de graduação, sincronização do cinto e cálculo de treinos cumpridos."""
+        now = timezone.now()
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.pavilhao,
+            modality=self.judo,
+            instructor=self.instructor,
+            title="Judo Treino 1",
+            starts_at=now - timedelta(days=2),
+            ends_at=now - timedelta(days=2, hours=-1),
+            capacity=10,
+        )
+
+        atleta = Person.objects.create(
+            organization=self.org,
+            first_name="Rui",
+            last_name="Costa",
+            member_category=Person.MemberCategory.SOCIO,
+            current_belt="Cinto Branco",
+        )
+
+        # Registar 1 treino concluído
+        Booking.objects.create(
+            organization=self.org,
+            person=atleta,
+            event=event,
+            status=Booking.Status.CHECKED_IN,
+        )
+
+        # Submeter nova graduação via endpoint
+        res = self.client.post(f"/clients/{atleta.pk}/graduation/add/", data={
+            "modality": self.judo.id,
+            "rank_name": "Cinto Amarelo (7º Kyu)",
+            "rank_order": "2",
+            "awarded_date": now.date().isoformat(),
+            "examiner": self.instructor.id,
+            "certificate_number": "CERT-2024-001",
+        })
+        self.assertEqual(res.status_code, 302)
+
+        # Verifica sincronização
+        atleta.refresh_from_db()
+        self.assertEqual(atleta.current_belt, "Cinto Amarelo (7º Kyu)")
+
+        grad = AthleteGraduation.objects.filter(person=atleta).first()
+        self.assertIsNotNone(grad)
+        self.assertEqual(grad.rank_name, "Cinto Amarelo (7º Kyu)")
+        self.assertEqual(grad.classes_attended_count, 1)  # Contabilizou 1 aula
+
+    def test_association_governance_and_card_views(self):
+        """Verifica rendering das páginas de Governança da ACR e Cartão Digital."""
+        # Criar órgãos sociais
+        board = GoverningBody.objects.create(
+            organization=self.org,
+            body_type=GoverningBody.BodyType.BOARD,
+            term_label="2024–2028",
+            start_date=timezone.now().date() - timedelta(days=100),
+            end_date=timezone.now().date() + timedelta(days=1000),
+            is_active=True,
+        )
+        GoverningBodyMember.objects.create(
+            governing_body=board,
+            name="Paulo Teixeira",
+            role="Presidente da Direção",
+            order=1,
+        )
+
+        atleta = Person.objects.create(
+            organization=self.org,
+            first_name="Mariana",
+            last_name="Silva",
+            member_category=Person.MemberCategory.SOCIO,
+            nif="250999888",
+        )
+
+        # 1. Página de Governança
+        res_gov = self.client.get("/association/governance/")
+        self.assertEqual(res_gov.status_code, 200)
+        self.assertContains(res_gov, "Órgãos Sociais")
+        self.assertContains(res_gov, "Paulo Teixeira")
+
+        # 2. Cartão Digital do Sócio
+        res_card = self.client.get(f"/clients/{atleta.pk}/card/")
+        self.assertEqual(res_card.status_code, 200)
+        self.assertContains(res_card, "Cartão Digital")
+        self.assertContains(res_card, "0010189147")  # Apólice Generali
+        self.assertContains(res_card, "Mariana Silva")
+
+        # 3. Quiosque do Pavilhão
+        res_kiosk = self.client.get("/kiosk/")
+        self.assertEqual(res_kiosk.status_code, 200)
+        self.assertContains(res_kiosk, "ACR DE BASTO")
 

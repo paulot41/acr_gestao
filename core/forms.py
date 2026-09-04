@@ -26,7 +26,8 @@ class PersonForm(forms.ModelForm):
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'nif',
             'date_of_birth', 'address', 'emergency_contact', 'emergency_relationship',
-            'member_category', 'insurance_policy', 'insurance_expiry', 'medical_certificate_expiry',
+            'member_category', 'member_number', 'admission_date', 'membership_fee_status', 'current_belt',
+            'insurance_policy', 'insurance_expiry', 'medical_certificate_expiry',
             'guardian_name', 'guardian_phone', 'guardian_nif',
             'entity_affiliation', 'status', 'notes',
             'consent_rgpd', 'image_consent', 'regulation_accepted', 'photo'
@@ -42,6 +43,10 @@ class PersonForm(forms.ModelForm):
             'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome e telefone de emergência'}),
             'emergency_relationship': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Pai, Mãe, Cônjuge'}),
             'member_category': forms.Select(attrs={'class': 'form-select'}),
+            'member_number': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'N.º de Sócio (auto se vazio)'}),
+            'admission_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'membership_fee_status': forms.Select(attrs={'class': 'form-select'}),
+            'current_belt': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Cinto Branco, Amarelo, etc.'}),
             'insurance_policy': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 0010189147'}),
             'insurance_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'medical_certificate_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),

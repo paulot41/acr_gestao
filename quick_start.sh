@@ -43,34 +43,34 @@ echo -e "${BLUE}🚀 Iniciando deploy automático...${NC}"
 
 # Parar containers existentes
 echo "🛑 Parando containers existentes..."
-docker-compose -f docker-compose.base-nginx.yml down --remove-orphans 2>/dev/null || true
+docker-compose -f docker-compose.yml down --remove-orphans 2>/dev/null || true
 
 # Build e deploy
 echo "🔨 Fazendo build e iniciando containers..."
-docker-compose -f docker-compose.base-nginx.yml up -d --build
+docker-compose -f docker-compose.yml up -d --build
 
 # Aguardar serviços
 echo "⏳ Aguardando serviços ficarem prontos..."
 sleep 30
 
 # Verificar se containers estão a correr
-if ! docker-compose -f docker-compose.base-nginx.yml ps | grep -q "Up"; then
+if ! docker-compose -f docker-compose.yml ps | grep -q "Up"; then
     echo "❌ Alguns containers não estão a correr!"
-    docker-compose -f docker-compose.base-nginx.yml logs
+    docker-compose -f docker-compose.yml logs
     exit 1
 fi
 
 # Migrações
 echo "📊 Executando migrações..."
-docker-compose -f docker-compose.base-nginx.yml exec web python manage.py migrate
+docker-compose -f docker-compose.yml exec web python manage.py migrate
 
 # Ficheiros estáticos
 echo "📁 Recolhendo ficheiros estáticos..."
-docker-compose -f docker-compose.base-nginx.yml exec web python manage.py collectstatic --noinput
+docker-compose -f docker-compose.yml exec web python manage.py collectstatic --noinput
 
 # Criar superuser
 echo "👤 Criando superuser..."
-docker-compose -f docker-compose.base-nginx.yml exec web python manage.py shell << 'EOF'
+docker-compose -f docker-compose.yml exec web python manage.py shell << 'EOF'
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(username='admin').exists():
@@ -82,7 +82,7 @@ EOF
 
 # Dados iniciais
 echo "🎯 Criando dados iniciais..."
-docker-compose -f docker-compose.base-nginx.yml exec web python /app/init_data.py
+docker-compose -f docker-compose.yml exec web python /app/init_data.py
 
 echo
 echo -e "${GREEN}🎉 Deploy completo!${NC}"

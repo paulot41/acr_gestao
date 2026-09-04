@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Variáveis
-COMPOSE_FILE="docker-compose.base-nginx.yml"
+COMPOSE_FILE="docker-compose.yml"
 ENV_FILE=".env.local"
 PROJECT_NAME="acr_gestao"
 

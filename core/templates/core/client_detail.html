@@ -37,11 +37,29 @@
                     </span>
                     {% if client.member_category == 'socio' %}
                     <span class="badge bg-primary" title="Sócio Oficial da ACR">
-                        <i class="fas fa-id-badge me-1"></i>Sócio ACR
+                        <i class="fas fa-id-badge me-1"></i>Sócio ACR {% if client.member_number %}#{{ client.member_number }}{% endif %}
                     </span>
+                    {% if client.membership_fee_status == 'up_to_date' %}
+                    <span class="badge bg-success" title="Quotas da ACR em dia">
+                        <i class="fas fa-check-circle me-1"></i>Quotas em Dia
+                    </span>
+                    {% elif client.membership_fee_status == 'overdue' %}
+                    <span class="badge bg-danger" title="Quotas da ACR pendentes">
+                        <i class="fas fa-exclamation-circle me-1"></i>Quotas em Atraso
+                    </span>
+                    {% elif client.membership_fee_status == 'exempt' %}
+                    <span class="badge bg-secondary" title="Isento de Quotas">
+                        <i class="fas fa-star me-1"></i>Quotas Isento
+                    </span>
+                    {% endif %}
                     {% else %}
                     <span class="badge bg-secondary" title="Praticante Não Sócio">
                         <i class="fas fa-user me-1"></i>Não Sócio
+                    </span>
+                    {% endif %}
+                    {% if client.current_belt %}
+                    <span class="badge bg-warning text-dark" title="Graduação Atual">
+                        <i class="fas fa-medal me-1"></i>{{ client.current_belt }}
                     </span>
                     {% endif %}
                     <span class="badge {{ insurance_status.badge }}">
@@ -81,6 +99,10 @@
                 {% endif %}
             </ul>
         </div>
+
+        <a href="{% url 'core:member_card' client.pk %}" class="btn btn-outline-dark shadow-sm" target="_blank" title="Abrir Cartão Digital de Sócio / Praticante">
+            <i class="fas fa-id-card me-1 text-primary"></i>Cartão Digital
+        </a>
 
         {% if client.email %}
         <a href="{% url 'core:client_resend_welcome' client.pk %}" class="btn btn-outline-info shadow-sm" title="Reenviar E-mail Institucional com Apólice de Seguro">
@@ -302,6 +324,53 @@
                     </div>
                 </div>
             </div>
+        <!-- Graduações & Exames de Cinto -->
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-award me-2 text-warning"></i>Graduações & Exames de Cinto
+                </h5>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#clientAddGraduationModal">
+                    <i class="fas fa-plus me-1"></i>Registar Exame
+                </button>
+            </div>
+            <div class="card-body p-0">
+                {% if graduations %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Cinto / Graduação</th>
+                                    <th>Modalidade</th>
+                                    <th>Data</th>
+                                    <th>Examinador</th>
+                                    <th>Diploma / N.º</th>
+                                    <th>Treinos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for grad in graduations %}
+                                <tr>
+                                    <td class="fw-bold">
+                                        <i class="fas fa-medal text-warning me-1"></i>{{ grad.rank_name }}
+                                    </td>
+                                    <td>{{ grad.modality.name }}</td>
+                                    <td>{{ grad.awarded_date|date:"d/m/Y" }}</td>
+                                    <td>{{ grad.examiner.full_name|default:grad.examiner_name|default:"Comissão Técnica" }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ grad.certificate_number|default:"—" }}</span></td>
+                                    <td><span class="badge bg-info text-dark">{{ grad.classes_attended_count }} aulas</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-award fs-2 mb-2 d-block text-secondary"></i>
+                        Sem histórico de graduações registado.
+                    </div>
+                {% endif %}
+            </div>
         </div>
 
         <!-- Presenças e Aulas Recentes -->
@@ -473,6 +542,74 @@
                 {% endif %}
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Graduação -->
+<div class="modal fade" id="clientAddGraduationModal" tabindex="-1" aria-labelledby="clientAddGradModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{% url 'core:athlete_graduation_add' client.pk %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="clientAddGradModalLabel">
+                    <i class="fas fa-award text-primary me-2"></i>Atribuir Nova Graduação / Cinto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Modalidade <span class="text-danger">*</span></label>
+                    <select name="modality" class="form-select" required>
+                        <option value="">Selecione a Modalidade...</option>
+                        {% for mod in modalities %}
+                            <option value="{{ mod.id }}">{{ mod.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Designação do Cinto / Graduação <span class="text-danger">*</span></label>
+                    <input type="text" name="rank_name" class="form-control" placeholder="Ex: Cinto Amarelo (7º Kyu)" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Ordem do Cinto (1, 2, 3...)</label>
+                        <input type="number" name="rank_order" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Data da Atribuição</label>
+                        <input type="date" name="awarded_date" class="form-control" value="{% now 'Y-m-d' %}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Examinador / Mestre</label>
+                    <select name="examiner" class="form-select mb-2">
+                        <option value="">Selecione o Instrutor / Examinador...</option>
+                        {% for inst in instructors %}
+                            <option value="{{ inst.id }}">{{ inst.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="examiner_name" class="form-control" placeholder="Ou digite o nome do examinador externo...">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">N.º do Diploma</label>
+                        <input type="text" name="certificate_number" class="form-control" placeholder="Ex: DIP-2024-042">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Treinos Cumpridos</label>
+                        <input type="number" name="classes_attended_count" class="form-control" placeholder="Automático se vazio">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Observações / Avaliação Técnica</label>
+                    <textarea name="notes" rows="2" class="form-control" placeholder="Notas sobre a prestação técnica do atleta..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success">Registar Graduação</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

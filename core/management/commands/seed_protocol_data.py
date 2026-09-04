@@ -4,7 +4,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from core.models import (
-    Organization, ProtocolConfiguration, Instructor, Resource, Modality, Person
+    Organization, ProtocolConfiguration, Instructor, Resource, Modality, Person,
+    GoverningBody, GoverningBodyMember
 )
 
 
@@ -157,11 +158,98 @@ class Command(BaseCommand):
             if p_created:
                 created_count += 1
 
+        # 7. Órgãos Sociais da Associação ACR (Mandato 2024–2028)
+        term = "2024–2028"
+        start_d = date(2024, 1, 15)
+        end_d = date(2028, 1, 14)
+        election_d = date(2024, 1, 12)
+
+        # Direção
+        board, _ = GoverningBody.objects.get_or_create(
+            organization=org,
+            body_type=GoverningBody.BodyType.BOARD,
+            term_label=term,
+            defaults={
+                "start_date": start_d,
+                "end_date": end_d,
+                "election_date": election_d,
+                "is_active": True,
+                "electoral_minutes_ref": "Ata n.º 01/2024 da Assembleia Eleitoral da ACR",
+                "notes": "Direção executiva em exercício ordinário de funções estatutárias.",
+            }
+        )
+        board_roles = [
+            ("Paulo Sérgio da Cunha Teixeira", "Presidente da Direção", 1, "Representante Legal da ACR"),
+            ("António José Silva", "Vice-Presidente", 2, "Pelouro de Desporto e Instalações"),
+            ("Manuel Carvalho", "Tesoureiro", 3, "Gestão Financeira e Controlo Orçamental"),
+            ("Maria João Costa", "Secretária", 4, "Atas, Expediente e Registo de Sócios"),
+            ("Joaquim Ribeiro", "Vogal", 5, "Apoio a Eventos e Relações Institucionais"),
+        ]
+        for name, role, order, notes in board_roles:
+            GoverningBodyMember.objects.get_or_create(
+                governing_body=board,
+                name=name,
+                defaults={"role": role, "order": order, "notes": notes}
+            )
+
+        # Mesa da Assembleia Geral
+        assembly, _ = GoverningBody.objects.get_or_create(
+            organization=org,
+            body_type=GoverningBody.BodyType.GENERAL_ASSEMBLY,
+            term_label=term,
+            defaults={
+                "start_date": start_d,
+                "end_date": end_d,
+                "election_date": election_d,
+                "is_active": True,
+                "electoral_minutes_ref": "Ata n.º 01/2024 da Assembleia Eleitoral da ACR",
+                "notes": "Mesa condutora dos trabalhos da Assembleia Geral.",
+            }
+        )
+        assembly_roles = [
+            ("Fernando Moreira", "Presidente da Mesa", 1, "Convocatória e Direção das Assembleias"),
+            ("Rui Pereira", "1.º Secretário", 2, "Redação de Atas"),
+            ("Ana Ramos", "2.ª Secretária", 3, "Apoio ao Escrutínio e Caderno Eleitoral"),
+        ]
+        for name, role, order, notes in assembly_roles:
+            GoverningBodyMember.objects.get_or_create(
+                governing_body=assembly,
+                name=name,
+                defaults={"role": role, "order": order, "notes": notes}
+            )
+
+        # Conselho Fiscal
+        fiscal, _ = GoverningBody.objects.get_or_create(
+            organization=org,
+            body_type=GoverningBody.BodyType.FISCAL_COUNCIL,
+            term_label=term,
+            defaults={
+                "start_date": start_d,
+                "end_date": end_d,
+                "election_date": election_d,
+                "is_active": True,
+                "electoral_minutes_ref": "Ata n.º 01/2024 da Assembleia Eleitoral da ACR",
+                "notes": "Fiscalização de contas e emissão de pareceres obrigatórios.",
+            }
+        )
+        fiscal_roles = [
+            ("José Barbosa", "Presidente do Conselho Fiscal", 1, "Fiscalização e Relatório de Contas"),
+            ("Vítor Martins", "Relator", 2, "Elaboração de Pareceres de Gestão"),
+            ("Teresa Fernandes", "Vogal", 3, "Verificação Patrimonial e Documental"),
+        ]
+        for name, role, order, notes in fiscal_roles:
+            GoverningBodyMember.objects.get_or_create(
+                governing_body=fiscal,
+                name=name,
+                defaults={"role": role, "order": order, "notes": notes}
+            )
+
         self.stdout.write(self.style.SUCCESS(
             f"Parametrização concluída com sucesso! Organização: '{org.name}'\n"
             f"• Apólice: {config.insurance_policy_number} ({config.insurance_company})\n"
             f"• Mediador: {config.broker_name} (ASF: {config.broker_asf_number})\n"
             f"• Diretor Técnico: {daniel.full_name} (Cédula: {daniel.ipdj_license_number})\n"
             f"• Espaço: {pavilhao.name} ({pavilhao.get_facility_type_display()})\n"
+            f"• Órgãos Sociais da ACR: Mandato {term} (Direção, Mesa AG, Conselho Fiscal)\n"
             f"• Atletas registados/atualizados: {created_count} criados de {len(initial_athletes)} da pasta oficial."
         ))

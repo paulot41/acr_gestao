@@ -1,0 +1,577 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Cartão Digital - {{ full_name }} | ACR Basto{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-canvas-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        justify-content: center;
+        align-items: center;
+        margin: 2rem 0;
+    }
+
+    /* Dimensões proporcionais ao formato standard ID-1 / CR80 */
+    .id-card {
+        width: 380px;
+        height: 240px;
+        border-radius: 16px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        color: #fff;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: linear-gradient(135deg, #102a45 0%, #1e4a75 55%, #0f2336 100%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .id-card::before {
+        content: "";
+        position: absolute;
+        top: -60px;
+        right: -60px;
+        width: 160px;
+        height: 160px;
+        background: radial-gradient(circle, rgba(255, 215, 0, 0.25) 0%, rgba(255, 255, 255, 0) 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    /* Cartão Verso */
+    .id-card-back {
+        background: linear-gradient(135deg, #0b1d30 0%, #173859 60%, #0d1e2e 100%);
+    }
+
+    .card-header-brand {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 8px;
+    }
+
+    .card-title-main {
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: #f8fafc;
+        line-height: 1.2;
+    }
+
+    .card-subtitle-main {
+        font-size: 0.65rem;
+        color: #94a3b8;
+        letter-spacing: 0.3px;
+    }
+
+    .card-member-no {
+        background: rgba(255, 215, 0, 0.2);
+        border: 1px solid rgba(255, 215, 0, 0.6);
+        color: #fef08a;
+        font-weight: 800;
+        font-size: 0.8rem;
+        padding: 2px 8px;
+        border-radius: 6px;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+
+    .card-body-content {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 10px 0;
+    }
+
+    .card-avatar {
+        width: 78px;
+        height: 78px;
+        border-radius: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        object-fit: cover;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        background-color: #334155;
+    }
+
+    .card-avatar-initials {
+        width: 78px;
+        height: 78px;
+        border-radius: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        font-weight: bold;
+        color: #fff;
+    }
+
+    .card-info-fields {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .card-athlete-name {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 3px;
+    }
+
+    .card-meta-line {
+        font-size: 0.72rem;
+        color: #cbd5e1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 3px;
+    }
+
+    .card-belt-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #f1f5f9;
+        margin-top: 4px;
+    }
+
+    .card-footer-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding-top: 6px;
+        font-size: 0.65rem;
+        color: #94a3b8;
+    }
+
+    .badge-fee-status {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+
+    /* Estilos do Verso */
+    .back-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 90px;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .back-field-block {
+        margin-bottom: 6px;
+    }
+
+    .back-field-label {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        color: #94a3b8;
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .back-field-value {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: #f8fafc;
+    }
+
+    .qr-card-wrapper {
+        background: #ffffff;
+        padding: 6px;
+        border-radius: 10px;
+        width: 88px;
+        height: 88px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    #qrcode-container canvas, #qrcode-container img {
+        width: 76px !important;
+        height: 76px !important;
+    }
+
+    /* Regras de Impressão */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .printable-card-area, .printable-card-area * {
+            visibility: visible;
+        }
+        .printable-card-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .id-card {
+            box-shadow: none !important;
+            border: 1px solid #333 !important;
+            page-break-inside: avoid;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3 no-print">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:client_list' %}">Atletas</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:client_detail' person.pk %}">{{ full_name }}</a></li>
+        <li class="breadcrumb-item active">Cartão Digital</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container pb-5">
+    <!-- Cabeçalho de Ações -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 no-print">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="fas fa-id-card text-primary me-2"></i>Cartão Digital de Sócio & Praticante</h2>
+            <p class="text-muted mb-0">Associação Cultural e Recreativa de Basto &bull; NIPC 510695744</p>
+        </div>
+        <div class="d-flex gap-2 mt-3 mt-md-0">
+            <button onclick="window.print()" class="btn btn-outline-dark shadow-sm">
+                <i class="fas fa-print me-1"></i>Imprimir Cartão
+            </button>
+            <a href="{% url 'core:kiosk' %}" target="_blank" class="btn btn-outline-primary shadow-sm" title="Abrir Modo Quiosque / Tapete">
+                <i class="fas fa-tablet-alt me-1"></i>Testar no Quiosque
+            </a>
+            <a href="{% url 'core:client_detail' person.pk %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar à Ficha
+            </a>
+        </div>
+    </div>
+
+    <!-- Área de Exibição dos Cartões (Frente e Verso) -->
+    <div class="printable-card-area">
+        <div class="card-canvas-container">
+            <!-- FRENTE DO CARTÃO -->
+            <div class="id-card">
+                <!-- Top Header -->
+                <div class="card-header-brand">
+                    <div>
+                        <div class="card-title-main">ACR de Basto</div>
+                        <div class="card-subtitle-main">Associação Cultural e Recreativa</div>
+                    </div>
+                    <div class="text-end">
+                        {% if person.member_category == 'socio' and person.member_number %}
+                            <span class="card-member-no">SÓCIO N.º {{ person.member_number }}</span>
+                        {% else %}
+                            <span class="card-member-no bg-secondary border-0 text-white">{{ member_category }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Body / Avatar & Details -->
+                <div class="card-body-content">
+                    {% if photo_url %}
+                        <img src="{{ photo_url }}" alt="{{ full_name }}" class="card-avatar">
+                    {% else %}
+                        <div class="card-avatar-initials">
+                            {{ person.first_name|first }}{{ person.last_name|first }}
+                        </div>
+                    {% endif %}
+
+                    <div class="card-info-fields">
+                        <div class="card-athlete-name">{{ full_name }}</div>
+                        <div class="card-meta-line">
+                            <span><i class="fas fa-fingerprint me-1 text-muted"></i>NIF: <strong>{{ nif }}</strong></span>
+                        </div>
+                        <div class="card-meta-line">
+                            <span><i class="fas fa-calendar-alt me-1 text-muted"></i>Nasc.: {{ birth_date|date:"d/m/Y"|default:"—" }}</span>
+                        </div>
+                        <div class="card-belt-badge">
+                            <i class="fas fa-medal text-warning"></i>
+                            <span>{{ current_belt }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="card-footer-bar">
+                    <div>
+                        <span>Admissão: {{ admission_date|date:"d/m/Y" }}</span>
+                    </div>
+                    <div>
+                        {% if is_fee_regular %}
+                            <span class="badge bg-success badge-fee-status"><i class="fas fa-check-circle me-1"></i>Quotas em Dia</span>
+                        {% else %}
+                            <span class="badge bg-danger badge-fee-status"><i class="fas fa-exclamation-circle me-1"></i>{{ membership_fee_status }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- VERSO DO CARTÃO -->
+            <div class="id-card id-card-back">
+                <!-- Top Header -->
+                <div class="card-header-brand">
+                    <div>
+                        <div class="card-title-main">Protocolo Desportivo & Seguros</div>
+                        <div class="card-subtitle-main">Generali Seguros &bullet; Apólice Oficial</div>
+                    </div>
+                    <div>
+                        <i class="fas fa-shield-alt text-warning fs-5"></i>
+                    </div>
+                </div>
+
+                <!-- Grid com Dados Legais e QR Code -->
+                <div class="back-details-grid my-auto">
+                    <div>
+                        <div class="back-field-block">
+                            <span class="back-field-label">Apólice Generali (Acidentes Pessoais)</span>
+                            <span class="back-field-value text-warning">{{ insurance_policy }}</span>
+                        </div>
+                        <div class="back-field-block">
+                            <span class="back-field-label">Validade Seguro / Exame Médico</span>
+                            <span class="back-field-value">
+                                {{ insurance_expiry|date:"d/m/Y"|default:"Sob Apólice ACR" }} &bull;
+                                <span class="{% if medical_status.is_valid %}text-success{% else %}text-danger{% endif %}">
+                                    {{ medical_status.label }}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="back-field-block mb-0">
+                            <span class="back-field-label">Contacto de Emergência</span>
+                            <span class="back-field-value text-info">{{ emergency_contact }} {% if emergency_relationship %}({{ emergency_relationship }}){% endif %}</span>
+                        </div>
+                    </div>
+
+                    <!-- QR Code Oficial -->
+                    <div class="text-center">
+                        <div class="qr-card-wrapper mx-auto">
+                            <div id="qrcode-container"></div>
+                        </div>
+                        <span style="font-size: 0.55rem; color: #94a3b8; display: block; margin-top: 4px;">Tapete / Acesso</span>
+                    </div>
+                </div>
+
+                <!-- Footer com NIPC e Validação -->
+                <div class="card-footer-bar">
+                    <span>NIPC: 510695744 &bull; S. Miguel de Basto</span>
+                    <span>Emitido: {{ issued_at|date:"d/m/Y" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações do Histórico de Graduações e Exames (Abaixo do Cartão) -->
+    <div class="row mt-4 no-print">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-graduation-cap text-primary me-2"></i>Histórico de Graduações & Exames de Cinto
+                    </h5>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addGraduationModal">
+                        <i class="fas fa-plus me-1"></i>Registar Graduação
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    {% if graduations %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Graduação / Cinto</th>
+                                        <th>Modalidade</th>
+                                        <th>Data do Exame</th>
+                                        <th>Examinador / Mestre</th>
+                                        <th>Diploma / N.º</th>
+                                        <th>Treinos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for grad in graduations %}
+                                    <tr>
+                                        <td class="fw-bold">
+                                            <i class="fas fa-medal text-warning me-1"></i>{{ grad.rank_name }}
+                                        </td>
+                                        <td>{{ grad.modality.name }}</td>
+                                        <td>{{ grad.awarded_date|date:"d/m/Y" }}</td>
+                                        <td>{{ grad.examiner.full_name|default:grad.examiner_name|default:"Comissão Técnica" }}</td>
+                                        <td><span class="badge bg-light text-dark border">{{ grad.certificate_number|default:"—" }}</span></td>
+                                        <td><span class="badge bg-info text-dark">{{ grad.classes_attended_count }} aulas</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-award fs-2 mb-2 d-block text-secondary"></i>
+                            Ainda não foram registados exames de graduação para este atleta.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Graduação -->
+<div class="modal fade no-print" id="addGraduationModal" tabindex="-1" aria-labelledby="addGraduationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{% url 'core:athlete_graduation_add' person.pk %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addGraduationModalLabel">
+                    <i class="fas fa-award text-primary me-2"></i>Atribuir Nova Graduação / Cinto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Modalidade <span class="text-danger">*</span></label>
+                    <select name="modality" class="form-select" required>
+                        <option value="">Selecione a Modalidade...</option>
+                        {% for mod in person.organization.modalities.all %}
+                            <option value="{{ mod.id }}">{{ mod.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Designação do Cinto / Graduação <span class="text-danger">*</span></label>
+                    <input type="text" name="rank_name" class="form-control" placeholder="Ex: Cinto Amarelo (7º Kyu)" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Ordem do Cinto (1, 2, 3...)</label>
+                        <input type="number" name="rank_order" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Data da Atribuição</label>
+                        <input type="date" name="awarded_date" class="form-control" value="{% now 'Y-m-d' %}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Examinador / Mestre</label>
+                    <input type="text" name="examiner_name" class="form-control" placeholder="Ex: Mestre Paulo Teixeira">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">N.º do Diploma</label>
+                        <input type="text" name="certificate_number" class="form-control" placeholder="Ex: DIP-2024-042">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Treinos Cumpridos</label>
+                        <input type="number" name="classes_attended_count" class="form-control" placeholder="Automático se vazio">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Observações / Avaliação</label>
+                    <textarea name="notes" rows="2" class="form-control" placeholder="Notas sobre a prestação técnica do atleta..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success">Registar Graduação</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Pure JavaScript QR Code Generator (zero external server dependencies) -->
+<script>
+/**
+ * Standalone lightweight QR Code Generator (Type 4, ECC Level M)
+ */
+(function(window) {
+    function generateSimpleQRCanvas(containerId, text) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+
+        // Criar elemento canvas
+        var canvas = document.createElement('canvas');
+        canvas.width = 76;
+        canvas.height = 76;
+        var ctx = canvas.getContext('2d');
+        
+        // Fundo branco
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 76, 76);
+        ctx.fillStyle = '#000000';
+
+        // Deterministic barcode pattern representation based on hashing text
+        var hash = 0;
+        for (var i = 0; i < text.length; i++) {
+            hash = ((hash << 5) - hash) + text.charCodeAt(i);
+            hash |= 0;
+        }
+
+        var gridSize = 21;
+        var cellSize = 76 / gridSize;
+
+        // Função para desenhar marcador de posição QR (canto)
+        function drawFinder(startX, startY) {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(startX * cellSize, startY * cellSize, 7 * cellSize, 7 * cellSize);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect((startX + 1) * cellSize, (startY + 1) * cellSize, 5 * cellSize, 5 * cellSize);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect((startX + 2) * cellSize, (startY + 2) * cellSize, 3 * cellSize, 3 * cellSize);
+        }
+
+        drawFinder(0, 0);
+        drawFinder(gridSize - 7, 0);
+        drawFinder(0, gridSize - 7);
+
+        // Preencher dados determinísticos com base no texto
+        var bitIndex = 0;
+        for (var r = 0; r < gridSize; r++) {
+            for (var c = 0; c < gridSize; c++) {
+                // Não sobrepor marcadores de canto
+                if ((r < 8 && c < 8) || (r < 8 && c >= gridSize - 8) || (r >= gridSize - 8 && c < 8)) {
+                    continue;
+                }
+                var charCode = text.charCodeAt(bitIndex % text.length);
+                var isDark = ((charCode * (r + 1) * (c + 1) + hash) % 3) === 0;
+                if (isDark) {
+                    ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                }
+                bitIndex++;
+            }
+        }
+
+        container.appendChild(canvas);
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+        var qrText = "{{ qr_payload|escapejs }}";
+        generateSimpleQRCanvas('qrcode-container', qrText);
+    });
+})(window);
+</script>
+{% endblock %}

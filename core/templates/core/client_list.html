@@ -67,15 +67,15 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label for="search" class="form-label">Pesquisar</label>
                 <input type="text" class="form-control" id="search" name="search"
-                       value="{{ search }}" placeholder="Nome, email...">
+                       value="{{ search }}" placeholder="Nome, NIF, email, tel...">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-2">
                 <label for="status" class="form-label">Estado</label>
                 <select class="form-select" id="status" name="status">
-                    <option value="">Todos os estados</option>
+                    <option value="">Todos</option>
                     {% for value, label in status_choices %}
                         <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
                             {{ label }}
@@ -83,9 +83,31 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="col-md-2">
+                <label for="member_category" class="form-label">Categoria</label>
+                <select class="form-select" id="member_category" name="member_category">
+                    <option value="">Todas</option>
+                    {% for value, label in member_category_choices %}
+                        <option value="{{ value }}" {% if member_category == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="membership_fee_status" class="form-label">Quotas ACR</label>
+                <select class="form-select" id="membership_fee_status" name="membership_fee_status">
+                    <option value="">Todas</option>
+                    {% for value, label in fee_status_choices %}
+                        <option value="{{ value }}" {% if fee_status == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-outline-primary me-2">
-                    <i class="bi bi-search"></i>
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i> Filtrar
                 </button>
                 <a href="{% url 'core:client_list' %}" class="btn btn-outline-secondary">
                     <i class="bi bi-x-circle"></i>
@@ -140,8 +162,14 @@
                                         <a href="{% url 'core:client_detail' client.pk %}" class="fw-bold text-dark text-decoration-none">
                                             {{ client.full_name }}
                                         </a>
+                                        {% if client.member_category == 'socio' %}
+                                            <span class="badge bg-primary ms-1" title="Sócio ACR">#{{ client.member_number|default:'—' }}</span>
+                                        {% endif %}
+                                        {% if client.current_belt %}
+                                            <span class="badge bg-warning text-dark ms-1" style="font-size: 0.72rem;">{{ client.current_belt }}</span>
+                                        {% endif %}
                                         {% if client.is_minor %}
-                                            <span class="badge bg-warning text-dark ms-1">Menor</span>
+                                            <span class="badge bg-info text-dark ms-1">Menor</span>
                                         {% endif %}
                                         {% if client.nif %}
                                             <br><small class="text-muted">NIF: {{ client.nif }}</small>
@@ -179,6 +207,10 @@
                             </td>
                             <td>
                                 <div class="d-flex align-items-center gap-1">
+                                    <a href="{% url 'core:member_card' client.pk %}"
+                                       class="btn btn-outline-dark btn-sm" target="_blank" title="Cartão Digital">
+                                        <i class="fas fa-id-card"></i>
+                                    </a>
                                     <a href="{% url 'core:client_pay' client.pk %}"
                                        class="btn btn-outline-success btn-sm" title="Cobrar / Registar Pagamento">
                                         <i class="fas fa-cash-register"></i>

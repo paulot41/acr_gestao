@@ -35,9 +35,16 @@ urlpatterns = [
     path('clients/<int:pk>/', web_views.client_detail, name='client_detail'),
     path('clients/<int:pk>/edit/', web_views.client_edit, name='client_edit'),
     path('clients/<int:pk>/delete/', web_views.client_delete, name='client_delete'),
+    path('clients/<int:pk>/card/', web_views.member_card_view, name='member_card'),
+    path('clients/<int:pk>/graduation/add/', web_views.athlete_graduation_add, name='athlete_graduation_add'),
     path('clients/<int:client_id>/pay/', web_views.client_pay, name='client_pay'),
     path('clients/<int:client_id>/subscribe/', web_views.client_subscribe, name='client_subscribe'),
     path('clients/<int:client_id>/resend-welcome/', web_views.client_resend_welcome, name='client_resend_welcome'),
+
+    # Quiosque de Tapete e Associação ACR
+    path('kiosk/', web_views.kiosk_view, name='kiosk'),
+    path('kiosk/checkin/', web_views.kiosk_checkin_api, name='kiosk_checkin_api'),
+    path('association/governance/', web_views.association_governance_view, name='association_governance'),
 
     # Balcão de Caixa e Pagamentos
     path('cashier/', web_views.cashier_dashboard, name='cashier_dashboard'),

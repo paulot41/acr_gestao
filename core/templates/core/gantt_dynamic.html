@@ -1,21 +1,68 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Agenda de Marcações - Gestão de Horários{% endblock %}
+{% block title %}Agenda de Marcações & Gestão de Instalações - ACR & Proform SC{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* ==========================================================================
+       Layout Geral e Controlos
+       ========================================================================== */
+    .controls-bar {
+        background: #ffffff;
+        padding: 14px 20px;
+        border-bottom: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        position: sticky;
+        top: 0;
+        z-index: 210;
+    }
+
+    .view-mode-pill {
+        display: inline-flex;
+        background: #e9ecef;
+        padding: 3px;
+        border-radius: 30px;
+    }
+
+    .view-mode-pill .btn {
+        border-radius: 25px;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 5px 14px;
+        border: none;
+        color: #495057;
+        transition: all 0.2s ease;
+    }
+
+    .view-mode-pill .btn.active {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+    }
+
+    .filter-bar {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 10px 20px;
+    }
+
+    /* ==========================================================================
+       Vista 1: Timeline Diária (Horizontal por Salas)
+       ========================================================================== */
     .gantt-container {
         display: flex;
-        height: calc(100vh - 200px);
+        height: calc(100vh - 215px);
         overflow: hidden;
+        background: #ffffff;
     }
 
     .gantt-sidebar {
-        width: 250px;
-        background: #f8f9fa;
-        border-right: 2px solid #dee2e6;
+        width: 260px;
+        background: #f8fafc;
+        border-right: 2px solid #e2e8f0;
         overflow-y: auto;
+        flex-shrink: 0;
     }
 
     .gantt-main {
@@ -27,29 +74,29 @@
     .gantt-header {
         position: sticky;
         top: 0;
-        background: white;
+        background: #ffffff;
         z-index: 100;
-        border-bottom: 2px solid #dee2e6;
+        border-bottom: 2px solid #cbd5e1;
         display: flex;
     }
 
     .gantt-time-header {
         display: flex;
-        height: 60px;
+        height: 52px;
         margin-left: 0;
     }
 
     .time-slot {
         min-width: 80px;
-        border-right: 1px solid #dee2e6;
+        border-right: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: bold;
+        font-weight: 600;
         font-size: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: white;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
     }
 
     .gantt-grid {
@@ -58,32 +105,34 @@
     }
 
     .resource-row {
-        height: 80px;
-        border-bottom: 1px solid #dee2e6;
+        height: 84px;
+        border-bottom: 1px solid #e2e8f0;
         display: flex;
         position: relative;
     }
 
     .resource-label {
-        width: 250px;
-        padding: 15px;
-        background: #f8f9fa;
-        border-right: 2px solid #dee2e6;
+        width: 260px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border-right: 2px solid #e2e8f0;
         position: sticky;
         left: 0;
         z-index: 50;
         display: flex;
         align-items: center;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.02);
     }
 
     .resource-info h6 {
         margin: 0;
         font-size: 14px;
-        color: #495057;
+        font-weight: 600;
+        color: #1e293b;
     }
 
     .resource-info small {
-        color: #6c757d;
+        color: #64748b;
         font-size: 11px;
     }
 
@@ -95,47 +144,54 @@
 
     .time-cell {
         min-width: 80px;
-        border-right: 1px solid #e9ecef;
+        border-right: 1px solid #f1f5f9;
         position: relative;
         cursor: crosshair;
-        transition: background-color 0.2s;
+        transition: background-color 0.15s;
     }
 
     .time-cell:hover {
-        background-color: rgba(0, 123, 255, 0.1);
+        background-color: rgba(59, 130, 246, 0.08);
     }
 
     .time-cell.selecting {
-        background-color: rgba(0, 123, 255, 0.3);
+        background-color: rgba(59, 130, 246, 0.25);
     }
 
     .event-block {
         position: absolute;
-        background: linear-gradient(135deg, #28a745, #20c997);
+        background: linear-gradient(135deg, #10b981, #059669);
         color: white;
-        border-radius: 4px;
-        padding: 4px 8px;
+        border-radius: 6px;
+        padding: 5px 8px;
         font-size: 11px;
         cursor: pointer;
         z-index: 10;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+        transition: transform 0.15s, box-shadow 0.15s;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .event-block:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 5px 12px rgba(0,0,0,0.25);
+        z-index: 15;
+    }
+
+    .event-block.dragging {
+        opacity: 0.7;
+        cursor: grabbing;
     }
 
     .event-block.individual {
-        background: linear-gradient(135deg, #fd7e14, #e83e8c);
+        background: linear-gradient(135deg, #f59e0b, #d97706);
     }
 
     .event-block.group_class {
-        background: linear-gradient(135deg, #6f42c1, #6610f2);
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
     }
 
     .current-time-line {
@@ -143,99 +199,134 @@
         top: 0;
         bottom: 0;
         width: 2px;
-        background: #dc3545;
+        background: #ef4444;
         z-index: 200;
         pointer-events: none;
     }
 
     .current-time-indicator {
         position: absolute;
-        top: -10px;
-        left: -8px;
-        width: 18px;
-        height: 18px;
-        background: #dc3545;
+        top: -8px;
+        left: -7px;
+        width: 16px;
+        height: 16px;
+        background: #ef4444;
         border-radius: 50%;
-        box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
     }
 
-    .controls-bar {
-        background: white;
-        padding: 15px;
-        border-bottom: 1px solid #dee2e6;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    /* ==========================================================================
+       Vista 2: Grelha Semanal da Instalação (Pavilhão/Horário)
+       ========================================================================== */
+    .weekly-view-wrapper {
+        height: calc(100vh - 215px);
+        overflow-y: auto;
+        padding: 16px 20px;
+        background: #f8fafc;
     }
 
-    .view-toggle {
-        display: flex;
-        gap: 10px;
-        align-items: center;
+    .weekly-grid {
+        display: grid;
+        grid-template-columns: 80px repeat(7, 1fr);
+        gap: 8px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
-    .btn-view {
-        padding: 6px 12px;
-        font-size: 12px;
-        border-radius: 20px;
-        transition: all 0.3s;
-    }
-
-    .btn-view.active {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-    }
-
-    .modal-content {
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-
-    .modal-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 15px 15px 0 0;
-    }
-
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 1px solid #ced4da;
-        transition: all 0.3s;
-    }
-
-    .form-control:focus, .form-select:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    }
-
-    .sidebar-header {
-        padding: 15px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: bold;
+    .weekly-header-cell {
+        background: #f1f5f9;
+        font-weight: 700;
+        font-size: 13px;
         text-align: center;
+        padding: 12px 6px;
+        border-radius: 8px;
+        color: #334155;
     }
 
-    .resource-item {
-        padding: 12px 15px;
-        border-bottom: 1px solid #e9ecef;
+    .weekly-header-cell.today {
+        background: #e0e7ff;
+        color: #4338ca;
+        border: 2px solid #6366f1;
+    }
+
+    .weekly-time-col-header {
+        background: transparent;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .weekly-day-column {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 550px;
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 8px;
+        border: 1px dashed #cbd5e1;
+    }
+
+    .weekly-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 10px;
+        border-left: 5px solid #6366f1;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.06);
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: all 0.2s ease;
+        position: relative;
     }
 
-    .resource-item:hover {
-        background-color: #e3f2fd;
+    .weekly-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.12);
     }
 
-    .resource-item.selected {
-        background-color: #bbdefb;
-        border-left: 4px solid #2196f3;
+    .occupancy-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 10px;
+        display: inline-block;
     }
 
+    .occupancy-low {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .occupancy-medium {
+        background: #fef9c3;
+        color: #854d0e;
+    }
+
+    .occupancy-full {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .badge-recurrence {
+        background: #e0e7ff;
+        color: #3730a3;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 6px;
+    }
+
+    /* Badges de Entidade */
     .entity-badge {
         font-size: 10px;
         padding: 2px 6px;
         border-radius: 10px;
-        margin-left: 5px;
+        margin-left: 4px;
+        font-weight: 600;
     }
 
     .entity-acr {
@@ -253,23 +344,63 @@
         color: #7b1fa2;
     }
 
+    /* Print Styles */
+    .print-header {
+        display: none;
+    }
+
+    @media print {
+        body {
+            background: #ffffff !important;
+            font-size: 11px !important;
+            color: #000000 !important;
+        }
+
+        .navbar, .sidebar, .controls-bar, .filter-bar, .btn, #loading-overlay, footer {
+            display: none !important;
+        }
+
+        .print-header {
+            display: block !important;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+
+        .weekly-view-wrapper, .gantt-container {
+            height: auto !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+        }
+
+        .weekly-grid {
+            border: 1px solid #000 !important;
+            box-shadow: none !important;
+        }
+
+        .weekly-card {
+            box-shadow: none !important;
+            border: 1px solid #444 !important;
+            break-inside: avoid;
+        }
+    }
+
     @media (max-width: 768px) {
         .gantt-container {
             flex-direction: column;
             height: auto;
         }
-
         .gantt-sidebar {
             width: 100%;
-            height: 200px;
+            height: 180px;
         }
-
         .resource-label {
             width: 100%;
         }
-
-        .time-slot, .time-cell {
-            min-width: 60px;
+        .weekly-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -279,97 +410,184 @@
 <div class="container-fluid p-0">
     <!-- Hidden CSRF token for AJAX requests -->
     <form style="display:none;">{% csrf_token %}</form>
-    <!-- Barra de Controles -->
+
+    <!-- Cabeçalho de Impressão (Apenas visível em Print) -->
+    <div class="print-header">
+        <h4 class="mb-1 fw-bold">ACR & PROFORM SC - Grelha Geral de Ocupação das Instalações</h4>
+        <div id="print-subtitle" class="small text-secondary">Pavilhão & Salas Desportivas</div>
+    </div>
+
+    <!-- Barra de Controlos Superior -->
     <div class="controls-bar">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <div class="d-flex align-items-center gap-3">
-                    <h4 class="mb-0">
-                        <i class="fas fa-calendar-alt text-primary"></i>
-                        Agenda de Marcações
-                    </h4>
-                    <input type="date" id="gantt-date" class="form-control" style="width: auto;" value="{{ request.GET.date|default:'' }}">
-                    <div class="btn-group btn-group-sm" role="group" aria-label="Navegar dias">
-                        <button type="button" class="btn btn-outline-secondary" id="gantt-prev-day">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" id="gantt-next-day">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <!-- Esquerda: Título e Alternador de Vista -->
+            <div class="d-flex align-items-center gap-3">
+                <h4 class="mb-0 fw-bold d-flex align-items-center gap-2 text-dark">
+                    <i class="fas fa-calendar-alt text-primary"></i>
+                    <span>Agenda & Instalações</span>
+                </h4>
+
+                <div class="view-mode-pill">
+                    <button type="button" class="btn active" id="btn-mode-daily" data-mode="daily">
+                        <i class="fas fa-bars-progress me-1"></i> Timeline Diária
+                    </button>
+                    <button type="button" class="btn" id="btn-mode-weekly" data-mode="weekly">
+                        <i class="fas fa-calendar-week me-1"></i> Grelha Semanal
+                    </button>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="view-toggle justify-content-end">
-                    <button class="btn btn-view active" data-view="standard" id="view-standard">
+
+            <!-- Centro: Navegador de Datas -->
+            <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" id="gantt-prev-btn" title="Anterior">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="gantt-today-btn">
+                        Hoje
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="gantt-next-btn" title="Seguinte">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <input type="date" id="gantt-date" class="form-control form-control-sm" style="width: auto;" value="{{ request.GET.date|default:'' }}">
+                <span id="gantt-period-label" class="badge bg-light text-dark border px-2 py-2 fw-semibold"></span>
+            </div>
+
+            <!-- Direita: Ações Rápidas -->
+            <div class="d-flex align-items-center gap-2">
+                <div id="daily-hours-toggle" class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary active" data-view="standard" id="view-standard">
                         06h - 22h
                     </button>
-                    <button class="btn btn-view" data-view="extended" id="view-extended">
+                    <button class="btn btn-outline-secondary" data-view="extended" id="view-extended">
                         24 Horas
                     </button>
-                    <button class="btn btn-outline-primary btn-sm" id="refresh-gantt">
-                        <i class="fas fa-sync-alt"></i> Atualizar
-                    </button>
+                </div>
+
+                <button type="button" class="btn btn-primary btn-sm" id="btn-create-modal">
+                    <i class="fas fa-plus-circle me-1"></i> Nova Aula
+                </button>
+
+                <button type="button" class="btn btn-outline-dark btn-sm" onclick="window.print();" title="Imprimir Grelha">
+                    <i class="fas fa-print"></i>
+                </button>
+
+                <button class="btn btn-outline-primary btn-sm" id="refresh-gantt" title="Atualizar dados">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Filtros Rápidos (Espaço, Modalidade, Instrutor) -->
+    <div class="filter-bar">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="fas fa-map-marker-alt text-primary"></i></span>
+                    <select id="filter-resource" class="form-select">
+                        <option value="">Todos os Espaços / Salas</option>
+                        {% for resource in resources %}
+                        <option value="{{ resource.id }}">{{ resource.name }} ({{ resource.get_entity_type_display }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="fas fa-dumbbell text-success"></i></span>
+                    <select id="filter-modality" class="form-select">
+                        <option value="">Todas as Modalidades</option>
+                        {% for modality in modalities %}
+                        <option value="{{ modality.id }}">{{ modality.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="fas fa-user-tie text-info"></i></span>
+                    <select id="filter-instructor" class="form-select">
+                        <option value="">Todos os Instrutores</option>
+                        {% for instructor in instructors %}
+                        <option value="{{ instructor.id }}">{{ instructor.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="button" class="btn btn-light btn-sm border text-secondary" id="clear-filters">
+                    <i class="fas fa-times me-1"></i> Limpar Filtros
+                </button>
+                <div class="ms-auto d-flex align-items-center gap-1 text-muted small">
+                    <span class="badge bg-success rounded-pill">&nbsp;</span> Disponível
+                    <span class="badge bg-danger rounded-pill ms-2">&nbsp;</span> Lotado
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Container Principal do Gantt -->
-    <div class="gantt-container">
-        <!-- Sidebar com Recursos -->
-        <div class="gantt-sidebar">
-            <div class="sidebar-header">
-                <i class="fas fa-map-marker-alt"></i>
-                Espaços Disponíveis
-            </div>
-            <div id="resources-list">
-                {% for resource in resources %}
-                <div class="resource-item" data-resource-id="{{ resource.id }}">
-                    <div class="resource-info">
-                        <h6>{{ resource.name }}</h6>
-                        <small>
-                            Cap: {{ resource.capacity }}
-                            <span class="entity-badge entity-{{ resource.entity_type }}">
-                                {{ resource.get_entity_type_display }}
-                            </span>
-                        </small>
-                    </div>
+    <!-- CONTAINER 1: Vista Diária (Timeline Horizontal por Salas) -->
+    <div id="daily-view-container">
+        <div class="gantt-container">
+            <!-- Sidebar com Recursos -->
+            <div class="gantt-sidebar">
+                <div class="p-3 bg-light border-bottom fw-bold text-dark d-flex align-items-center justify-content-between">
+                    <span><i class="fas fa-door-open me-2 text-primary"></i>Instalações</span>
+                    <span class="badge bg-secondary rounded-pill" id="resource-count-badge">{{ resources|length }}</span>
                 </div>
-                {% endfor %}
+                <div id="resources-list">
+                    {% for resource in resources %}
+                    <div class="resource-item p-3 border-bottom" data-resource-id="{{ resource.id }}">
+                        <div class="resource-info">
+                            <h6 class="mb-1">{{ resource.name }}</h6>
+                            <small class="text-muted d-block">
+                                Lotação: <strong>{{ resource.capacity }}</strong>
+                                <span class="entity-badge entity-{{ resource.entity_type }}">
+                                    {{ resource.get_entity_type_display }}
+                                </span>
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Área Principal da Timeline -->
+            <div class="gantt-main">
+                <div class="gantt-header">
+                    <div class="gantt-time-header" id="time-header"></div>
+                </div>
+
+                <div class="gantt-grid" id="gantt-grid"></div>
+
+                <!-- Indicador de Hora Atual -->
+                <div class="current-time-line" id="current-time-line" style="display: none;">
+                    <div class="current-time-indicator"></div>
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- Área Principal do Gantt -->
-        <div class="gantt-main">
-            <!-- Cabeçalho com Horas -->
-            <div class="gantt-header">
-                <div class="gantt-time-header" id="time-header">
-                    <!-- Horas serão geradas dinamicamente via JavaScript -->
-                </div>
-            </div>
-
-            <!-- Grid Principal -->
-            <div class="gantt-grid" id="gantt-grid">
-                <!-- Linhas dos recursos serão geradas dinamicamente -->
-            </div>
-
-            <!-- Linha de Tempo Atual -->
-            <div class="current-time-line" id="current-time-line" style="display: none;">
-                <div class="current-time-indicator"></div>
+    <!-- CONTAINER 2: Vista Semanal da Instalação (Pavilhão/Horário) -->
+    <div id="weekly-view-container" style="display: none;">
+        <div class="weekly-view-wrapper">
+            <div class="weekly-grid" id="weekly-grid">
+                <!-- Cabeçalhos dos Dias e Horários gerados via JavaScript -->
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para Criar/Editar Evento -->
+<!-- Modal para Criar / Editar Aula -->
 <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="eventModalLabel">
-                    <i class="fas fa-calendar-plus"></i>
-                    <span id="modal-title-text">Criar Nova Aula</span>
+                    <i class="fas fa-calendar-plus me-2"></i>
+                    <span id="modal-title-text">Agendar Nova Aula</span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -378,29 +596,48 @@
                     {% csrf_token %}
                     <input type="hidden" id="event-id" name="event_id">
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="event-title" class="form-label">Título da Aula</label>
-                            <input type="text" class="form-control" id="event-title" name="title" required>
+                    <!-- Local e Horário -->
+                    <div class="row g-2 mb-3 bg-light p-2 rounded border">
+                        <div class="col-md-5">
+                            <label class="form-label small text-muted mb-0 fw-bold">Espaço / Instalação</label>
+                            <select class="form-select form-select-sm" id="event-resource" name="resource_id" required>
+                                {% for resource in resources %}
+                                <option value="{{ resource.id }}" data-capacity="{{ resource.capacity }}">{{ resource.name }} (Lotação: {{ resource.capacity }})</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="event-type" class="form-label">Tipo de Aula</label>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0 fw-bold">Data</label>
+                            <input type="date" class="form-control form-control-sm" id="event-date" name="date" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted mb-0 fw-bold">Início</label>
+                            <input type="time" class="form-control form-control-sm" id="event-start-time" name="start_time" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted mb-0 fw-bold">Fim</label>
+                            <input type="time" class="form-control form-control-sm" id="event-end-time" name="end_time" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-7 mb-3">
+                            <label for="event-title" class="form-label fw-bold">Título da Aula</label>
+                            <input type="text" class="form-control" id="event-title" name="title" placeholder="Ex: Judo Cadetes, Krav Maga Avançado..." required>
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="event-type" class="form-label fw-bold">Tipo de Aula</label>
                             <select class="form-select" id="event-type" name="event_type">
                                 <option value="open_class">Aula Aberta</option>
                                 <option value="group_class">Aula de Turma</option>
-                                <option value="individual">Aula Individual</option>
+                                <option value="individual">Aula Individual / PT</option>
                             </select>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="event-description" class="form-label">Descrição</label>
-                        <textarea class="form-control" id="event-description" name="description" rows="2"></textarea>
-                    </div>
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="event-modality" class="form-label">Modalidade</label>
+                            <label for="event-modality" class="form-label fw-bold">Modalidade</label>
                             <select class="form-select" id="event-modality" name="modality_id">
                                 <option value="">Selecionar modalidade...</option>
                                 {% for modality in modalities %}
@@ -411,7 +648,7 @@
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="event-instructor" class="form-label">Instrutor</label>
+                            <label for="event-instructor" class="form-label fw-bold">Instrutor Responsável</label>
                             <select class="form-select" id="event-instructor" name="instructor_id">
                                 <option value="">Selecionar instrutor...</option>
                                 {% for instructor in instructors %}
@@ -426,7 +663,7 @@
                     <!-- Campos específicos por tipo -->
                     <div id="group-class-fields" style="display: none;">
                         <div class="mb-3">
-                            <label for="event-class-group" class="form-label">Turma</label>
+                            <label for="event-class-group" class="form-label fw-bold">Turma Associada</label>
                             <select class="form-select" id="event-class-group" name="class_group_id">
                                 <option value="">Selecionar turma...</option>
                                 {% for group in class_groups %}
@@ -440,9 +677,9 @@
 
                     <div id="individual-fields" style="display: none;">
                         <div class="mb-3">
-                            <label for="event-client" class="form-label">Cliente</label>
+                            <label for="event-client" class="form-label fw-bold">Atleta / Cliente Individual</label>
                             <select class="form-select" id="event-client" name="individual_client_id">
-                                <option value="">Selecionar cliente...</option>
+                                <option value="">Selecionar atleta...</option>
                                 {% for client in clients %}
                                 <option value="{{ client.id }}">
                                     {{ client.full_name }} ({{ client.get_entity_affiliation_display }})
@@ -454,44 +691,105 @@
 
                     <div id="open-class-fields">
                         <div class="mb-3">
-                            <label for="event-capacity" class="form-label">Capacidade Máxima</label>
-                            <input type="number" class="form-control" id="event-capacity" name="capacity" min="1" max="50">
+                            <label for="event-capacity" class="form-label fw-bold">Capacidade Máxima de Participantes</label>
+                            <input type="number" class="form-control" id="event-capacity" name="capacity" min="1" max="100">
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">Horário</label>
-                            <div class="d-flex align-items-center gap-2">
-                                <span id="selected-time" class="badge bg-info"></span>
-                            </div>
+                    <div class="mb-3">
+                        <label for="event-description" class="form-label fw-bold">Descrição / Observações</label>
+                        <textarea class="form-control" id="event-description" name="description" rows="2" placeholder="Detalhes da aula, objetivos, material necessário..."></textarea>
+                    </div>
+
+                    <!-- Secção de Recorrência (Apenas no Modo Criação) -->
+                    <div class="card bg-light border-0 p-3 mb-2" id="recurrence-section">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="event-is-recurring" name="is_recurring">
+                            <label class="form-check-label fw-bold" for="event-is-recurring">
+                                <i class="fas fa-redo-alt text-primary me-1"></i> Repetir Semanalmente (Série Recorrente)
+                            </label>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Espaço</label>
-                            <div class="d-flex align-items-center gap-2">
-                                <span id="selected-resource" class="badge bg-success"></span>
+                        <div id="recurrence-details" style="display: none;">
+                            <div class="row g-2 align-items-center mb-2">
+                                <div class="col-md-5">
+                                    <label for="event-recurrence-end" class="form-label small mb-1 fw-semibold">Repetir até:</label>
+                                    <input type="date" class="form-control form-control-sm" id="event-recurrence-end" name="recurrence_end_date">
+                                </div>
+                                <div class="col-md-7">
+                                    <label class="form-label small mb-1 fw-semibold">Dias da Semana:</label>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-mon" value="0">
+                                            <label class="form-check-label small" for="rec-mon">Seg</label>
+                                        </div>
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-tue" value="1">
+                                            <label class="form-check-label small" for="rec-tue">Ter</label>
+                                        </div>
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-wed" value="2">
+                                            <label class="form-check-label small" for="rec-wed">Qua</label>
+                                        </div>
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-thu" value="3">
+                                            <label class="form-check-label small" for="rec-thu">Qui</label>
+                                        </div>
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-fri" value="4">
+                                            <label class="form-check-label small" for="rec-fri">Sex</label>
+                                        </div>
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-sat" value="5">
+                                            <label class="form-check-label small" for="rec-sat">Sáb</label>
+                                        </div>
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input rec-weekday" type="checkbox" id="rec-sun" value="6">
+                                            <label class="form-check-label small" for="rec-sun">Dom</label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                            <small class="text-muted"><i class="fas fa-shield-alt text-success me-1"></i> O agendador previne conflitos de espaço e instrutor automaticamente, ignorando ocorrências em sobreposição sem bloquear as restantes.</small>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de Ocupação Atual (Apenas em Edição) -->
+                    <div id="event-occupancy-info" class="p-2 mb-2 bg-light rounded border" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small fw-bold">Ocupação / Presenças Confirmadas:</span>
+                            <span id="modal-occupancy-badge" class="occupancy-badge occupancy-low">0 / 0 (0%)</span>
                         </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-outline-danger" id="delete-event" style="display: none;">
-                    <i class="fas fa-trash"></i> Eliminar Aula
-                </button>
-                <button type="button" class="btn btn-primary" id="save-event">
-                    <i class="fas fa-save"></i> Guardar Aula
-                </button>
+            <div class="modal-footer d-flex justify-content-between">
+                <div>
+                    <a href="#" id="modal-checkin-link" class="btn btn-outline-success" target="_blank" style="display: none;">
+                        <i class="fas fa-clipboard-check me-1"></i> Abrir Check-in no Tapete
+                    </a>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-outline-danger" id="delete-event" style="display: none;">
+                        <i class="fas fa-trash me-1"></i> Eliminar Aula
+                    </button>
+                    <button type="button" class="btn btn-danger" id="delete-series" style="display: none;">
+                        <i class="fas fa-trash-alt me-1"></i> Eliminar Toda a Série
+                    </button>
+                    <button type="button" class="btn btn-primary" id="save-event">
+                        <i class="fas fa-save me-1"></i> Guardar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Loading overlay -->
-<div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
-    <div class="spinner-border text-light" role="status">
-        <span class="visually-hidden">A carregar...</span>
+<div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 9999; justify-content: center; align-items: center;">
+    <div class="text-center text-white">
+        <div class="spinner-border text-light mb-2" role="status"></div>
+        <div class="fw-semibold">A carregar horários...</div>
     </div>
 </div>
 {% endblock %}
@@ -506,16 +804,27 @@ const GANTT_DETAILS_URL_TEMPLATE = "{% url 'core:get_event_details' 0 %}";
 
 class GanttDynamic {
     constructor() {
+        this.currentMode = 'daily'; // 'daily' ou 'weekly'
+        this.currentView = 'standard'; // 'standard' (6-22h) ou 'extended' (0-23h)
         this.selectedDate = new Date().toISOString().split('T')[0];
-        this.currentView = 'standard'; // standard (6-22h) ou extended (0-23h)
+        
+        // Filtros
+        this.filterResource = '';
+        this.filterModality = '';
+        this.filterInstructor = '';
+
+        // Seleção & Drag
         this.isSelecting = false;
         this.selectionStart = null;
         this.selectionEnd = null;
         this.selectedResource = null;
         this.isDragging = false;
         this.dragging = null;
+
+        // Dados
         this.events = [];
         this.resources = [];
+        this.meta = {};
 
         this.init();
     }
@@ -527,86 +836,197 @@ class GanttDynamic {
         } else {
             dateInput.value = this.selectedDate;
         }
+
         this.setupEventListeners();
         this.loadGanttData();
         this.updateCurrentTimeLine();
 
-        // Atualizar linha de tempo a cada minuto
         setInterval(() => this.updateCurrentTimeLine(), 60000);
     }
 
     setupEventListeners() {
-        // Data picker
+        // Alternador de Modo (Timeline Diária vs Grelha Semanal)
+        document.getElementById('btn-mode-daily').addEventListener('click', () => this.switchMode('daily'));
+        document.getElementById('btn-mode-weekly').addEventListener('click', () => this.switchMode('weekly'));
+
+        // Navegação de datas
         document.getElementById('gantt-date').addEventListener('change', (e) => {
             this.selectedDate = e.target.value;
             this.loadGanttData();
         });
-        document.getElementById('gantt-prev-day').addEventListener('click', () => {
-            this.shiftDay(-1);
-        });
-        document.getElementById('gantt-next-day').addEventListener('click', () => {
-            this.shiftDay(1);
+
+        document.getElementById('gantt-prev-btn').addEventListener('click', () => {
+            this.shiftDate(this.currentMode === 'weekly' ? -7 : -1);
         });
 
-        // Botões de vista
-        document.querySelectorAll('.btn-view').forEach(btn => {
+        document.getElementById('gantt-next-btn').addEventListener('click', () => {
+            this.shiftDate(this.currentMode === 'weekly' ? 7 : 1);
+        });
+
+        document.getElementById('gantt-today-btn').addEventListener('click', () => {
+            this.selectedDate = new Date().toISOString().split('T')[0];
+            document.getElementById('gantt-date').value = this.selectedDate;
+            this.loadGanttData();
+        });
+
+        // Alternador de amplitude horária (06h-22h vs 24h)
+        document.querySelectorAll('#daily-hours-toggle .btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#daily-hours-toggle .btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 this.currentView = e.target.dataset.view;
                 this.renderGantt();
             });
         });
 
-        // Refresh
+        // Filtros
+        document.getElementById('filter-resource').addEventListener('change', (e) => {
+            this.filterResource = e.target.value;
+            this.loadGanttData();
+        });
+        document.getElementById('filter-modality').addEventListener('change', (e) => {
+            this.filterModality = e.target.value;
+            this.loadGanttData();
+        });
+        document.getElementById('filter-instructor').addEventListener('change', (e) => {
+            this.filterInstructor = e.target.value;
+            this.loadGanttData();
+        });
+        document.getElementById('clear-filters').addEventListener('click', () => {
+            document.getElementById('filter-resource').value = '';
+            document.getElementById('filter-modality').value = '';
+            document.getElementById('filter-instructor').value = '';
+            this.filterResource = '';
+            this.filterModality = '';
+            this.filterInstructor = '';
+            this.loadGanttData();
+        });
+
+        // Botão Novo Evento manual
+        document.getElementById('btn-create-modal').addEventListener('click', () => {
+            this.openManualCreateModal();
+        });
+
+        // Botão Atualizar
         document.getElementById('refresh-gantt').addEventListener('click', () => {
             this.loadGanttData();
         });
 
-        // Event type change
+        // Alteração de tipo de aula no formulário
         document.getElementById('event-type').addEventListener('change', (e) => {
             this.toggleEventTypeFields(e.target.value);
         });
 
-        // Save event
+        // Switch de recorrência
+        document.getElementById('event-is-recurring').addEventListener('change', (e) => {
+            document.getElementById('recurrence-details').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Guardar
         document.getElementById('save-event').addEventListener('click', () => {
             this.saveEvent();
         });
 
-        // Delete event
+        // Eliminar único
         document.getElementById('delete-event').addEventListener('click', () => {
-            this.deleteEvent();
+            this.deleteEvent(false);
         });
+
+        // Eliminar série
+        document.getElementById('delete-series').addEventListener('click', () => {
+            this.deleteEvent(true);
+        });
+    }
+
+    switchMode(mode) {
+        this.currentMode = mode;
+        if (mode === 'daily') {
+            document.getElementById('btn-mode-daily').classList.add('active');
+            document.getElementById('btn-mode-weekly').classList.remove('active');
+            document.getElementById('daily-view-container').style.display = 'block';
+            document.getElementById('weekly-view-container').style.display = 'none';
+            document.getElementById('daily-hours-toggle').style.display = 'inline-flex';
+        } else {
+            document.getElementById('btn-mode-weekly').classList.add('active');
+            document.getElementById('btn-mode-daily').classList.remove('active');
+            document.getElementById('daily-view-container').style.display = 'none';
+            document.getElementById('weekly-view-container').style.display = 'block';
+            document.getElementById('daily-hours-toggle').style.display = 'none';
+        }
+        this.loadGanttData();
+    }
+
+    shiftDate(days) {
+        const parts = this.selectedDate.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setDate(d.getDate() + days);
+        this.selectedDate = d.toISOString().split('T')[0];
+        document.getElementById('gantt-date').value = this.selectedDate;
+        this.loadGanttData();
     }
 
     loadGanttData() {
         document.getElementById('loading-overlay').style.display = 'flex';
 
-        fetch(`${GANTT_DATA_URL}?date=${this.selectedDate}`, { credentials: 'same-origin' })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                return response.json();
+        let url = `${GANTT_DATA_URL}?date=${this.selectedDate}&view_type=${this.currentMode === 'weekly' ? 'week' : 'day'}`;
+        if (this.filterResource) url += `&resource_id=${encodeURIComponent(this.filterResource)}`;
+        if (this.filterModality) url += `&modality_id=${encodeURIComponent(this.filterModality)}`;
+        if (this.filterInstructor) url += `&instructor_id=${encodeURIComponent(this.filterInstructor)}`;
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
             })
             .then(data => {
-                this.events = data.events;
-                this.resources = data.resources;
+                this.events = data.events || [];
+                this.resources = data.resources || [];
+                this.meta = data;
+
+                this.updatePeriodLabel(data);
                 this.renderGantt();
             })
-            .catch(error => {
-                console.error('Erro ao carregar dados:', error);
-                this.showAlert('Erro ao carregar dados do Gantt', 'danger');
+            .catch(err => {
+                console.error('Erro ao carregar dados do Gantt:', err);
+                this.showAlert('Erro ao carregar os dados de marcações.', 'danger');
             })
             .finally(() => {
                 document.getElementById('loading-overlay').style.display = 'none';
             });
     }
 
+    updatePeriodLabel(data) {
+        const labelElem = document.getElementById('gantt-period-label');
+        const printSub = document.getElementById('print-subtitle');
+        if (this.currentMode === 'weekly' && data.week_start && data.week_end) {
+            const startParts = data.week_start.split('-');
+            const endParts = data.week_end.split('-');
+            const txt = `Semana: ${startParts[2]}/${startParts[1]} a ${endParts[2]}/${endParts[1]}/${endParts[0]}`;
+            labelElem.textContent = txt;
+            if (printSub) printSub.textContent = `Período: ${txt}`;
+        } else {
+            const parts = (data.date || this.selectedDate).split('-');
+            const txt = `Dia: ${parts[2]}/${parts[1]}/${parts[0]}`;
+            labelElem.textContent = txt;
+            if (printSub) printSub.textContent = `Data: ${txt}`;
+        }
+    }
+
     renderGantt() {
+        if (this.currentMode === 'daily') {
+            this.renderDailyTimeline();
+        } else {
+            this.renderWeeklyTimetable();
+        }
+    }
+
+    /* ==========================================================================
+       Renderização 1: Timeline Diária
+       ========================================================================== */
+    renderDailyTimeline() {
         this.renderTimeHeader();
         this.renderResourceRows();
-        this.renderEvents();
+        this.renderDailyEvents();
         this.updateCurrentTimeLine();
     }
 
@@ -621,7 +1041,6 @@ class GanttDynamic {
             const timeSlot = document.createElement('div');
             timeSlot.className = 'time-slot';
             timeSlot.textContent = `${hour.toString().padStart(2, '0')}:00`;
-            timeSlot.dataset.hour = hour;
             header.appendChild(timeSlot);
         }
     }
@@ -630,17 +1049,24 @@ class GanttDynamic {
         const grid = document.getElementById('gantt-grid');
         grid.innerHTML = '';
 
-        this.resources.forEach(resource => {
+        // Filtrar recursos caso haja filtro selecionado
+        let resourcesToDisplay = this.resources;
+        if (this.filterResource) {
+            resourcesToDisplay = this.resources.filter(r => r.id == this.filterResource);
+        }
+
+        document.getElementById('resource-count-badge').textContent = resourcesToDisplay.length;
+
+        resourcesToDisplay.forEach(resource => {
             const row = document.createElement('div');
             row.className = 'resource-row';
             row.dataset.resourceId = resource.id;
 
-            // Label do recurso
             const label = document.createElement('div');
             label.className = 'resource-label';
             label.innerHTML = `
-                <div class="resource-info">
-                    <h6>${resource.name}</h6>
+                <div class="resource-info text-truncate">
+                    <h6 class="text-truncate" title="${resource.name}">${resource.name}</h6>
                     <small>
                         Cap: ${resource.capacity}
                         <span class="entity-badge entity-${resource.entity_type}">
@@ -650,7 +1076,6 @@ class GanttDynamic {
                 </div>
             `;
 
-            // Grid de tempo
             const timeGrid = document.createElement('div');
             timeGrid.className = 'time-grid';
 
@@ -663,10 +1088,8 @@ class GanttDynamic {
                 cell.dataset.hour = hour;
                 cell.dataset.resourceId = resource.id;
 
-                // Event listeners para seleção
                 cell.addEventListener('mousedown', (e) => this.startSelection(e));
                 cell.addEventListener('mousemove', (e) => this.updateSelection(e));
-                cell.addEventListener('mouseover', (e) => this.updateSelection(e));
                 cell.addEventListener('mouseup', (e) => this.endSelection(e));
 
                 timeGrid.appendChild(cell);
@@ -678,7 +1101,7 @@ class GanttDynamic {
         });
     }
 
-    renderEvents() {
+    renderDailyEvents() {
         this.events.forEach(event => {
             const row = document.querySelector(`.resource-row[data-resource-id="${event.resource_id}"]`);
             if (!row) return;
@@ -688,35 +1111,42 @@ class GanttDynamic {
             eventBlock.className = `event-block ${event.event_type}`;
             eventBlock.dataset.eventId = event.id;
 
-            // Calcular posição e tamanho com precisão de minutos
             const startHour = this.currentView === 'standard' ? 6 : 0;
             const hm = (event.start_time || '00:00').split(':');
             const startMinutes = ((parseInt(hm[0], 10) - startHour) * 60) + parseInt(hm[1] || '0', 10);
             const left = (startMinutes / 60) * 80;
-            const width = (event.duration_minutes / 60) * 80;
+            const width = Math.max(30, (event.duration_minutes / 60) * 80);
 
             eventBlock.style.left = `${left}px`;
             eventBlock.style.width = `${width}px`;
-            eventBlock.style.top = '10px';
-            eventBlock.style.height = '60px';
+            eventBlock.style.top = '8px';
+            eventBlock.style.height = '68px';
 
             if (event.modality && event.modality.color) {
                 eventBlock.style.background = `linear-gradient(135deg, ${event.modality.color}, ${this.darkenColor(event.modality.color, 20)})`;
             }
 
+            const occClass = event.occupancy_pct >= 100 ? 'occupancy-full' : (event.occupancy_pct > 70 ? 'occupancy-medium' : 'occupancy-low');
+            const recurringIcon = event.is_recurring ? `<i class="fas fa-redo-alt ms-1 text-warning" title="Série Recorrente"></i>` : '';
+
             eventBlock.innerHTML = `
-                <div style="font-weight: bold; font-size: 11px; margin-bottom: 2px;">
-                    ${event.title}
+                <div class="d-flex justify-content-between align-items-start text-truncate">
+                    <span class="fw-bold text-truncate" style="font-size: 11px;">${event.title}</span>
+                    <span>${recurringIcon}</span>
                 </div>
-                <div style="font-size: 10px; opacity: 0.9;">
-                    ${event.start_time} - ${event.end_time}
+                <div style="font-size: 10px; opacity: 0.95;">
+                    <i class="far fa-clock"></i> ${event.start_time} - ${event.end_time}
                 </div>
-                <div style="font-size: 9px; opacity: 0.8;">
-                    ${event.instructor.name}
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                    <span class="badge ${occClass} occupancy-badge" title="Lotação da Aula">
+                        ${event.bookings_count}/${event.capacity} (${event.occupancy_pct}%)
+                    </span>
+                    <a href="${event.checkin_url}" target="_blank" class="badge bg-light text-dark text-decoration-none" title="Abrir Check-in no Tapete" onclick="event.stopPropagation();">
+                        <i class="fas fa-clipboard-check text-success"></i>
+                    </a>
                 </div>
             `;
 
-            // Click para editar
             eventBlock.addEventListener('dblclick', (ev) => {
                 if (this.isDragging) {
                     ev.preventDefault();
@@ -726,15 +1156,137 @@ class GanttDynamic {
                 this.editEvent(event.id);
             });
 
-            // Drag horizontal para ajustar horário
             eventBlock.addEventListener('mousedown', (ev) => this.beginDrag(ev, event, eventBlock));
 
             timeGrid.appendChild(eventBlock);
         });
     }
 
+    /* ==========================================================================
+       Renderização 2: Grelha Semanal da Instalação
+       ========================================================================== */
+    renderWeeklyTimetable() {
+        const grid = document.getElementById('weekly-grid');
+        grid.innerHTML = '';
+
+        const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+        const weekDates = this.calculateWeekDates(this.meta.week_start || this.selectedDate);
+
+        // 1. Cabeçalho da coluna de tempo
+        const timeColHeader = document.createElement('div');
+        timeColHeader.className = 'weekly-time-col-header';
+        timeColHeader.innerHTML = `<i class="fas fa-clock"></i>`;
+        grid.appendChild(timeColHeader);
+
+        // 2. Cabeçalhos dos 7 dias
+        const todayStr = new Date().toISOString().split('T')[0];
+        weekDays.forEach((dayName, idx) => {
+            const dateStr = weekDates[idx];
+            const isToday = dateStr === todayStr;
+            const parts = dateStr.split('-');
+            const headerCell = document.createElement('div');
+            headerCell.className = `weekly-header-cell ${isToday ? 'today' : ''}`;
+            headerCell.innerHTML = `
+                <div>${dayName}</div>
+                <div class="small fw-normal text-muted">${parts[2]}/${parts[1]}</div>
+            `;
+            grid.appendChild(headerCell);
+        });
+
+        // 3. Coluna de Legenda Horária
+        const timeLegendCol = document.createElement('div');
+        timeLegendCol.className = 'd-flex flex-column justify-content-between py-2 text-center text-muted small fw-semibold';
+        timeLegendCol.style.minHeight = '650px';
+        for (let h = 7; h <= 22; h += 2) {
+            const slot = document.createElement('div');
+            slot.textContent = `${h.toString().padStart(2, '0')}:00`;
+            timeLegendCol.appendChild(slot);
+        }
+        grid.appendChild(timeLegendCol);
+
+        // 4. Colunas dos 7 dias preenchidas com os eventos
+        for (let weekdayIdx = 0; weekdayIdx < 7; weekdayIdx++) {
+            const dateStr = weekDates[weekdayIdx];
+            const dayColumn = document.createElement('div');
+            dayColumn.className = 'weekly-day-column';
+            dayColumn.dataset.date = dateStr;
+            dayColumn.dataset.weekday = weekdayIdx;
+
+            // Filtrar eventos do dia
+            const dayEvents = this.events.filter(e => {
+                if (e.date) return e.date === dateStr;
+                return e.weekday === weekdayIdx;
+            }).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+            if (dayEvents.length === 0) {
+                const emptyPlaceholder = document.createElement('div');
+                emptyPlaceholder.className = 'text-center text-muted small my-auto py-4';
+                emptyPlaceholder.innerHTML = `<i class="far fa-calendar-times opacity-50 d-block mb-1"></i>Sem aulas`;
+                dayColumn.appendChild(emptyPlaceholder);
+            } else {
+                dayEvents.forEach(event => {
+                    const card = document.createElement('div');
+                    card.className = 'weekly-card';
+                    card.dataset.eventId = event.id;
+
+                    const modColor = (event.modality && event.modality.color) ? event.modality.color : '#6366f1';
+                    card.style.borderLeftColor = modColor;
+
+                    const occClass = event.occupancy_pct >= 100 ? 'occupancy-full' : (event.occupancy_pct > 70 ? 'occupancy-medium' : 'occupancy-low');
+                    const recurringBadge = event.is_recurring ? `<span class="badge-recurrence ms-1" title="Série Recorrente"><i class="fas fa-redo-alt"></i> Recorrente</span>` : '';
+
+                    card.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-light text-dark fw-bold border" style="font-size: 11px;">
+                                <i class="far fa-clock text-primary"></i> ${event.start_time} - ${event.end_time}
+                            </span>
+                            <span class="badge ${occClass} occupancy-badge" title="Lotação da Aula">
+                                ${event.bookings_count}/${event.capacity} (${event.occupancy_pct}%)
+                            </span>
+                        </div>
+                        <h6 class="mb-1 fw-bold text-dark" style="font-size: 13px;">${event.title}</h6>
+                        <div class="small text-secondary mb-1">
+                            <i class="fas fa-map-marker-alt text-danger me-1"></i>${event.resource_name}
+                        </div>
+                        <div class="small text-muted mb-2">
+                            <i class="fas fa-user-tie text-info me-1"></i>${event.instructor.name}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-1 border-top">
+                            <div>${recurringBadge}</div>
+                            <a href="${event.checkin_url}" target="_blank" class="btn btn-sm btn-outline-success py-0 px-2 fw-semibold" style="font-size: 11px;" onclick="event.stopPropagation();">
+                                <i class="fas fa-clipboard-check me-1"></i> Check-in
+                            </a>
+                        </div>
+                    `;
+
+                    card.addEventListener('click', () => {
+                        this.editEvent(event.id);
+                    });
+
+                    dayColumn.appendChild(card);
+                });
+            }
+
+            grid.appendChild(dayColumn);
+        }
+    }
+
+    calculateWeekDates(weekStartStr) {
+        const parts = weekStartStr.split('-').map(Number);
+        const dates = [];
+        const base = new Date(parts[0], parts[1] - 1, parts[2]);
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(base);
+            d.setDate(base.getDate() + i);
+            dates.push(d.toISOString().split('T')[0]);
+        }
+        return dates;
+    }
+
+    /* ==========================================================================
+       Drag-to-Schedule na Timeline Diária
+       ========================================================================== */
     beginDrag(ev, event, eventBlock) {
-        // Permitir apenas botão esquerdo
         if (ev.button !== 0) return;
         this.dragging = {
             id: event.id,
@@ -753,9 +1305,7 @@ class GanttDynamic {
     onDragMove(e, eventBlock) {
         if (!this.dragging) return;
         const delta = e.clientX - this.dragging.startClientX;
-        if (!this.dragging.hasMoved && Math.abs(delta) < 5) {
-            return;
-        }
+        if (!this.dragging.hasMoved && Math.abs(delta) < 5) return;
         if (!this.dragging.hasMoved) {
             this.dragging.hasMoved = true;
             this.isDragging = true;
@@ -773,11 +1323,10 @@ class GanttDynamic {
             this.isDragging = false;
             return;
         }
+
         const startHourView = this.currentView === 'standard' ? 6 : 0;
         const left = parseFloat(eventBlock.style.left) || 0;
-        // Converter left -> minutos desde o início da vista
         let minutesFromView = Math.round((left / 80) * 60);
-        // Arredondar aos 5 minutos
         minutesFromView = Math.round(minutesFromView / 5) * 5;
         const startHour = startHourView + Math.floor(minutesFromView / 60);
         const startMinute = minutesFromView % 60;
@@ -785,7 +1334,6 @@ class GanttDynamic {
         const endHour = startHourView + Math.floor(endMinutesFromView / 60);
         const endMinute = endMinutesFromView % 60;
 
-        // Chamar API para atualizar horários
         const payload = {
             event_id: event.id,
             date: this.selectedDate,
@@ -805,41 +1353,28 @@ class GanttDynamic {
         .then(r => r.json())
         .then(res => {
             if (res && res.success) {
-                this.showAlert('Evento atualizado', 'success');
+                this.showAlert('Horário da aula atualizado com sucesso.', 'success');
                 this.loadGanttData();
             } else {
-                this.showAlert(res.error || 'Falha ao atualizar evento', 'danger');
+                this.showAlert(res.error || 'Não foi possível mover a aula devido a sobreposição.', 'danger');
                 this.loadGanttData();
             }
         })
         .catch(err => {
             console.error(err);
-            this.showAlert('Erro ao atualizar evento', 'danger');
+            this.showAlert('Erro ao atualizar horário da aula.', 'danger');
             this.loadGanttData();
         })
         .finally(() => {
             eventBlock.classList.remove('dragging');
             this.dragging = null;
-            setTimeout(() => {
-                this.isDragging = false;
-            }, 50);
+            setTimeout(() => { this.isDragging = false; }, 50);
         });
     }
 
-    shiftDay(delta) {
-        const dateInput = document.getElementById('gantt-date');
-        const value = dateInput.value || this.selectedDate;
-        if (!value) return;
-        const parts = value.split('-').map(Number);
-        if (parts.length !== 3) return;
-        const date = new Date(parts[0], parts[1] - 1, parts[2]);
-        date.setDate(date.getDate() + delta);
-        const newValue = date.toISOString().split('T')[0];
-        dateInput.value = newValue;
-        this.selectedDate = newValue;
-        this.loadGanttData();
-    }
-
+    /* ==========================================================================
+       Seleção por Arrastamento na Grelha (Criação Rápida)
+       ========================================================================== */
     startSelection(e) {
         this.isSelecting = true;
         this.selectedResource = e.target.dataset.resourceId;
@@ -856,7 +1391,6 @@ class GanttDynamic {
     updateSelection(e) {
         if (!this.isSelecting) return;
         if (e.target.dataset.resourceId !== this.selectedResource) return;
-
         const cell = e.target;
         const hour = parseInt(cell.dataset.hour);
         const minutes = this.minuteFromOffset(e, cell);
@@ -866,7 +1400,6 @@ class GanttDynamic {
 
     endSelection(e) {
         if (!this.isSelecting) return;
-
         this.isSelecting = false;
 
         if (this.selectionStart && this.selectionEnd) {
@@ -874,22 +1407,25 @@ class GanttDynamic {
             const endTotal = this.selectionEnd.hour * 60 + this.selectionEnd.minutes;
             let start = Math.min(startTotal, endTotal);
             let end = Math.max(startTotal, endTotal);
-            if (end === start) end += 30; // mínimo 30 min
+            if (end === start) end += 60; // Duração padrão 1h
 
             const startHour = Math.floor(start / 60);
             const startMinute = start % 60;
             const endHour = Math.floor(end / 60);
             const endMinute = end % 60;
 
-            this.openEventModal(this.selectedResource, startHour, endHour, startMinute, endMinute);
+            this.openEventModal({
+                resourceId: this.selectedResource,
+                date: this.selectedDate,
+                startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
+                endTime: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
+            });
         }
-
         this.clearSelection();
     }
 
     highlightSelection() {
         this.clearSelection();
-
         const s = this.selectionStart;
         const e = this.selectionEnd;
         const startHour = Math.min(s.hour, e.hour);
@@ -902,35 +1438,126 @@ class GanttDynamic {
     }
 
     clearSelection() {
-        document.querySelectorAll('.time-cell.selecting').forEach(cell => {
-            cell.classList.remove('selecting');
+        document.querySelectorAll('.time-cell.selecting').forEach(cell => cell.classList.remove('selecting'));
+    }
+
+    /* ==========================================================================
+       Modais de Criação e Edição
+       ========================================================================== */
+    openManualCreateModal() {
+        const defaultResource = this.filterResource || (this.resources.length > 0 ? this.resources[0].id : '');
+        this.openEventModal({
+            resourceId: defaultResource,
+            date: this.selectedDate,
+            startTime: '09:00',
+            endTime: '10:30'
         });
     }
 
-    openEventModal(resourceId, startHour, endHour, startMinute=0, endMinute=0) {
-        const resource = this.resources.find(r => r.id == resourceId);
-        if (!resource) return;
-
-        // Reset form
+    openEventModal(options) {
         document.getElementById('event-form').reset();
         document.getElementById('event-id').value = '';
-        document.getElementById('modal-title-text').textContent = 'Criar Nova Aula';
+        document.getElementById('modal-title-text').textContent = 'Agendar Nova Aula';
+        
+        // Elementos de edição escondidos na criação
         document.getElementById('delete-event').style.display = 'none';
+        document.getElementById('delete-series').style.display = 'none';
+        document.getElementById('modal-checkin-link').style.display = 'none';
+        document.getElementById('event-occupancy-info').style.display = 'none';
+        
+        // Mostrar secção de recorrência
+        document.getElementById('recurrence-section').style.display = 'block';
+        document.getElementById('event-is-recurring').checked = false;
+        document.getElementById('recurrence-details').style.display = 'none';
 
-        // Set selected info
-        document.getElementById('selected-resource').textContent = resource.name;
-        document.getElementById('selected-time').textContent = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')} - ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+        // Preencher defaults
+        if (options.resourceId) document.getElementById('event-resource').value = options.resourceId;
+        document.getElementById('event-date').value = options.date || this.selectedDate;
+        document.getElementById('event-start-time').value = options.startTime || '09:00';
+        document.getElementById('event-end-time').value = options.endTime || '10:00';
 
-        // Set capacity default
-        document.getElementById('event-capacity').value = resource.capacity;
+        // Sugerir fim da recorrência a 3 meses
+        const baseD = new Date(document.getElementById('event-date').value);
+        baseD.setMonth(baseD.getMonth() + 3);
+        document.getElementById('event-recurrence-end').value = baseD.toISOString().split('T')[0];
 
-        // Store selection data
-        this.currentSelection = { resourceId, startHour, startMinute, endHour, endMinute, date: this.selectedDate };
+        // Marcar o dia da semana do evento inicial
+        const evWeekday = new Date(document.getElementById('event-date').value).getDay();
+        const pythonWeekday = evWeekday === 0 ? 6 : evWeekday - 1; // JS 0=Dom vs Python 0=Seg
+        document.querySelectorAll('.rec-weekday').forEach(cb => {
+            cb.checked = (parseInt(cb.value) === pythonWeekday);
+        });
+
+        // Capacidade
+        const selRes = this.resources.find(r => r.id == document.getElementById('event-resource').value);
+        if (selRes) {
+            document.getElementById('event-capacity').value = selRes.capacity;
+        }
 
         this.toggleEventTypeFields('open_class');
-
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
         modal.show();
+    }
+
+    editEvent(eventId) {
+        const detailsUrl = GANTT_DETAILS_URL_TEMPLATE.replace('/0/', `/${eventId}/`);
+        fetch(detailsUrl, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('event-id').value = data.id;
+                document.getElementById('event-title').value = data.title;
+                document.getElementById('event-description').value = data.description || '';
+                document.getElementById('event-type').value = data.event_type;
+                document.getElementById('event-resource').value = data.resource_id;
+                document.getElementById('event-date').value = data.date;
+                document.getElementById('event-start-time').value = data.start_time;
+                document.getElementById('event-end-time').value = data.end_time;
+                document.getElementById('event-modality').value = data.modality_id || '';
+                document.getElementById('event-instructor').value = data.instructor_id || '';
+                document.getElementById('event-capacity').value = data.capacity;
+
+                if (data.event_type === 'group_class') {
+                    document.getElementById('event-class-group').value = data.class_group_id || '';
+                } else if (data.event_type === 'individual') {
+                    document.getElementById('event-client').value = data.individual_client_id || '';
+                }
+
+                this.toggleEventTypeFields(data.event_type);
+
+                // Configurar elementos específicos de edição
+                document.getElementById('modal-title-text').textContent = 'Editar Aula';
+                document.getElementById('recurrence-section').style.display = 'none'; // Não re-configura recorrência em edição simples
+                document.getElementById('delete-event').style.display = 'inline-block';
+                
+                // Se é recorrente, mostrar botão de eliminar série
+                if (data.is_recurring) {
+                    document.getElementById('delete-series').style.display = 'inline-block';
+                } else {
+                    document.getElementById('delete-series').style.display = 'none';
+                }
+
+                // Check-in shortcut
+                if (data.checkin_url) {
+                    const checkinBtn = document.getElementById('modal-checkin-link');
+                    checkinBtn.href = data.checkin_url;
+                    checkinBtn.style.display = 'inline-block';
+                }
+
+                // Occupancy badge
+                const occInfo = document.getElementById('event-occupancy-info');
+                const occBadge = document.getElementById('modal-occupancy-badge');
+                occInfo.style.display = 'block';
+                const occClass = data.occupancy_pct >= 100 ? 'occupancy-full' : (data.occupancy_pct > 70 ? 'occupancy-medium' : 'occupancy-low');
+                occBadge.className = `occupancy-badge ${occClass}`;
+                occBadge.textContent = `${data.bookings_count} / ${data.capacity} (${data.occupancy_pct}%)`;
+
+                const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+                modal.show();
+            })
+            .catch(err => {
+                console.error(err);
+                this.showAlert('Erro ao carregar detalhes da aula.', 'danger');
+            });
     }
 
     toggleEventTypeFields(eventType) {
@@ -944,19 +1571,43 @@ class GanttDynamic {
         const isEdit = !!eventId;
 
         if (isEdit) {
-            this.updateEventWithFormData(eventId);
+            this.updateEvent(eventId);
         } else {
             this.createEvent();
         }
     }
 
     createEvent() {
-        const formData = {
-            resource_id: this.currentSelection.resourceId,
-            start_time: `${this.currentSelection.startHour.toString().padStart(2, '0')}:${this.currentSelection.startMinute.toString().padStart(2, '0')}`,
-            end_time: `${this.currentSelection.endHour.toString().padStart(2, '0')}:${this.currentSelection.endMinute.toString().padStart(2, '0')}`,
-            date: this.currentSelection.date
+        const isRecurring = document.getElementById('event-is-recurring').checked;
+        const weekdays = [];
+        if (isRecurring) {
+            document.querySelectorAll('.rec-weekday:checked').forEach(cb => {
+                weekdays.push(parseInt(cb.value));
+            });
+        }
+
+        const payload = {
+            resource_id: document.getElementById('event-resource').value,
+            date: document.getElementById('event-date').value,
+            start_time: document.getElementById('event-start-time').value,
+            end_time: document.getElementById('event-end-time').value,
+            title: document.getElementById('event-title').value,
+            event_type: document.getElementById('event-type').value,
+            modality_id: document.getElementById('event-modality').value || null,
+            instructor_id: document.getElementById('event-instructor').value || null,
+            capacity: parseInt(document.getElementById('event-capacity').value) || null,
+            description: document.getElementById('event-description').value,
+            class_group_id: document.getElementById('event-class-group').value || null,
+            individual_client_id: document.getElementById('event-client').value || null,
+            is_recurring: isRecurring,
+            recurrence_end_date: isRecurring ? document.getElementById('event-recurrence-end').value : null,
+            recurrence_weekdays: isRecurring ? weekdays : null
         };
+
+        if (!payload.title || !payload.resource_id || !payload.start_time || !payload.end_time) {
+            this.showAlert('Por favor preencha todos os campos obrigatórios.', 'warning');
+            return;
+        }
 
         fetch(GANTT_CREATE_URL, {
             method: 'POST',
@@ -964,48 +1615,40 @@ class GanttDynamic {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': this.getCSRFToken()
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(payload)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Update event details
-                this.updateEventWithFormData(data.event_id);
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                this.showAlert(res.message || 'Aula criada com sucesso!', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                this.loadGanttData();
             } else {
-                this.showAlert(data.error || 'Erro ao criar evento', 'danger');
+                this.showAlert(res.error || 'Erro ao agendar aula.', 'danger');
             }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            this.showAlert('Erro ao criar evento', 'danger');
+        .catch(err => {
+            console.error(err);
+            this.showAlert('Erro ao comunicar com o servidor.', 'danger');
         });
     }
 
-    updateEventWithFormData(eventId) {
-        const formData = new FormData(document.getElementById('event-form'));
-        let titleValue = (formData.get('title') || '').toString().trim();
-        if (!titleValue) {
-            const resource = this.resources.find(r => r.id == this.currentSelection?.resourceId);
-            const resourceName = resource ? resource.name : 'Espaço';
-            titleValue = `Marcação - ${resourceName}`;
-            document.getElementById('event-title').value = titleValue;
-        }
-        const data = {
+    updateEvent(eventId) {
+        const payload = {
             event_id: eventId,
-            title: titleValue,
-            description: formData.get('description'),
-            event_type: formData.get('event_type'),
-            modality_id: formData.get('modality_id') || null,
-            instructor_id: formData.get('instructor_id') || null,
-            capacity: parseInt(formData.get('capacity')) || null
+            resource_id: document.getElementById('event-resource').value,
+            date: document.getElementById('event-date').value,
+            start_time: document.getElementById('event-start-time').value,
+            end_time: document.getElementById('event-end-time').value,
+            title: document.getElementById('event-title').value,
+            event_type: document.getElementById('event-type').value,
+            modality_id: document.getElementById('event-modality').value || null,
+            instructor_id: document.getElementById('event-instructor').value || null,
+            capacity: parseInt(document.getElementById('event-capacity').value) || null,
+            description: document.getElementById('event-description').value,
+            class_group_id: document.getElementById('event-class-group').value || null,
+            individual_client_id: document.getElementById('event-client').value || null
         };
-
-        // Add type-specific fields
-        if (data.event_type === 'group_class') {
-            data.class_group_id = formData.get('class_group_id') || null;
-        } else if (data.event_type === 'individual') {
-            data.individual_client_id = formData.get('individual_client_id') || null;
-        }
 
         fetch(GANTT_UPDATE_URL, {
             method: 'POST',
@@ -1013,69 +1656,33 @@ class GanttDynamic {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': this.getCSRFToken()
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                this.showAlert('Evento criado com sucesso!', 'success');
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                this.showAlert('Aula atualizada com sucesso!', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                 this.loadGanttData();
             } else {
-                this.showAlert(result.error || 'Erro ao atualizar evento', 'danger');
+                this.showAlert(res.error || 'Erro ao atualizar aula.', 'danger');
             }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            this.showAlert('Erro ao atualizar evento', 'danger');
+        .catch(err => {
+            console.error(err);
+            this.showAlert('Erro ao atualizar aula.', 'danger');
         });
     }
 
-    editEvent(eventId) {
-        const detailsUrl = GANTT_DETAILS_URL_TEMPLATE.replace('/0/', `/${eventId}/`);
-        fetch(detailsUrl, { credentials: 'same-origin' })
-            .then(response => response.json())
-            .then(data => {
-                // Populate form with event data
-                document.getElementById('event-id').value = data.id;
-                document.getElementById('event-title').value = data.title;
-                document.getElementById('event-description').value = data.description || '';
-                document.getElementById('event-type').value = data.event_type;
-                document.getElementById('event-modality').value = data.modality_id || '';
-                document.getElementById('event-instructor').value = data.instructor_id || '';
-                document.getElementById('event-capacity').value = data.capacity;
-
-                if (data.event_type === 'group_class') {
-                    document.getElementById('event-class-group').value = data.class_group_id || '';
-                } else if (data.event_type === 'individual') {
-                    document.getElementById('event-client').value = data.individual_client_id || '';
-                }
-
-                this.currentSelection = {
-                    resourceId: data.resource_id,
-                    date: this.selectedDate
-                };
-
-                this.toggleEventTypeFields(data.event_type);
-
-                // Update modal title
-                document.getElementById('modal-title-text').textContent = 'Editar Aula';
-                document.getElementById('delete-event').style.display = 'inline-block';
-
-                // Show modal
-                const modal = new bootstrap.Modal(document.getElementById('eventModal'));
-                modal.show();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                this.showAlert('Erro ao carregar detalhes do evento', 'danger');
-            });
-    }
-
-    deleteEvent() {
+    deleteEvent(deleteSeries = false) {
         const eventId = document.getElementById('event-id').value;
         if (!eventId) return;
-        if (!confirm('Tem a certeza que quer eliminar esta aula?')) return;
+
+        const confirmMsg = deleteSeries
+            ? 'ATENÇÃO: Pretende eliminar TODAS as aulas desta série recorrente?'
+            : 'Tem a certeza que pretende eliminar esta aula?';
+
+        if (!confirm(confirmMsg)) return;
 
         fetch(GANTT_DELETE_URL, {
             method: 'POST',
@@ -1083,25 +1690,27 @@ class GanttDynamic {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': this.getCSRFToken()
             },
-            body: JSON.stringify({ event_id: eventId })
+            body: JSON.stringify({ event_id: eventId, delete_series: deleteSeries })
         })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                this.showAlert('Aula eliminada com sucesso', 'success');
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                this.showAlert(res.message || 'Aula eliminada com sucesso.', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                 this.loadGanttData();
             } else {
-                this.showAlert(result.error || 'Erro ao eliminar aula', 'danger');
+                this.showAlert(res.error || 'Erro ao eliminar aula.', 'danger');
             }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            this.showAlert('Erro ao eliminar aula', 'danger');
+        .catch(err => {
+            console.error(err);
+            this.showAlert('Erro ao eliminar aula.', 'danger');
         });
     }
 
     updateCurrentTimeLine() {
+        if (this.currentMode !== 'daily') return;
+
         const now = new Date();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
@@ -1110,10 +1719,11 @@ class GanttDynamic {
         const endHour = this.currentView === 'standard' ? 22 : 23;
 
         const timeLine = document.getElementById('current-time-line');
+        if (!timeLine) return;
 
         if (currentHour >= startHour && currentHour <= endHour) {
             const position = (currentHour - startHour) * 80 + (currentMinute / 60) * 80;
-            timeLine.style.left = `${position + 250}px`; // 250px para compensar sidebar
+            timeLine.style.left = `${position + 260}px`; // 260px largura do sidebar
             timeLine.style.display = 'block';
         } else {
             timeLine.style.display = 'none';
@@ -1131,18 +1741,6 @@ class GanttDynamic {
             (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
     }
 
-    getCSRFToken() {
-        const input = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (input && input.value) {
-            return input.value;
-        }
-        const cookie = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('csrftoken='));
-        return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
-    }
-
-    // Converter deslocamento dentro da célula em minutos (arredonda a 5 em 5)
     minuteFromOffset(e, cell) {
         const rect = cell.getBoundingClientRect();
         const x = (e.clientX - rect.left);
@@ -1154,32 +1752,32 @@ class GanttDynamic {
         return minutes;
     }
 
+    getCSRFToken() {
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input && input.value) return input.value;
+        const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+        return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+    }
+
     showAlert(message, type = 'info') {
-        // Create alert element
         const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-        alertDiv.style.top = '20px';
-        alertDiv.style.right = '20px';
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed shadow-lg`;
+        alertDiv.style.top = '25px';
+        alertDiv.style.right = '25px';
         alertDiv.style.zIndex = '9999';
         alertDiv.innerHTML = `
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
-
         document.body.appendChild(alertDiv);
-
-        // Auto remove after 5 seconds
         setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.parentNode.removeChild(alertDiv);
-            }
+            if (alertDiv.parentNode) alertDiv.parentNode.removeChild(alertDiv);
         }, 5000);
     }
 }
 
-// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new GanttDynamic();
+    window.ganttApp = new GanttDynamic();
 });
 </script>
 {% endblock %}

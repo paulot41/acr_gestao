@@ -58,10 +58,13 @@ logs/
 # Local agent instructions
 AGENTS.md
 
-# Backups (manter estrutura mas não os arquivos)
-backups/*.sql
-backups/*.sql.gz
-backups/*.dump
+# Backups (manter estrutura com .gitkeep mas não os ficheiros de backup)
+backups/*
+!backups/.gitkeep
+
+# SSL & Certbot
+ssl/
+certbot/
 
 # Static files (gerados automaticamente)
 staticfiles/
