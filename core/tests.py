@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 from django.test import TestCase, Client, RequestFactory, override_settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -13,7 +14,8 @@ from notifications.models import NotificationLog
 from .models import (
     Organization, Person, Event, Resource, Booking,
     Instructor, Modality, ClassGroup, PaymentPlan,
-    ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog
+    ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog,
+    InstructorCommission, ProtocolPeriodSettlement
 )
 from .middleware import OrganizationMiddleware
 from .context_processors import organization_context
@@ -865,5 +867,238 @@ class MatCheckinTestCase(TestCase):
         self.assertIsNotNone(history)
         self.assertEqual(history.credits_amount, -1)
         self.assertEqual(history.credits_after, 4)
+
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class ProtocolFinanceTestCase(TestCase):
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.user = User.objects.create_superuser(username="admin_finance", password="password123", email="fin@acr.local")
+        self.client = Client()
+        self.client.login(username="admin_finance", password="password123")
+
+        self.today = timezone.now().date()
+        self.start_date = self.today.replace(day=1)
+        self.end_date = self.today
+
+        # Modalidades
+        self.mod_jj = Modality.objects.create(organization=self.org, name="Jiu-Jitsu", entity_type="acr")
+        self.mod_boxe = Modality.objects.create(organization=self.org, name="Boxe", entity_type="both")
+
+        # Espaço
+        self.dojo = Resource.objects.create(organization=self.org, name="Dojo Central", capacity=20)
+
+        # Instrutores
+        self.inst_carlos = Instructor.objects.create(
+            organization=self.org,
+            first_name="Carlos",
+            last_name="Gracie",
+            email="carlos@example.com",
+            entity_affiliation=Instructor.EntityAffiliation.ACR_ONLY,
+            acr_commission_rate=60.00
+        )
+        self.inst_miguel = Instructor.objects.create(
+            organization=self.org,
+            first_name="Miguel",
+            last_name="Santos",
+            email="miguel@example.com",
+            entity_affiliation=Instructor.EntityAffiliation.PROFORM_ONLY,
+            proform_commission_rate=70.00
+        )
+
+        # Praticantes
+        self.ath_acr = Person.objects.create(
+            organization=self.org,
+            first_name="Andre",
+            last_name="Costa",
+            entity_affiliation=Person.EntityAffiliation.ACR_ONLY
+        )
+        self.ath_proform = Person.objects.create(
+            organization=self.org,
+            first_name="Paula",
+            last_name="Lima",
+            entity_affiliation=Person.EntityAffiliation.PROFORM_ONLY
+        )
+        self.ath_both = Person.objects.create(
+            organization=self.org,
+            first_name="Joao",
+            last_name="Neves",
+            entity_affiliation=Person.EntityAffiliation.BOTH
+        )
+
+        # Pagamentos registados e concluídos
+        Payment.objects.create(
+            organization=self.org,
+            person=self.ath_acr,
+            amount=Decimal("100.00"),
+            status=Payment.Status.COMPLETED,
+            paid_date=self.today
+        )
+        Payment.objects.create(
+            organization=self.org,
+            person=self.ath_proform,
+            amount=Decimal("150.00"),
+            status=Payment.Status.COMPLETED,
+            paid_date=self.today
+        )
+        Payment.objects.create(
+            organization=self.org,
+            person=self.ath_both,
+            amount=Decimal("250.00"),
+            status=Payment.Status.COMPLETED,
+            paid_date=self.today
+        )
+
+        # Aulas lecionadas
+        starts = timezone.now().replace(microsecond=0)
+        self.event_jj = Event.objects.create(
+            organization=self.org,
+            modality=self.mod_jj,
+            instructor=self.inst_carlos,
+            resource=self.dojo,
+            title="Treino Jiu-Jitsu",
+            starts_at=starts,
+            ends_at=starts + timedelta(hours=1),
+            capacity=20
+        )
+        self.event_boxe = Event.objects.create(
+            organization=self.org,
+            modality=self.mod_boxe,
+            instructor=self.inst_miguel,
+            resource=self.dojo,
+            title="Treino Boxe",
+            starts_at=starts + timedelta(hours=2),
+            ends_at=starts + timedelta(hours=3),
+            capacity=20
+        )
+
+        # Presenças no tapete
+        Booking.objects.create(
+            organization=self.org,
+            event=self.event_jj,
+            person=self.ath_acr,
+            status=Booking.Status.CHECKED_IN
+        )
+        Booking.objects.create(
+            organization=self.org,
+            event=self.event_boxe,
+            person=self.ath_both,
+            status=Booking.Status.CHECKED_IN
+        )
+
+    def test_protocol_split_calculation_integrity(self):
+        """Valida que a receita bruta é dividida estritamente sem perda de cêntimos:
+           Receita Bruta = Remuneração Instrutores + Proform SC + ACR."""
+        from core.services.protocol_finance import calculate_period_protocol_split
+        split = calculate_period_protocol_split(self.org, self.start_date, self.end_date)
+
+        gross = split['gross_revenue']
+        self.assertEqual(gross, Decimal("500.00"))
+        self.assertEqual(split['acr_only_revenue'], Decimal("100.00"))
+        self.assertEqual(split['proform_only_revenue'], Decimal("150.00"))
+        self.assertEqual(split['joint_revenue'], Decimal("250.00"))
+
+        # Integridade estrita: soma das 3 partes deve ser rigorosamente igual a gross_revenue
+        inst_total = split['instructors_total']
+        proform_share = split['proform_share']
+        acr_share = split['acr_share']
+        self.assertEqual(gross, inst_total + proform_share + acr_share)
+
+        # Margem líquida
+        self.assertEqual(split['net_entity_margin'], gross - inst_total)
+        self.assertTrue(len(split['instructors_breakdown']) == 2)
+        self.assertTrue(len(split['modality_breakdown']) == 2)
+
+    def test_create_or_update_period_settlement(self):
+        """Gera e persiste fecho de contas oficial com integridade de valores."""
+        from core.services.protocol_finance import create_or_update_period_settlement
+        settlement = create_or_update_period_settlement(
+            self.org, self.start_date, self.end_date, notes="Acordo validado mensal"
+        )
+        self.assertIsNotNone(settlement.pk)
+        self.assertEqual(settlement.status, ProtocolPeriodSettlement.Status.DRAFT)
+        self.assertEqual(settlement.total_revenue, Decimal("500.00"))
+        self.assertEqual(
+            settlement.total_revenue,
+            settlement.instructor_total + settlement.proform_share + settlement.acr_share
+        )
+
+        # Atualização subsequente do mesmo fecho no mesmo período não cria duplicados
+        updated = create_or_update_period_settlement(
+            self.org, self.start_date, self.end_date, notes="Nova observação"
+        )
+        self.assertEqual(settlement.pk, updated.pk)
+        self.assertEqual(updated.notes, "Nova observação")
+
+    def test_protocol_supervision_views(self):
+        """Testa o portal de supervisão, emissão de fecho e visualização de declaração oficial."""
+        # 1. Acesso ao painel de supervisão
+        res = self.client.get("/protocol/supervision/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Supervisão do Protocolo ACR & Proform SC")
+        self.assertContains(res, "Receita Bruta Total")
+        self.assertContains(res, "Equilíbrio Estrito da Partilha Tripartida")
+        self.assertContains(res, "Carlos Gracie")
+
+        # 2. Criar fecho de contas via POST
+        res_create = self.client.post("/protocol/settlement/create/", data={
+            "start_date": self.start_date.strftime("%Y-%m-%d"),
+            "end_date": self.end_date.strftime("%Y-%m-%d"),
+            "notes": "Fecho Oficial Trimestral"
+        }, follow=True)
+        self.assertEqual(res_create.status_code, 200)
+        self.assertContains(res_create, "Declaração de Fecho de Contas")
+
+        settlement = ProtocolPeriodSettlement.objects.filter(organization=self.org).first()
+        self.assertIsNotNone(settlement)
+
+        # 3. Visualizar declaração oficial
+        res_detail = self.client.get(f"/protocol/settlement/{settlement.pk}/")
+        self.assertEqual(res_detail.status_code, 200)
+        self.assertContains(res_detail, "Protocolo de Cooperação Desportiva")
+        self.assertContains(res_detail, "Pela Associação Cultural e Recreativa (ACR)")
+        self.assertContains(res_detail, "Pelo Ginásio Proform SC")
+
+        # 4. Avançar estado do fecho (draft -> approved -> settled)
+        res_toggle1 = self.client.post(f"/protocol/settlement/{settlement.pk}/toggle-status/", follow=True)
+        self.assertEqual(res_toggle1.status_code, 200)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, ProtocolPeriodSettlement.Status.APPROVED)
+
+        res_toggle2 = self.client.post(f"/protocol/settlement/{settlement.pk}/toggle-status/", follow=True)
+        self.assertEqual(res_toggle2.status_code, 200)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, ProtocolPeriodSettlement.Status.SETTLED)
+        self.assertIsNotNone(settlement.settled_at)
+
+    def test_instructor_commission_toggle_paid(self):
+        """Valida a marcação e liquidação individual de comissões de instrutor."""
+        comm = InstructorCommission.objects.create(
+            organization=self.org,
+            instructor=self.inst_carlos,
+            event=self.event_jj,
+            total_revenue=Decimal("100.00"),
+            commission_rate=Decimal("60.00"),
+            is_paid=False
+        )
+        self.assertFalse(comm.is_paid)
+
+        # POST para toggle-paid
+        res = self.client.post(f"/protocol/commissions/{comm.pk}/toggle-paid/", follow=True)
+        self.assertEqual(res.status_code, 200)
+        comm.refresh_from_db()
+        self.assertTrue(comm.is_paid)
+        self.assertIsNotNone(comm.payment_date)
+
+        # Desmarcar pagamento
+        res2 = self.client.post(f"/protocol/commissions/{comm.pk}/toggle-paid/", follow=True)
+        self.assertEqual(res2.status_code, 200)
+        comm.refresh_from_db()
+        self.assertFalse(comm.is_paid)
+        self.assertIsNone(comm.payment_date)
 
 

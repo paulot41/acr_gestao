@@ -1,0 +1,437 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Supervisão Financeira do Protocolo - ACR & Proform SC{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3 no-print">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Supervisão ACR & Protocolo</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <!-- Cabeçalho Principal -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <h2 class="fw-bold mb-0 text-dark">
+                    <i class="fas fa-handshake text-primary me-2"></i>Supervisão do Protocolo ACR & Proform SC
+                </h2>
+                <span class="badge bg-primary fs-6">Desportos de Combate & Artes Marciais</span>
+            </div>
+            <p class="text-muted mb-0 mt-1">
+                Motor de fiscalização e divisão tripartida da receita entre Associação ACR, Ginásio Proform SC e Instrutores.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateSettlement">
+                <i class="fas fa-file-invoice-dollar me-1"></i>Emitir Fecho de Contas
+            </button>
+            <a href="{% url 'core:cashier_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-cash-register me-1"></i>Balcão de Caixa
+            </a>
+        </div>
+    </div>
+
+    <!-- Mensagens de Alerta Django -->
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtro de Datas do Período -->
+    <div class="card shadow-sm border-0 mb-4 bg-light">
+        <div class="card-body py-3">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted mb-1">
+                        <i class="fas fa-calendar-day me-1"></i>Início do Período:
+                    </label>
+                    <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted mb-1">
+                        <i class="fas fa-calendar-check me-1"></i>Fim do Período:
+                    </label>
+                    <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" required>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark w-100">
+                        <i class="fas fa-filter me-1"></i>Filtrar Período
+                    </button>
+                </div>
+                <div class="col-md-3 text-md-end text-muted small">
+                    Intervalo ativo: <strong class="text-dark">{{ start_date|date:"d/m/Y" }}</strong> a <strong class="text-dark">{{ end_date|date:"d/m/Y" }}</strong>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4 Cartões KPI: Divisão Tripartida -->
+    <div class="row g-3 mb-4">
+        <!-- 1. Receita Bruta Total -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #198754 !important;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Receita Bruta Total</span>
+                        <div class="rounded-circle bg-success-subtle p-2 text-success">
+                            <i class="fas fa-coins fa-lg"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1 text-dark">€ {{ split_data.gross_revenue|floatformat:2 }}</h3>
+                    <small class="text-muted">
+                        <i class="fas fa-receipt me-1"></i>{{ split_data.total_payments_count }} pagamentos arrecadados
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Instrutores -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #0d6efd !important;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Instrutores (Remuneração)</span>
+                        <div class="rounded-circle bg-primary-subtle p-2 text-primary">
+                            <i class="fas fa-chalkboard-teacher fa-lg"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1 text-primary">€ {{ split_data.instructors_total|floatformat:2 }}</h3>
+                    <small class="text-muted">
+                        <i class="fas fa-calendar-alt me-1"></i>{{ split_data.total_classes_period }} aulas no período
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Ginásio Proform SC -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #fd7e14 !important;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Ginásio Proform SC</span>
+                        <div class="rounded-circle bg-warning-subtle p-2 text-warning">
+                            <i class="fas fa-dumbbell fa-lg"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1 text-warning-emphasis">€ {{ split_data.proform_share|floatformat:2 }}</h3>
+                    <small class="text-muted">
+                        <i class="fas fa-building me-1"></i>Instalações, espaço e receção
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Associação ACR -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #6f42c1 !important;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Associação ACR</span>
+                        <div class="rounded-circle bg-purple-subtle p-2" style="color: #6f42c1; background-color: #f3e8ff;">
+                            <i class="fas fa-shield-alt fa-lg"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1" style="color: #6f42c1;">€ {{ split_data.acr_share|floatformat:2 }}</h3>
+                    <small class="text-muted">
+                        <i class="fas fa-award me-1"></i>Quota associativa e seguros
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Banner de Verificação de Integridade Aritmética -->
+    <div class="alert alert-light border shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fas fa-check-circle text-success fs-5"></i>
+            <div>
+                <strong class="text-dark">Equilíbrio Estrito da Partilha Tripartida:</strong>
+                <span class="text-muted ms-1">
+                    Receita Bruta (€{{ split_data.gross_revenue|floatformat:2 }}) =
+                    Instrutores (€{{ split_data.instructors_total|floatformat:2 }}) +
+                    Proform SC (€{{ split_data.proform_share|floatformat:2 }}) +
+                    ACR (€{{ split_data.acr_share|floatformat:2 }})
+                </span>
+            </div>
+        </div>
+        <div>
+            <span class="badge bg-secondary-subtle text-dark border">
+                Margem Líquida Entidades: <strong>€ {{ split_data.net_entity_margin|floatformat:2 }}</strong>
+            </span>
+        </div>
+    </div>
+
+    <!-- Segmentação por Afiliação de Praticantes -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="p-3 bg-white rounded shadow-sm border text-center">
+                <small class="text-muted text-uppercase fw-bold d-block mb-1">Praticantes ACR Exclusivos</small>
+                <div class="fs-4 fw-bold text-dark">€ {{ split_data.acr_only_revenue|floatformat:2 }}</div>
+                <small class="text-muted">Atletas afetos à associação</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 bg-white rounded shadow-sm border text-center">
+                <small class="text-muted text-uppercase fw-bold d-block mb-1">Praticantes Proform SC Exclusivos</small>
+                <div class="fs-4 fw-bold text-dark">€ {{ split_data.proform_only_revenue|floatformat:2 }}</div>
+                <small class="text-muted">Sócios do ginásio</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 bg-white rounded shadow-sm border text-center">
+                <small class="text-muted text-uppercase fw-bold d-block mb-1">Praticantes Partilhados (Ambos)</small>
+                <div class="fs-4 fw-bold text-dark">€ {{ split_data.joint_revenue|floatformat:2 }}</div>
+                <small class="text-muted">Protocolo conjunto (divisão 50/50)</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secção: Remuneração Discriminada por Instrutor -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="fas fa-chalkboard-teacher text-primary me-2"></i>Remunerações Devidas por Instrutor
+            </h5>
+            <span class="badge bg-primary-subtle text-primary fw-semibold">
+                {{ split_data.instructors_breakdown|length }} Instrutores com Atividade
+            </span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Instrutor</th>
+                        <th>Afiliação Protocolar</th>
+                        <th class="text-center">Aulas Lecionadas</th>
+                        <th class="text-center">Presenças no Tapete</th>
+                        <th class="text-center">Taxa Contratual</th>
+                        <th class="text-end">Valor Apurado</th>
+                        <th class="text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in split_data.instructors_breakdown %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark">{{ item.instructor.full_name }}</div>
+                            <small class="text-muted">{{ item.instructor.email|default:"Sem e-mail" }}</small>
+                        </td>
+                        <td>
+                            {% if item.instructor.entity_affiliation == 'acr_only' %}
+                            <span class="badge bg-primary">ACR</span>
+                            {% elif item.instructor.entity_affiliation == 'proform_only' %}
+                            <span class="badge bg-warning text-dark">Proform SC</span>
+                            {% else %}
+                            <span class="badge bg-info text-dark">Ambas as Entidades</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center fw-semibold">{{ item.classes_count }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border">
+                                <i class="fas fa-users me-1 text-muted"></i>{{ item.attendances_count }}
+                            </span>
+                        </td>
+                        <td class="text-center">{{ item.commission_rate|floatformat:1 }}%</td>
+                        <td class="text-end fw-bold text-primary fs-6">
+                            € {{ item.amount_due|floatformat:2 }}
+                        </td>
+                        <td class="text-center">
+                            {% if item.is_settled %}
+                            <span class="badge bg-success-subtle text-success border border-success">
+                                <i class="fas fa-check me-1"></i>Liquidado
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning">
+                                <i class="fas fa-clock me-1"></i>A Pagar
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fas fa-info-circle me-1"></i>Não foram lecionadas aulas por instrutores no período selecionado.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if split_data.instructors_breakdown %}
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="5" class="text-end">Total Geral Instrutores:</td>
+                        <td class="text-end text-primary fs-6">€ {{ split_data.instructors_total|floatformat:2 }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    <!-- Secção: Atividade por Arte Marcial / Modalidade -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 border-bottom">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="fas fa-tags text-secondary me-2"></i>Atividade por Modalidade / Arte Marcial
+            </h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Modalidade</th>
+                        <th>Âmbito Institucional</th>
+                        <th class="text-center">Aulas no Período</th>
+                        <th class="text-center">Total de Presenças / Atletas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mod in split_data.modality_breakdown %}
+                    <tr>
+                        <td class="fw-bold text-dark">{{ mod.modality.name }}</td>
+                        <td>{{ mod.entity_type }}</td>
+                        <td class="text-center fw-semibold">{{ mod.classes_count }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border">
+                                <i class="fas fa-check-double text-success me-1"></i>{{ mod.attendances_count }} presenças
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-3 text-muted">Nenhuma modalidade com registo no período.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Secção: Histórico de Fechos de Contas Oficiais -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="fas fa-history text-success me-2"></i>Histórico de Fechos Oficiais do Protocolo
+            </h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalCreateSettlement">
+                <i class="fas fa-plus me-1"></i>Novo Fecho
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Designação</th>
+                        <th>Período</th>
+                        <th class="text-end">Receita Bruta</th>
+                        <th class="text-end">Instrutores</th>
+                        <th class="text-end">Proform SC</th>
+                        <th class="text-end">Assoc. ACR</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in settlements %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'core:protocol_settlement_detail' s.pk %}" class="fw-bold text-decoration-none text-dark">
+                                {{ s.title }}
+                            </a>
+                            <small class="d-block text-muted">Emitido em {{ s.created_at|date:"d/m/Y H:i" }}</small>
+                        </td>
+                        <td>
+                            <span class="small">{{ s.period_start|date:"d/m/Y" }} a {{ s.period_end|date:"d/m/Y" }}</span>
+                        </td>
+                        <td class="text-end fw-semibold">€ {{ s.total_revenue|floatformat:2 }}</td>
+                        <td class="text-end text-primary">€ {{ s.instructor_total|floatformat:2 }}</td>
+                        <td class="text-end text-warning-emphasis">€ {{ s.proform_share|floatformat:2 }}</td>
+                        <td class="text-end text-purple fw-bold" style="color: #6f42c1;">€ {{ s.acr_share|floatformat:2 }}</td>
+                        <td class="text-center">
+                            {% if s.status == 'draft' %}
+                            <span class="badge bg-secondary">Rascunho</span>
+                            {% elif s.status == 'approved' %}
+                            <span class="badge bg-info text-dark">Aprovado</span>
+                            {% elif s.status == 'settled' %}
+                            <span class="badge bg-success">Liquidado</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                                <a href="{% url 'core:protocol_settlement_detail' s.pk %}" class="btn btn-sm btn-outline-primary" title="Ver Declaração Oficial">
+                                    <i class="fas fa-file-alt"></i> Declaração
+                                </a>
+                                <form method="post" action="{% url 'core:protocol_settlement_toggle_status' s.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Avançar Estado">
+                                        <i class="fas fa-step-forward"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="fas fa-info-circle me-1"></i>Nenhum fecho de contas oficial registado até ao momento.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Emitir Fecho Oficial -->
+<div class="modal fade" id="modalCreateSettlement" tabindex="-1" aria-labelledby="modalCreateSettlementLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'core:protocol_settlement_create' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="modalCreateSettlementLabel">
+                        <i class="fas fa-file-signature text-primary me-2"></i>Emitir Fecho de Contas Oficial
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Este processo calcula e fixa os valores da divisão tripartida da receita para o período indicado, criando a declaração executiva oficial do Protocolo.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Data de Início:</label>
+                        <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Data de Fim:</label>
+                        <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Notas e Observações:</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Observações de fecho acordadas entre a ACR e a Direção do Proform SC..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check me-1"></i>Emitir e Guardar Fecho
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

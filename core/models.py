@@ -787,6 +787,69 @@ class InstructorCommission(models.Model):
         super().save(*args, **kwargs)
 
 
+class ProtocolPeriodSettlement(models.Model):
+    """Fecho oficial de contas do Protocolo ACR & Proform SC por período."""
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Rascunho"
+        APPROVED = "approved", "Aprovado pela Direção"
+        SETTLED = "settled", "Liquidado / Pago"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="protocol_settlements")
+    title = models.CharField("Designação do Fecho", max_length=200, blank=True)
+    period_start = models.DateField("Início do Período")
+    period_end = models.DateField("Fim do Período")
+
+    # Valores financeiros da partilha
+    total_revenue = models.DecimalField(
+        "Receita Bruta Total",
+        max_digits=12,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    instructor_total = models.DecimalField(
+        "Remuneração dos Instrutores",
+        max_digits=12,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    proform_share = models.DecimalField(
+        "Parcela Ginásio Proform SC",
+        max_digits=12,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    acr_share = models.DecimalField(
+        "Parcela Associação ACR",
+        max_digits=12,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+
+    # Estado e Controlo
+    status = models.CharField("Estado", max_length=15, choices=Status.choices, default=Status.DRAFT)
+    settled_at = models.DateTimeField("Data de Liquidação", null=True, blank=True)
+    notes = models.TextField("Notas de Fecho e Observações", blank=True)
+    created_at = models.DateTimeField("Emitido em", auto_now_add=True)
+    updated_at = models.DateTimeField("Atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ["-period_end", "-created_at"]
+        verbose_name = "Fecho de Contas do Protocolo"
+        verbose_name_plural = "Fechos de Contas do Protocolo"
+
+    def __str__(self) -> str:
+        return f"Fecho Protocolo: {self.period_start:%d/%m/%Y} a {self.period_end:%d/%m/%Y} (€{self.total_revenue})"
+
+    def save(self, *args, **kwargs):
+        if not self.title:
+            self.title = f"Fecho de Contas ({self.period_start.strftime('%m/%Y')})"
+        super().save(*args, **kwargs)
+
+
 class GoogleCalendarConfig(models.Model):
     """Configuração OAuth2 para Google Calendar por organização."""
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name="google_calendar_config")

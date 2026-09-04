@@ -45,6 +45,13 @@ urlpatterns = [
     path('payments/add/', web_views.payment_create, name='payment_add'),
     path('payments/<int:payment_id>/receipt/', web_views.payment_receipt, name='payment_receipt'),
 
+    # Supervisão Financeira e Protocolo ACR & Proform SC
+    path('protocol/supervision/', web_views.protocol_supervision_dashboard, name='protocol_supervision'),
+    path('protocol/settlement/create/', web_views.protocol_settlement_create, name='protocol_settlement_create'),
+    path('protocol/settlement/<int:settlement_id>/', web_views.protocol_settlement_detail, name='protocol_settlement_detail'),
+    path('protocol/settlement/<int:settlement_id>/toggle-status/', web_views.protocol_settlement_toggle_status, name='protocol_settlement_toggle_status'),
+    path('protocol/commissions/<int:commission_id>/toggle-paid/', web_views.instructor_commission_toggle_paid, name='instructor_commission_toggle_paid'),
+
     # Google Drive & Sheets da ACR
     path('google-drive/', web_views.google_drive_sync_view, name='google_drive_sync'),
     path('google-drive/sync/', web_views.google_drive_trigger_sync, name='google_drive_trigger_sync'),

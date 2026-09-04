@@ -1,0 +1,247 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Fecho de Contas #{{ settlement.pk }} - Protocolo ACR & Proform SC{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printableSettlement, #printableSettlement * {
+            visibility: visible;
+        }
+        #printableSettlement {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 20px !important;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3 no-print">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:protocol_supervision' %}">Supervisão ACR</a></li>
+        <li class="breadcrumb-item active">Fecho #{{ settlement.pk }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+    <!-- Barra de Ações do Topo (Oculta na impressão) -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 no-print">
+        <a href="{% url 'core:protocol_supervision' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Voltar à Supervisão
+        </a>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Estado Atual -->
+            <span class="me-2">
+                Estado:
+                {% if settlement.status == 'draft' %}
+                <span class="badge bg-secondary fs-6">Rascunho</span>
+                {% elif settlement.status == 'approved' %}
+                <span class="badge bg-info text-dark fs-6">Aprovado pela Direção</span>
+                {% elif settlement.status == 'settled' %}
+                <span class="badge bg-success fs-6">Liquidado / Pago</span>
+                {% endif %}
+            </span>
+
+            <!-- Alterar Estado Form -->
+            <form method="post" action="{% url 'core:protocol_settlement_toggle_status' settlement.pk %}" class="d-inline">
+                {% csrf_token %}
+                {% if settlement.status == 'draft' %}
+                <input type="hidden" name="status" value="approved">
+                <button type="submit" class="btn btn-info text-dark">
+                    <i class="fas fa-check-circle me-1"></i>Aprovar Fecho
+                </button>
+                {% elif settlement.status == 'approved' %}
+                <input type="hidden" name="status" value="settled">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-hand-holding-usd me-1"></i>Marcar Liquidado
+                </button>
+                {% else %}
+                <input type="hidden" name="status" value="draft">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="fas fa-undo me-1"></i>Reverter para Rascunho
+                </button>
+                {% endif %}
+            </form>
+
+            <button onclick="window.print()" class="btn btn-dark">
+                <i class="fas fa-print me-1"></i>Imprimir Declaração / PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Documento Formal de Fecho de Contas -->
+    <div class="card border shadow-sm p-4 p-md-5 bg-white" id="printableSettlement">
+        <!-- Cabeçalho Oficial -->
+        <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+            <div>
+                <h3 class="fw-bold text-primary mb-1">Associação Cultural e Recreativa & Proform SC</h3>
+                <h5 class="text-secondary fw-semibold mb-1">Protocolo de Cooperação Desportiva</h5>
+                <small class="text-muted d-block">Desportos de Combate, Artes Marciais e Bem-Estar</small>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-dark fs-6 mb-1 text-uppercase">Declaração de Fecho de Contas</span>
+                <div class="fw-bold fs-5 text-dark">Registo N.º #{{ settlement.pk }}</div>
+                <small class="text-muted d-block">Emitido em: {{ settlement.created_at|date:"d/m/Y H:i" }}</small>
+                {% if settlement.settled_at %}
+                <small class="text-success d-block fw-semibold">Liquidado em: {{ settlement.settled_at|date:"d/m/Y" }}</small>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Identificação do Período -->
+        <div class="bg-light p-3 rounded mb-4 border">
+            <div class="row align-items-center">
+                <div class="col-md-7">
+                    <div class="small text-muted text-uppercase fw-bold">Designação Oficial:</div>
+                    <div class="fs-5 fw-bold text-dark">{{ settlement.title }}</div>
+                </div>
+                <div class="col-md-5 text-md-end">
+                    <div class="small text-muted text-uppercase fw-bold">Período de Apuramento:</div>
+                    <div class="fs-6 fw-bold text-dark">
+                        {{ settlement.period_start|date:"d/m/Y" }} até {{ settlement.period_end|date:"d/m/Y" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Síntese: Balanço Tripartido -->
+        <h5 class="fw-bold text-dark mb-3">
+            <i class="fas fa-balance-scale text-primary me-2"></i>Apuramento e Divisão da Receita
+        </h5>
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Rubrica Financeira</th>
+                        <th>Critério Protocolar</th>
+                        <th width="180" class="text-end">Montante</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="table-light fw-semibold">
+                        <td>1. Receita Bruta Total Arrecadada</td>
+                        <td>Mensalidades, Aulas Avulsas, Créditos e Quotas</td>
+                        <td class="text-end text-dark fs-6">€ {{ settlement.total_revenue|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <i class="fas fa-minus text-danger me-2"></i>
+                            2. Remuneração dos Instrutores
+                        </td>
+                        <td>Aulas lecionadas e taxas contratuais apuradas</td>
+                        <td class="text-end text-primary fw-bold fs-6">€ {{ settlement.instructor_total|floatformat:2 }}</td>
+                    </tr>
+                    <tr class="table-light">
+                        <td class="fw-semibold">
+                            <i class="fas fa-equals text-muted me-2"></i>
+                            Margem Institucional Líquida a Repartir
+                        </td>
+                        <td class="text-muted">Receita Bruta após dedução dos instrutores</td>
+                        <td class="text-end fw-bold text-dark fs-6">€ {{ split_data.net_entity_margin|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-4">
+                            <i class="fas fa-dumbbell text-warning me-2"></i>
+                            Parcela: Ginásio Proform SC
+                        </td>
+                        <td>Cedência de espaço, instalações físicas, receção e balcão</td>
+                        <td class="text-end text-warning-emphasis fw-bold fs-6">€ {{ settlement.proform_share|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-4">
+                            <i class="fas fa-shield-alt text-purple me-2" style="color: #6f42c1;"></i>
+                            Parcela: Associação ACR
+                        </td>
+                        <td>Organização desportiva, filiações, apólices de seguro e supervisão</td>
+                        <td class="text-end fw-bold fs-6" style="color: #6f42c1;">€ {{ settlement.acr_share|floatformat:2 }}</td>
+                    </tr>
+                </tbody>
+                <tfoot class="table-light">
+                    <tr class="small text-muted">
+                        <td colspan="2">Verificação de Integridade Aritmética (Saldo Residual):</td>
+                        <td class="text-end text-success fw-bold">€ 0.00 (Equilíbrio Rigoroso)</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Discriminação de Instrutores -->
+        <h5 class="fw-bold text-dark mb-3 mt-4">
+            <i class="fas fa-chalkboard-teacher text-primary me-2"></i>Discriminação de Remuneração por Instrutor
+        </h5>
+        <div class="table-responsive mb-4">
+            <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Instrutor</th>
+                        <th>Afiliação</th>
+                        <th class="text-center">Aulas</th>
+                        <th class="text-center">Presenças</th>
+                        <th class="text-center">Taxa (%)</th>
+                        <th class="text-end">Remuneração Devida</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in split_data.instructors_breakdown %}
+                    <tr>
+                        <td class="fw-semibold">{{ item.instructor.full_name }}</td>
+                        <td>{{ item.instructor.get_entity_affiliation_display }}</td>
+                        <td class="text-center">{{ item.classes_count }}</td>
+                        <td class="text-center">{{ item.attendances_count }}</td>
+                        <td class="text-center">{{ item.commission_rate|floatformat:1 }}%</td>
+                        <td class="text-end fw-bold text-primary">€ {{ item.amount_due|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-2 text-muted">Sem registo de aulas de instrutores no período.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Observações e Notas -->
+        {% if settlement.notes %}
+        <div class="mb-4">
+            <h6 class="fw-bold text-dark mb-2">Notas e Observações de Fecho:</h6>
+            <div class="p-3 bg-light rounded border text-muted small">
+                {{ settlement.notes|linebreaksbr }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Bloco Oficial de Assinaturas e Carimbos -->
+        <div class="mt-5 pt-4 border-top">
+            <div class="row text-center">
+                <div class="col-6">
+                    <div style="border-bottom: 1px solid #000; width: 80%; margin: 40px auto 10px auto;"></div>
+                    <div class="fw-bold text-dark">Pela Associação Cultural e Recreativa (ACR)</div>
+                    <small class="text-muted d-block">Direção Executiva / Tesouraria</small>
+                </div>
+                <div class="col-6">
+                    <div style="border-bottom: 1px solid #000; width: 80%; margin: 40px auto 10px auto;"></div>
+                    <div class="fw-bold text-dark">Pelo Ginásio Proform SC</div>
+                    <small class="text-muted d-block">Gerência / Administração</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

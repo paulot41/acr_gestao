@@ -107,6 +107,11 @@
                             <i class="fas fa-cash-register"></i> Caixa
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'protocol' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:protocol_supervision' %}">
+                            <i class="fas fa-handshake"></i> Supervisão ACR
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if 'client' in request.resolver_match.url_name %}active{% endif %}" href="#" id="clientsDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-users"></i> Atletas

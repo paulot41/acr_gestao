@@ -17,7 +17,8 @@ from django.views.decorators.http import require_http_methods
 
 from .models import (
     Person, Instructor, Modality, Event, Resource, Payment, Booking,
-    PaymentPlan, ClientSubscription, CreditHistory, GoogleDriveSyncLog
+    PaymentPlan, ClientSubscription, CreditHistory, GoogleDriveSyncLog,
+    InstructorCommission, ProtocolPeriodSettlement
 )
 from notifications.models import NotificationLog
 from .forms import (
@@ -25,6 +26,7 @@ from .forms import (
     PaymentRegistrationForm, ClientSubscriptionForm
 )
 from .services.communications import send_athlete_welcome_email, get_whatsapp_url
+from .services.protocol_finance import calculate_period_protocol_split, create_or_update_period_settlement
 
 
 
@@ -1410,5 +1412,181 @@ def event_quick_add_attendance(request, event_id):
 
     messages.success(request, f"Atleta {person.full_name} entrou no tapete! {note}")
     return redirect('core:event_checkin', event_id=event.pk)
+
+
+# ==============================================================================
+# JANELA 4: SUPERVISÃO FINANCEIRA ACR E DIVISÃO TRIPARTIDA DO PROTOCOLO
+# ==============================================================================
+
+@role_required(["admin", "staff"])
+def protocol_supervision_dashboard(request):
+    """
+    Portal de Supervisão Financeira da ACR e do Protocolo ACR & Proform SC.
+    Apresenta a divisão tripartida da receita, comissões de instrutores e histórico de fechos de contas.
+    """
+    org = request.organization
+    today = timezone.now().date()
+
+    # Período selecionado (por defeito o mês corrente)
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = today.replace(day=1)
+    else:
+        start_date = today.replace(day=1)
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            end_date = today
+    else:
+        end_date = today
+
+    # Calcular a divisão tripartida
+    split_data = calculate_period_protocol_split(org, start_date, end_date)
+
+    # Fechos oficiais já registados
+    settlements = ProtocolPeriodSettlement.objects.filter(
+        organization=org
+    ).order_by('-period_end', '-created_at')[:25]
+
+    # Comissões de instrutores do período com registo individual
+    commissions = InstructorCommission.objects.filter(
+        organization=org,
+        event__starts_at__date__gte=start_date,
+        event__starts_at__date__lte=end_date
+    ).select_related('instructor', 'event', 'event__modality').order_by('-event__starts_at')
+
+    context = {
+        'organization': org,
+        'start_date': start_date,
+        'end_date': end_date,
+        'split_data': split_data,
+        'settlements': settlements,
+        'commissions': commissions,
+        'today': today,
+    }
+    return render(request, 'core/protocol_supervision.html', context)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def protocol_settlement_create(request):
+    """
+    Gera ou atualiza um fecho de contas oficial do protocolo com base no período filtrado.
+    """
+    org = request.organization
+    start_date_str = request.POST.get('start_date')
+    end_date_str = request.POST.get('end_date')
+    notes = request.POST.get('notes', '').strip()
+
+    if not start_date_str or not end_date_str:
+        messages.error(request, "Indique as datas de início e fim para emitir o fecho de contas.")
+        return redirect('core:protocol_supervision')
+
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, "Formato de data inválido.")
+        return redirect('core:protocol_supervision')
+
+    if start_date > end_date:
+        messages.error(request, "A data inicial não pode ser posterior à data final.")
+        return redirect('core:protocol_supervision')
+
+    settlement = create_or_update_period_settlement(org, start_date, end_date, notes=notes)
+    messages.success(
+        request,
+        f"Fecho de Contas ({start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}) gerado com sucesso!"
+    )
+    return redirect('core:protocol_settlement_detail', settlement_id=settlement.pk)
+
+
+@role_required(["admin", "staff"])
+def protocol_settlement_detail(request, settlement_id):
+    """
+    Exibe a declaração detalhada de fecho de contas do protocolo, com layout oficial pronto para impressão.
+    """
+    org = request.organization
+    settlement = get_object_or_404(ProtocolPeriodSettlement, pk=settlement_id, organization=org)
+
+    # Obter os dados discriminados desse período
+    split_data = calculate_period_protocol_split(org, settlement.period_start, settlement.period_end)
+
+    context = {
+        'organization': org,
+        'settlement': settlement,
+        'split_data': split_data,
+        'today': timezone.now().date(),
+    }
+    return render(request, 'core/protocol_settlement_detail.html', context)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def protocol_settlement_toggle_status(request, settlement_id):
+    """
+    Atualiza o estado de um fecho de contas (Rascunho -> Aprovado -> Liquidado).
+    """
+    org = request.organization
+    settlement = get_object_or_404(ProtocolPeriodSettlement, pk=settlement_id, organization=org)
+
+    new_status = request.POST.get('status')
+    if new_status in [s.value for s in ProtocolPeriodSettlement.Status]:
+        settlement.status = new_status
+    else:
+        # Progressão automática por defeito
+        if settlement.status == ProtocolPeriodSettlement.Status.DRAFT:
+            settlement.status = ProtocolPeriodSettlement.Status.APPROVED
+        elif settlement.status == ProtocolPeriodSettlement.Status.APPROVED:
+            settlement.status = ProtocolPeriodSettlement.Status.SETTLED
+        elif settlement.status == ProtocolPeriodSettlement.Status.SETTLED:
+            settlement.status = ProtocolPeriodSettlement.Status.DRAFT
+
+    if settlement.status == ProtocolPeriodSettlement.Status.SETTLED:
+        settlement.settled_at = timezone.now()
+    else:
+        settlement.settled_at = None
+
+    settlement.save()
+    messages.success(request, f"Estado do fecho atualizado para '{settlement.get_status_display()}'.")
+    return redirect('core:protocol_settlement_detail', settlement_id=settlement.pk)
+
+
+@role_required(["admin", "staff"])
+@require_http_methods(["POST"])
+def instructor_commission_toggle_paid(request, commission_id):
+    """
+    Alterna o estado de pagamento de uma comissão individual de instrutor.
+    """
+    org = request.organization
+    commission = get_object_or_404(InstructorCommission, pk=commission_id, organization=org)
+
+    commission.is_paid = not commission.is_paid
+    if commission.is_paid:
+        commission.payment_date = timezone.now().date()
+    else:
+        commission.payment_date = None
+    commission.save()
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'is_paid': commission.is_paid,
+            'payment_date': commission.payment_date.strftime('%d/%m/%Y') if commission.payment_date else None,
+            'message': f"Comissão de {commission.instructor.full_name} marcada como {'Paga' if commission.is_paid else 'Pendente'}."
+        })
+
+    messages.success(
+        request,
+        f"Comissão de {commission.instructor.full_name} marcada como {'Paga' if commission.is_paid else 'Pendente'}."
+    )
+    return redirect(request.META.get('HTTP_REFERER', 'core:protocol_supervision'))
 
 
