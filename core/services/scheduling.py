@@ -65,24 +65,27 @@ def ensure_capacity(booking: "app_models.Booking") -> None:
     if not event or not booking.organization_id:
         return
 
-    # Contar reservas confirmadas existentes (excluindo a própria em update)
-    confirmed_qs = app_models.Booking.objects.filter(
+    # Lista de espera é permitida mesmo quando a aula está cheia
+    if booking.status == app_models.Booking.Status.WAITLIST:
+        return
+
+    # Contar reservas ativas existentes (confirmadas e checked-in, excluindo a própria em update)
+    active_qs = app_models.Booking.objects.filter(
         organization=booking.organization,
         event=event,
-        status=app_models.Booking.Status.CONFIRMED,
+        status__in=[app_models.Booking.Status.CONFIRMED, app_models.Booking.Status.CHECKED_IN],
     )
     if booking.pk:
-        confirmed_qs = confirmed_qs.exclude(pk=booking.pk)
+        active_qs = active_qs.exclude(pk=booking.pk)
 
-    confirmed_count = confirmed_qs.count()
+    active_count = active_qs.count()
 
     # Capacidade efetiva
-    capacity = event.capacity or 0
-    if capacity <= confirmed_count:
+    if event.capacity is not None and active_count >= event.capacity:
         raise ValidationError("Evento sem vagas disponíveis.")
 
     # Extra: para eventos individuais reforçar regra de 1 lugar
-    if event.event_type == app_models.Event.EventType.INDIVIDUAL and confirmed_count >= 1:
+    if event.event_type == app_models.Event.EventType.INDIVIDUAL and active_count >= 1:
         raise ValidationError("Aula individual já tem um participante.")
 
 

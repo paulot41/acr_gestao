@@ -3,10 +3,11 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.shortcuts import render, get_object_or_404, redirect
-from .auth_views import role_required
+from .auth_views import role_required, acr_required, proform_required, protocol_access_required
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import DatabaseError
+from django.db import DatabaseError, IntegrityError
 from django.db.models import Q, Count, Sum
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse, HttpResponse
@@ -143,7 +144,14 @@ def client_list(request):
         clients = clients.filter(status=status_filter)
 
     if entity:
-        clients = clients.filter(entity_affiliation=entity)
+        if entity in ('acr', 'acr_only'):
+            clients = clients.filter(entity_affiliation__in=[Person.EntityAffiliation.ACR_ONLY, Person.EntityAffiliation.BOTH])
+        elif entity in ('proform', 'proform_only'):
+            clients = clients.filter(entity_affiliation__in=[Person.EntityAffiliation.PROFORM_ONLY, Person.EntityAffiliation.BOTH])
+        elif entity == 'both':
+            clients = clients.filter(entity_affiliation=Person.EntityAffiliation.BOTH)
+        else:
+            clients = clients.filter(entity_affiliation=entity)
 
     if member_category:
         clients = clients.filter(member_category=member_category)
@@ -231,7 +239,7 @@ def client_create(request):
     """Criar novo cliente/atleta."""
     org = request.organization
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES, organization=org)
+        form = PersonForm(request.POST, request.FILES, organization=org, user=request.user)
         if form.is_valid():
             client = form.save(commit=False)
             client.organization = org
@@ -249,7 +257,7 @@ def client_create(request):
 
             return redirect('core:client_detail', pk=client.pk)
     else:
-        form = PersonForm(organization=org)
+        form = PersonForm(organization=org, user=request.user)
 
     return render(request, 'core/client_form.html', {'form': form, 'title': 'Novo Atleta / Cliente'})
 
@@ -261,13 +269,13 @@ def client_edit(request, pk):
     client = get_object_or_404(Person, pk=pk, organization=org)
 
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES, instance=client, organization=org)
+        form = PersonForm(request.POST, request.FILES, instance=client, organization=org, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, f'Ficha de {client.full_name} atualizada com sucesso!')
             return redirect('core:client_detail', pk=client.pk)
     else:
-        form = PersonForm(instance=client, organization=org)
+        form = PersonForm(instance=client, organization=org, user=request.user)
 
     return render(request, 'core/client_form.html', {
         'form': form,
@@ -282,7 +290,7 @@ def client_add(request):
     org = request.organization
 
     if request.method == 'POST':
-        form = PersonForm(request.POST, request.FILES, organization=org)
+        form = PersonForm(request.POST, request.FILES, organization=org, user=request.user)
         if form.is_valid():
             client = form.save(commit=False)
             client.organization = org
@@ -299,7 +307,7 @@ def client_add(request):
 
             return redirect('core:client_detail', pk=client.pk)
     else:
-        form = PersonForm(organization=org)
+        form = PersonForm(organization=org, user=request.user)
 
     return render(request, 'core/client_form.html', {
         'form': form,
@@ -396,7 +404,7 @@ def instructor_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Instrutor {instructor.full_name} atualizado com sucesso!')
-            return redirect('instructor_detail', pk=instructor.pk)
+            return redirect('core:instructor_detail', pk=instructor.pk)
     else:
         form = InstructorForm(instance=instructor, organization=request.organization)
 
@@ -445,15 +453,18 @@ def modality_list(request):
 def modality_create(request):
     """Criar nova modalidade."""
     if request.method == 'POST':
-        form = ModalityForm(request.POST)
+        form = ModalityForm(request.POST, organization=request.organization)
         if form.is_valid():
             modality = form.save(commit=False)
             modality.organization = request.organization
-            modality.save()
-            messages.success(request, f'Modalidade {modality.name} criada com sucesso!')
-            return redirect('modality_list')
+            try:
+                modality.save()
+                messages.success(request, f'Modalidade {modality.name} criada com sucesso!')
+                return redirect('core:modality_list')
+            except IntegrityError:
+                form.add_error('name', 'Já existe uma modalidade com este nome.')
     else:
-        form = ModalityForm()
+        form = ModalityForm(organization=request.organization)
 
     return render(request, 'core/modality_form.html', {'form': form, 'title': 'Nova Modalidade'})
 
@@ -464,13 +475,16 @@ def modality_edit(request, pk):
     modality = get_object_or_404(Modality, pk=pk, organization=request.organization)
 
     if request.method == 'POST':
-        form = ModalityForm(request.POST, instance=modality)
+        form = ModalityForm(request.POST, instance=modality, organization=request.organization)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'Modalidade {modality.name} atualizada com sucesso!')
-            return redirect('modality_list')
+            try:
+                form.save()
+                messages.success(request, f'Modalidade {modality.name} atualizada com sucesso!')
+                return redirect('core:modality_list')
+            except IntegrityError:
+                form.add_error('name', 'Já existe uma modalidade com este nome.')
     else:
-        form = ModalityForm(instance=modality)
+        form = ModalityForm(instance=modality, organization=request.organization)
 
     return render(request, 'core/modality_form.html', {
         'form': form,
@@ -485,15 +499,18 @@ def modality_add(request):
     org = request.organization
 
     if request.method == 'POST':
-        form = ModalityForm(request.POST)
+        form = ModalityForm(request.POST, organization=org)
         if form.is_valid():
             modality = form.save(commit=False)
             modality.organization = org
-            modality.save()
-            messages.success(request, f'Modalidade {modality.name} criada com sucesso!')
-            return redirect('core:modality_list')
+            try:
+                modality.save()
+                messages.success(request, f'Modalidade {modality.name} criada com sucesso!')
+                return redirect('core:modality_list')
+            except IntegrityError:
+                form.add_error('name', 'Já existe uma modalidade com este nome.')
     else:
-        form = ModalityForm()
+        form = ModalityForm(organization=org)
 
     return render(request, 'core/modality_form.html', {
         'form': form,
@@ -521,15 +538,18 @@ def resource_add(request):
     org = request.organization
 
     if request.method == 'POST':
-        form = ResourceForm(request.POST)
+        form = ResourceForm(request.POST, organization=org)
         if form.is_valid():
             resource = form.save(commit=False)
             resource.organization = org
-            resource.save()
-            messages.success(request, f'Espaço "{resource.name}" criado com sucesso!')
-            return redirect('core:resource_list')
+            try:
+                resource.save()
+                messages.success(request, f'Espaço "{resource.name}" criado com sucesso!')
+                return redirect('core:resource_list')
+            except IntegrityError:
+                form.add_error('name', 'Já existe um espaço com este nome.')
     else:
-        form = ResourceForm()
+        form = ResourceForm(organization=org)
 
     return render(request, 'core/resource_form.html', {
         'form': form,
@@ -545,13 +565,16 @@ def resource_edit(request, pk):
     resource = get_object_or_404(Resource, pk=pk, organization=org)
 
     if request.method == 'POST':
-        form = ResourceForm(request.POST, instance=resource)
+        form = ResourceForm(request.POST, instance=resource, organization=org)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'Espaço "{resource.name}" atualizado com sucesso!')
-            return redirect('core:resource_list')
+            try:
+                form.save()
+                messages.success(request, f'Espaço "{resource.name}" atualizado com sucesso!')
+                return redirect('core:resource_list')
+            except IntegrityError:
+                form.add_error('name', 'Já existe um espaço com este nome.')
     else:
-        form = ResourceForm(instance=resource)
+        form = ResourceForm(instance=resource, organization=org)
 
     return render(request, 'core/resource_form.html', {
         'form': form,
@@ -574,7 +597,7 @@ def gantt_view(request):
     return redirect('core:gantt')
 
 
-@role_required(["admin", "staff"])
+@role_required(["admin", "staff", "instructor"])
 def events_json(request):
     """API endpoint OTIMIZADA para eventos do calendário/gantt."""
     org = request.organization
@@ -666,17 +689,18 @@ def events_json(request):
 def event_create(request):
     """Criar novo evento/aula."""
     if request.method == 'POST':
-        form = EventForm(request.POST)
+        form = EventForm(request.POST, organization=request.organization)
         if form.is_valid():
             event = form.save(commit=False)
             event.organization = request.organization
-            event.save()
-            messages.success(request, f'Aula {event.title} criada com sucesso!')
-            return redirect('gantt_view')
+            try:
+                event.save()
+                messages.success(request, f'Aula {event.title} criada com sucesso!')
+                return redirect('core:gantt')
+            except ValidationError as e:
+                form.add_error(None, e)
     else:
-        form = EventForm()
-        # Filtrar recursos da organização
-        form.fields['resource'].queryset = Resource.objects.filter(organization=request.organization)
+        form = EventForm(organization=request.organization)
 
     return render(request, 'core/event_form.html', {'form': form, 'title': 'Nova Aula'})
 
@@ -800,15 +824,16 @@ def event_edit(request, pk):
     event = get_object_or_404(Event, pk=pk, organization=request.organization)
 
     if request.method == 'POST':
-        form = EventForm(request.POST, instance=event)
+        form = EventForm(request.POST, instance=event, organization=request.organization)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'Aula {event.title} atualizada com sucesso!')
-            return redirect('event_list')
+            try:
+                form.save()
+                messages.success(request, f'Aula {event.title} atualizada com sucesso!')
+                return redirect('core:event_list')
+            except ValidationError as e:
+                form.add_error(None, e)
     else:
-        form = EventForm(instance=event)
-        # Filtrar recursos da organização
-        form.fields['resource'].queryset = Resource.objects.filter(organization=request.organization)
+        form = EventForm(instance=event, organization=request.organization)
 
     return render(request, 'core/event_form.html', {
         'form': form,
@@ -827,9 +852,12 @@ def event_add(request):
         if form.is_valid():
             event = form.save(commit=False)
             event.organization = org
-            event.save()
-            messages.success(request, f'Evento {event.title} criado com sucesso!')
-            return redirect('core:schedule')
+            try:
+                event.save()
+                messages.success(request, f'Evento {event.title} criado com sucesso!')
+                return redirect('core:schedule')
+            except ValidationError as e:
+                form.add_error(None, e)
     else:
         form = EventForm(organization=org)
 
@@ -848,9 +876,13 @@ def event_delete(request, pk):
 
     if request.method == 'POST':
         title = event.title
-        event.delete()
-        messages.success(request, f'Evento "{title}" eliminado com sucesso!')
-        return redirect('core:schedule')
+        try:
+            event.delete()
+            messages.success(request, f'Evento "{title}" eliminado com sucesso!')
+            return redirect('core:schedule')
+        except (ProtectedError, DatabaseError) as e:
+            messages.error(request, f'Não é possível eliminar o evento "{title}": existem registos associados.')
+            return redirect('core:schedule')
 
     return render(request, 'core/event_confirm_delete.html', {
         'event': event
@@ -1390,6 +1422,11 @@ def event_quick_add_attendance(request, event_id):
         messages.error(request, "Selecione um praticante para adicionar à aula.")
         return redirect('core:event_checkin', event_id=event.pk)
 
+    try:
+        person_id = int(person_id)
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'ID inválido'}, status=400)
+
     person = get_object_or_404(Person, pk=person_id, organization=org)
 
     # Verificar se já tem reserva
@@ -1449,7 +1486,7 @@ def event_quick_add_attendance(request, event_id):
 # JANELA 4: SUPERVISÃO FINANCEIRA ACR E DIVISÃO TRIPARTIDA DO PROTOCOLO
 # ==============================================================================
 
-@role_required(["admin", "staff"])
+@protocol_access_required(require_approval_power=False)
 def protocol_supervision_dashboard(request):
     """
     Portal de Supervisão Financeira da ACR e do Protocolo ACR & Proform SC.
@@ -1505,7 +1542,7 @@ def protocol_supervision_dashboard(request):
     return render(request, 'core/protocol_supervision.html', context)
 
 
-@role_required(["admin", "staff"])
+@protocol_access_required(require_approval_power=False)
 @require_http_methods(["POST"])
 def protocol_settlement_create(request):
     """
@@ -1539,7 +1576,7 @@ def protocol_settlement_create(request):
     return redirect('core:protocol_settlement_detail', settlement_id=settlement.pk)
 
 
-@role_required(["admin", "staff"])
+@protocol_access_required(require_approval_power=False)
 def protocol_settlement_detail(request, settlement_id):
     """
     Exibe a declaração detalhada de fecho de contas do protocolo, com layout oficial pronto para impressão.
@@ -1559,7 +1596,7 @@ def protocol_settlement_detail(request, settlement_id):
     return render(request, 'core/protocol_settlement_detail.html', context)
 
 
-@role_required(["admin", "staff"])
+@protocol_access_required(require_approval_power=True)
 @require_http_methods(["POST"])
 def protocol_settlement_toggle_status(request, settlement_id):
     """
@@ -1634,10 +1671,13 @@ def member_card_view(request, pk):
     return render(request, "core/membership_card.html", card_data)
 
 
-@role_required(["admin", "staff"])
+@role_required(["admin", "staff", "instructor", "proform_director"])
 @require_http_methods(["POST"])
 def athlete_graduation_add(request, pk):
     """Regista um novo exame/graduação de cinto para o atleta."""
+    if not (request.user.is_superuser or getattr(request, 'can_manage_sports', False)):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Apenas a direção técnica ou treinadores credenciados podem registar graduações.")
     org = request.organization
     person = get_object_or_404(Person, pk=pk, organization=org)
 
@@ -1653,6 +1693,12 @@ def athlete_graduation_add(request, pk):
 
     if not rank_name or not modality_id:
         messages.error(request, "Modalidade e nome da graduação/cinto são obrigatórios.")
+        return redirect("core:client_detail", pk=person.pk)
+
+    try:
+        modality_id = int(modality_id)
+    except (ValueError, TypeError):
+        messages.error(request, "Modalidade inválida.")
         return redirect("core:client_detail", pk=person.pk)
 
     modality = get_object_or_404(Modality, pk=modality_id, organization=org)
@@ -1761,7 +1807,7 @@ def kiosk_checkin_api(request):
     return JsonResponse(result)
 
 
-@role_required(["admin", "staff"])
+@acr_required(require_direction=True)
 def association_governance_view(request):
     """Painel institucional da Associação ACR: Órgãos Sociais, Mandatos e Caderno de Sócios."""
     org = request.organization

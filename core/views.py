@@ -189,7 +189,7 @@ def create_event_from_gantt(request):
         # Validar recurso
         try:
             resource = Resource.objects.get(id=resource_id, organization=org)
-        except Resource.DoesNotExist:
+        except (Resource.DoesNotExist, ValueError, TypeError):
             return JsonResponse({'error': 'Recurso não encontrado'}, status=404)
 
         # Parsear data
@@ -204,7 +204,7 @@ def create_event_from_gantt(request):
         if instructor_id:
             try:
                 instructor = Instructor.objects.get(id=instructor_id, organization=org)
-            except Instructor.DoesNotExist:
+            except (Instructor.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'error': 'Instrutor não encontrado'}, status=404)
         elif not (request.user.is_staff or request.user.is_superuser):
             try:
@@ -218,7 +218,7 @@ def create_event_from_gantt(request):
         if modality_id:
             try:
                 modality = Modality.objects.get(id=modality_id, organization=org)
-            except Modality.DoesNotExist:
+            except (Modality.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'error': 'Modalidade não encontrada'}, status=404)
 
         # Turma
@@ -227,7 +227,7 @@ def create_event_from_gantt(request):
         if class_group_id:
             try:
                 class_group = ClassGroup.objects.get(id=class_group_id, organization=org)
-            except ClassGroup.DoesNotExist:
+            except (ClassGroup.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'error': 'Turma não encontrada'}, status=404)
 
         # Cliente individual
@@ -236,13 +236,16 @@ def create_event_from_gantt(request):
         if individual_client_id:
             try:
                 individual_client = Person.objects.get(id=individual_client_id, organization=org)
-            except Person.DoesNotExist:
+            except (Person.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'error': 'Cliente não encontrado'}, status=404)
 
         event_type = data.get('event_type', Event.EventType.OPEN_CLASS)
         title = (data.get('title') or '').strip() or f"Aula - {resource.name}"
         description = data.get('description', '')
-        capacity = int(data.get('capacity')) if data.get('capacity') else None
+        try:
+            capacity = int(data.get('capacity')) if data.get('capacity') is not None and data.get('capacity') != '' else None
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'Capacidade inválida'}, status=400)
 
         # CASO 1: Série Recorrente
         if is_recurring:
@@ -261,7 +264,10 @@ def create_event_from_gantt(request):
                 # Se não especificado explicitamente, usa o dia da semana do evento inicial
                 weekdays = [event_date.weekday()]
             else:
-                weekdays = [int(w) for w in weekdays]
+                try:
+                    weekdays = [int(w) for w in weekdays]
+                except (ValueError, TypeError):
+                    return JsonResponse({'error': 'Dias da semana da série recorrente inválidos'}, status=400)
 
             series_result = create_recurring_event_series(
                 organization=org,
@@ -345,6 +351,8 @@ def create_event_from_gantt(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'success': False, 'error': f'Parâmetros inválidos: {str(e)}'}, status=400)
     except ValidationError as e:
         msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
         return JsonResponse({'error': msg}, status=400)
@@ -367,7 +375,7 @@ def update_event_details(request):
 
         try:
             event = Event.objects.get(id=event_id, organization=org)
-        except Event.DoesNotExist:
+        except (Event.DoesNotExist, ValueError, TypeError):
             return JsonResponse({'error': 'Evento não encontrado'}, status=404)
 
         # Atualizar campos permitidos
@@ -422,7 +430,10 @@ def update_event_details(request):
                 event.class_group = None
                 event.individual_client = None
                 if 'capacity' in data:
-                    event.capacity = min(int(data['capacity']), event.resource.capacity)
+                    try:
+                        event.capacity = min(int(data['capacity']), event.resource.capacity)
+                    except (ValueError, TypeError):
+                        return JsonResponse({'error': 'Capacidade inválida'}, status=400)
 
         # Atualização opcional de horários e recurso (suporta drag no Gantt)
         # Aceita: 'date' (YYYY-MM-DD), 'start_time' (HH:MM), 'end_time' (HH:MM), 'resource_id'
@@ -517,6 +528,8 @@ def update_event_details(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'success': False, 'error': f'Parâmetros inválidos: {str(e)}'}, status=400)
     except ValidationError as e:
         msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
         return JsonResponse({'error': msg}, status=400)
@@ -540,7 +553,7 @@ def delete_event_api(request):
 
         try:
             event = Event.objects.get(id=event_id, organization=org)
-        except Event.DoesNotExist:
+        except (Event.DoesNotExist, ValueError, TypeError):
             return JsonResponse({'success': False, 'error': 'Evento não encontrado'}, status=404)
 
         if delete_series and event.recurrence_group_id:
@@ -563,9 +576,11 @@ def delete_event_api(request):
         })
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'success': False, 'error': f'Parâmetros inválidos: {str(e)}'}, status=400)
     except DatabaseError as e:
         logger.error("Erro ao eliminar evento: %s", e)
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 @role_required(["admin", "staff", "instructor"])
@@ -805,7 +820,6 @@ def validate_event_conflict(request):
         starts_at_str = data.get('starts_at')
         ends_at_str = data.get('ends_at')
         exclude_event_id = data.get('exclude_event_id')  # Para edições
-
         instructor_id = data.get('instructor_id')
 
         if not all([starts_at_str, ends_at_str]):
@@ -813,6 +827,30 @@ def validate_event_conflict(request):
 
         if not resource_id and not instructor_id:
             return JsonResponse({'error': 'Recurso ou Instrutor obrigatório para validação'}, status=400)
+
+        if resource_id is not None and resource_id != '':
+            try:
+                resource_id = int(resource_id)
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'ID de recurso inválido'}, status=400)
+        else:
+            resource_id = None
+
+        if instructor_id is not None and instructor_id != '':
+            try:
+                instructor_id = int(instructor_id)
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'ID de instrutor inválido'}, status=400)
+        else:
+            instructor_id = None
+
+        if exclude_event_id is not None and exclude_event_id != '':
+            try:
+                exclude_event_id = int(exclude_event_id)
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'ID de evento excluído inválido'}, status=400)
+        else:
+            exclude_event_id = None
 
         try:
             starts_at = datetime.fromisoformat(starts_at_str.replace('Z', ''))
@@ -884,6 +922,8 @@ def validate_event_conflict(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'error': f'Parâmetros inválidos: {str(e)}'}, status=400)
     except DatabaseError as e:
         logger.error("Erro ao verificar conflitos de evento: %s", e)
         return JsonResponse({'error': str(e)}, status=500)

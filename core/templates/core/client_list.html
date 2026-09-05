@@ -94,6 +94,7 @@
                     {% endfor %}
                 </select>
             </div>
+            {% if request.can_manage_association or request.is_acr %}
             <div class="col-md-2">
                 <label for="membership_fee_status" class="form-label">Quotas ACR</label>
                 <select class="form-select" id="membership_fee_status" name="membership_fee_status">
@@ -105,6 +106,7 @@
                     {% endfor %}
                 </select>
             </div>
+            {% endif %}
             <div class="col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary me-2">
                     <i class="bi bi-search"></i> Filtrar

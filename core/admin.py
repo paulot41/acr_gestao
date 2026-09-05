@@ -184,7 +184,6 @@ admin_site.register(models.Organization)
 admin_site.register(models.ClassGroup)
 admin_site.register(models.InstructorCommission)
 admin_site.register(models.CreditHistory)
-admin_site.register(models.UserProfile)
 admin_site.register(models.Product, ProductAdmin)
 admin_site.register(models.Membership)
 admin_site.register(models.ClassTemplate)
@@ -211,7 +210,77 @@ admin.site.register(models.Organization)
 admin.site.register(models.ClassGroup)
 admin.site.register(models.InstructorCommission)
 admin.site.register(models.CreditHistory)
-admin.site.register(models.UserProfile)
+class GoverningBodyMemberInline(admin.TabularInline):
+    model = models.GoverningBodyMember
+    extra = 1
+    fields = ("person", "name", "role", "order")
+
+
+class GoverningBodyAdmin(admin.ModelAdmin):
+    list_display = ("body_type", "term_label", "start_date", "end_date", "is_active")
+    list_filter = ("body_type", "is_active")
+    search_fields = ("term_label", "notes", "electoral_minutes_ref")
+    inlines = [GoverningBodyMemberInline]
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        profile = getattr(request.user, "profile", None)
+        if profile and profile.can_manage_association:
+            return True
+        return request.user.groups.filter(name="Direção ACR").exists()
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request):
+        return self.has_module_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+
+class GoverningBodyMemberAdmin(admin.ModelAdmin):
+    list_display = ("name", "role", "governing_body", "order")
+    list_filter = ("governing_body__body_type", "governing_body")
+    search_fields = ("name", "role", "person__first_name", "person__last_name")
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        profile = getattr(request.user, "profile", None)
+        if profile and profile.can_manage_association:
+            return True
+        return request.user.groups.filter(name="Direção ACR").exists()
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request):
+        return self.has_module_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "user_type", "entity_affiliation", "organization", "is_active")
+    list_filter = ("user_type", "entity_affiliation", "is_active", "organization")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "user__email")
+
+
+admin_site.register(models.UserProfile, UserProfileAdmin)
+admin_site.register(models.AthleteGraduation)
+admin_site.register(models.GoverningBody, GoverningBodyAdmin)
+admin_site.register(models.GoverningBodyMember, GoverningBodyMemberAdmin)
+
+admin.site.register(models.UserProfile, UserProfileAdmin)
 admin.site.register(models.Product, ProductAdmin)
 admin.site.register(models.Membership)
 admin.site.register(models.ClassTemplate)
@@ -223,8 +292,8 @@ admin.site.register(models.Invoice, InvoiceAdmin)
 admin.site.register(models.Campaign)
 admin.site.register(models.MessageLog)
 admin.site.register(models.AthleteGraduation)
-admin.site.register(models.GoverningBody)
-admin.site.register(models.GoverningBodyMember)
+admin.site.register(models.GoverningBody, GoverningBodyAdmin)
+admin.site.register(models.GoverningBodyMember, GoverningBodyMemberAdmin)
 
 
 # --- User management: Custom User admin with inline UserProfile ---

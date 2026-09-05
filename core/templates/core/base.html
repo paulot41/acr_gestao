@@ -101,24 +101,37 @@
                             <i class="fas fa-calendar-alt"></i> Calendário
                         </a>
                     </li>
-                    {% if request.user_role == 'admin' or request.user_role == 'staff' %}
+                    {% if request.is_management or request.user_role == 'admin' or request.user_role == 'staff' %}
                     <li class="nav-item">
                         <a class="nav-link {% if 'cashier' in request.resolver_match.url_name or 'payment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:cashier_dashboard' %}">
                             <i class="fas fa-cash-register"></i> Caixa
                         </a>
                     </li>
+                    {% if request.can_manage_association or request.can_supervise_protocol %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if 'association' in request.resolver_match.url_name or 'protocol' in request.resolver_match.url_name %}active{% endif %}" href="#" id="associationDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-landmark"></i> Associação ACR
                         </a>
                         <ul class="dropdown-menu">
+                            {% if request.can_manage_association %}
                             <li><a class="dropdown-item" href="{% url 'core:association_governance' %}"><i class="fas fa-sitemap me-2 text-primary"></i>Órgãos Sociais & Mandatos</a></li>
-                            <li><a class="dropdown-item" href="{% url 'core:protocol_supervision' %}"><i class="fas fa-handshake me-2 text-success"></i>Protocolo ACR & Proform SC</a></li>
                             <li><a class="dropdown-item" href="{% url 'core:client_list' %}?member_category=socio"><i class="fas fa-id-card me-2 text-warning"></i>Caderno de Sócios</a></li>
+                            {% endif %}
+                            {% if request.can_supervise_protocol %}
+                            <li><a class="dropdown-item" href="{% url 'core:protocol_supervision' %}"><i class="fas fa-handshake me-2 text-success"></i>Protocolo ACR & Proform SC</a></li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'core:kiosk' %}" target="_blank"><i class="fas fa-tablet-alt me-2 text-info"></i>Quiosque Pavilhão / Tapete</a></li>
                         </ul>
                     </li>
+                    {% else %}
+                    <!-- Acesso direto do ProForm ao Quiosque no tapete sem menu institucional da ACR -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'core:kiosk' %}" target="_blank">
+                            <i class="fas fa-tablet-alt text-info"></i> Quiosque Tapete
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if 'client' in request.resolver_match.url_name %}active{% endif %}" href="#" id="clientsDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-users"></i> Atletas
@@ -191,16 +204,32 @@
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle"></i> {{ user.username }}
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle fs-5"></i>
+                            <span>{{ user.get_full_name|default:user.username }}</span>
+                            {% if request.is_acr_direction %}
+                            <span class="badge bg-primary" style="font-size: 0.7rem;">Direção ACR</span>
+                            {% elif request.is_proform_director %}
+                            <span class="badge bg-success" style="font-size: 0.7rem;">Dir. ProForm</span>
+                            {% elif request.is_proform %}
+                            <span class="badge bg-success" style="font-size: 0.7rem;">ProForm</span>
+                            {% elif request.is_acr %}
+                            <span class="badge bg-primary" style="font-size: 0.7rem;">ACR</span>
+                            {% elif user.is_superuser %}
+                            <span class="badge bg-dark" style="font-size: 0.7rem;">Admin</span>
+                            {% endif %}
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            {% if request.user_role == 'admin' or request.user_role == 'staff' %}
-                            <li><a class="dropdown-item" href="{% url 'core:settings' %}"><i class="fas fa-sliders-h"></i> Parametrização Protocolo</a></li>
-                            <li><a class="dropdown-item" href="/admin/"><i class="fas fa-cogs"></i> Admin Django</a></li>
+                        <ul class="dropdown-menu dropdown-menu-end shadow">
+                            {% if request.can_supervise_protocol or request.can_manage_association or user.is_superuser %}
+                            <li><a class="dropdown-item" href="{% url 'core:settings' %}"><i class="fas fa-sliders-h me-2 text-secondary"></i>Parametrização Protocolo</a></li>
+                            {% endif %}
+                            {% if user.is_superuser or user.is_staff %}
+                            <li><a class="dropdown-item" href="/admin/"><i class="fas fa-cogs me-2 text-secondary"></i>Admin Django</a></li>
+                            {% endif %}
+                            {% if request.can_supervise_protocol or request.can_manage_association or user.is_superuser or user.is_staff %}
                             <li><hr class="dropdown-divider"></li>
                             {% endif %}
-                            <li><a class="dropdown-item" href="{% url 'core:logout' %}"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'core:logout' %}"><i class="fas fa-sign-out-alt me-2"></i>Sair</a></li>
                         </ul>
                     </li>
                     {% else %}

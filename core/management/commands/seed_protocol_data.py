@@ -244,6 +244,77 @@ class Command(BaseCommand):
                 defaults={"role": role, "order": order, "notes": notes}
             )
 
+        # 9. Configurar Grupos e Permissões Oficiais (ACR vs ProForm)
+        from django.core.management import call_command
+        from django.contrib.auth.models import User, Group
+        from core.models import UserProfile
+
+        call_command("setup_roles_and_permissions")
+
+        # 10. Utilizadores Institucionais de Referência
+        # 10.1 Paulo Teixeira (Presidente da Direção da Associação ACR)
+        paulo_user, p_created = User.objects.get_or_create(
+            username="paulo.teixeira",
+            defaults={
+                "first_name": "Paulo",
+                "last_name": "Teixeira",
+                "email": "paulo.t.41@gmail.com",
+                "is_staff": True,
+                "is_superuser": True,
+            }
+        )
+        if p_created:
+            paulo_user.set_password("acr_direcao_2026")
+            paulo_user.save()
+
+        UserProfile.objects.update_or_create(
+            user=paulo_user,
+            organization=org,
+            defaults={
+                "user_type": UserProfile.UserType.ACR_DIRECTION,
+                "entity_affiliation": UserProfile.EntityAffiliation.ACR_ONLY,
+                "can_view_finances": True,
+                "can_manage_bookings": True,
+                "can_view_all_clients": True,
+                "can_create_events": True,
+            }
+        )
+        dir_acr_group = Group.objects.filter(name="Direção ACR").first()
+        if dir_acr_group:
+            paulo_user.groups.add(dir_acr_group)
+
+        # 10.2 Daniel Coelho (Diretor Técnico Oficial do ProForm)
+        daniel_user, d_created = User.objects.get_or_create(
+            username="daniel.coelho",
+            defaults={
+                "first_name": "Daniel",
+                "last_name": "Coelho",
+                "email": "daniel.coelho@proform.pt",
+                "is_staff": True,
+                "is_superuser": False,
+            }
+        )
+        if d_created:
+            daniel_user.set_password("proform_dt_2026")
+            daniel_user.save()
+
+        UserProfile.objects.update_or_create(
+            user=daniel_user,
+            organization=org,
+            defaults={
+                "user_type": UserProfile.UserType.PROFORM_DIRECTOR,
+                "entity_affiliation": UserProfile.EntityAffiliation.PROFORM_ONLY,
+                "instructor": daniel,
+                "can_view_finances": True,
+                "can_manage_bookings": True,
+                "can_view_all_clients": True,
+                "can_create_events": True,
+            }
+        )
+        dt_pf_group = Group.objects.filter(name="Direção Técnica Proform").first()
+        if dt_pf_group:
+            daniel_user.groups.add(dt_pf_group)
+
         self.stdout.write(self.style.SUCCESS(
             f"Parametrização concluída com sucesso! Organização: '{org.name}'\n"
             f"• Apólice: {config.insurance_policy_number} ({config.insurance_company})\n"
@@ -251,5 +322,6 @@ class Command(BaseCommand):
             f"• Diretor Técnico: {daniel.full_name} (Cédula: {daniel.ipdj_license_number})\n"
             f"• Espaço: {pavilhao.name} ({pavilhao.get_facility_type_display()})\n"
             f"• Órgãos Sociais da ACR: Mandato {term} (Direção, Mesa AG, Conselho Fiscal)\n"
+            f"• Utilizadores de Referência configurados: 'paulo.teixeira' (Direção ACR) e 'daniel.coelho' (Direção Técnica ProForm)\n"
             f"• Atletas registados/atualizados: {created_count} criados de {len(initial_athletes)} da pasta oficial."
         ))

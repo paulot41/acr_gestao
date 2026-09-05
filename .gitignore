@@ -57,6 +57,8 @@ logs/
 
 # Local agent instructions
 AGENTS.md
+.agents/
+ORIGINAL_REQUEST.md
 
 # Backups (manter estrutura com .gitkeep mas não os ficheiros de backup)
 backups/*

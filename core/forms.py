@@ -8,11 +8,42 @@ from .models import (
 
 
 class PersonForm(forms.ModelForm):
-    """Formulário para criação/edição de clientes e atletas."""
+    """Formulário para criação/edição de clientes e atletas com controlo de permissões ACR vs ProForm."""
 
     def __init__(self, *args, **kwargs):
         self.organization = kwargs.pop("organization", None)
+        self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
+
+        # Verificar se o utilizador tem permissão para gerir a Associação ACR
+        can_manage_association = True
+        if self.user:
+            if not self.user.is_superuser:
+                profile = getattr(self.user, "profile", None)
+                if profile:
+                    can_manage_association = profile.can_manage_association
+                else:
+                    can_manage_association = self.user.groups.filter(name__in=["Direção ACR", "Staff ACR"]).exists()
+
+        self.can_manage_association = can_manage_association
+
+        # Se não puder gerir associação (ex: treinadores/staff do ProForm), bloquear campos estatutários
+        if not can_manage_association:
+            associative_fields = ['member_category', 'member_number', 'admission_date', 'membership_fee_status']
+            for f in associative_fields:
+                if f in self.fields:
+                    self.fields[f].disabled = True
+                    self.fields[f].help_text = "Campo exclusivo da Associação ACR (Acesso reservado à Direção ACR)."
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not getattr(self, 'can_manage_association', True) and self.instance and self.instance.pk:
+            # Preservar dados associativos da base de dados caso haja tentativa de envio indevido
+            cleaned_data['member_category'] = self.instance.member_category
+            cleaned_data['member_number'] = self.instance.member_number
+            cleaned_data['admission_date'] = self.instance.admission_date
+            cleaned_data['membership_fee_status'] = self.instance.membership_fee_status
+        return cleaned_data
 
     def _get_org(self):
         if self.organization:
@@ -99,6 +130,22 @@ class InstructorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.organization = kwargs.pop("organization", None)
         super().__init__(*args, **kwargs)
+        if 'acr_commission_rate' in self.fields:
+            self.fields['acr_commission_rate'].required = False
+        if 'proform_commission_rate' in self.fields:
+            self.fields['proform_commission_rate'].required = False
+
+    def clean_acr_commission_rate(self):
+        val = self.cleaned_data.get('acr_commission_rate')
+        if val is None:
+            return getattr(self.instance, 'acr_commission_rate', None) or Decimal('60.00')
+        return val
+
+    def clean_proform_commission_rate(self):
+        val = self.cleaned_data.get('proform_commission_rate')
+        if val is None:
+            return getattr(self.instance, 'proform_commission_rate', None) or Decimal('70.00')
+        return val
 
     def _get_org(self):
         if self.organization:
@@ -165,6 +212,31 @@ class ModalityForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        self.organization = kwargs.pop('organization', None)
+        super().__init__(*args, **kwargs)
+        if 'color' in self.fields:
+            self.fields['color'].required = False
+        if self.organization and not getattr(self.instance, 'organization_id', None):
+            self.instance.organization = self.organization
+
+    def clean_color(self):
+        color = self.cleaned_data.get('color')
+        if not color:
+            return getattr(self.instance, 'color', None) or '#0d6efd'
+        return color
+
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        org = self.organization or getattr(self.instance, 'organization', None)
+        if org and name:
+            qs = Modality.objects.filter(organization=org, name__iexact=name)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError('Já existe uma modalidade com este nome.')
+        return name
+
 
 class ClassGroupForm(forms.ModelForm):
     """Formulário para criação/edição de turmas."""
@@ -228,6 +300,7 @@ class EventForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         if organization:
+            self.instance.organization = organization
             self.fields['resource'].queryset = Resource.objects.filter(organization=organization, is_available=True)
             self.fields['modality'].queryset = Modality.objects.filter(organization=organization, is_active=True)
             self.fields['instructor'].queryset = Instructor.objects.filter(organization=organization, is_active=True)
@@ -285,6 +358,7 @@ class BookingForm(forms.ModelForm):
         organization = kwargs.pop("organization", None)
         super().__init__(*args, **kwargs)
         if organization:
+            self.instance.organization = organization
             self.fields["event"].queryset = Event.objects.filter(organization=organization)
             self.fields["person"].queryset = Person.objects.filter(organization=organization)
 
@@ -311,6 +385,23 @@ class ResourceForm(forms.ModelForm):
             'equipment_list': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Lista de equipamentos disponíveis...'}),
             'special_features': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Características especiais...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        self.organization = kwargs.pop('organization', None)
+        super().__init__(*args, **kwargs)
+        if self.organization and not getattr(self.instance, 'organization_id', None):
+            self.instance.organization = self.organization
+
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        org = self.organization or getattr(self.instance, 'organization', None)
+        if org and name:
+            qs = Resource.objects.filter(organization=org, name__iexact=name)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError('Já existe um espaço com este nome.')
+        return name
 
 
 # Formulário de filtros para listas

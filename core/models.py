@@ -429,7 +429,7 @@ class Modality(models.Model):
     description = models.TextField("Descrição", blank=True)
     default_duration_minutes = models.PositiveIntegerField("Duração Padrão (min)", default=60)
     max_capacity = models.PositiveIntegerField("Capacidade Máxima", default=10)
-    color = models.CharField("Cor", max_length=7, default="#0d6efd", help_text="Cor hexadecimal para o Gantt")
+    color = models.CharField("Cor", max_length=7, default="#0d6efd", blank=True, help_text="Cor hexadecimal para o Gantt")
     is_active = models.BooleanField("Ativa", default=True)
     created_at = models.DateTimeField("Criada em", auto_now_add=True)
 
@@ -692,6 +692,15 @@ class Event(models.Model):
         if self.ends_at <= self.starts_at:
             raise ValidationError("ends_at must be after starts_at")
 
+        if self.resource_id:
+            if not self.resource.is_available:
+                raise ValidationError("O espaço selecionado está indisponível.")
+            if self.resource.capacity is not None and self.capacity is not None and self.capacity > self.resource.capacity:
+                raise ValidationError(f"A capacidade da aula ({self.capacity}) não pode exceder a capacidade da sala ({self.resource.capacity}).")
+
+        if self.instructor_id and not self.instructor.is_active:
+            raise ValidationError("O instrutor selecionado está inativo.")
+
         # Validações específicas por tipo de evento
         if self.event_type == self.EventType.GROUP_CLASS:
             if not self.class_group:
@@ -701,13 +710,14 @@ class Event(models.Model):
         elif self.event_type == self.EventType.INDIVIDUAL:
             if not self.individual_client:
                 raise ValidationError("Aulas individuais devem ter um cliente associado")
-            self.capacity = 1
+            if not self.capacity:
+                self.capacity = 1
         else:  # OPEN_CLASS
-            if not self.capacity and hasattr(self, 'resource') and self.resource:
+            if self.capacity is None and hasattr(self, 'resource') and self.resource:
                 self.capacity = self.resource.capacity
 
         # Sincronizar capacity e max_capacity para evitar ambiguidade
-        if not self.capacity and self.max_capacity:
+        if self.capacity is None and self.max_capacity:
             self.capacity = self.max_capacity
         self.max_capacity = self.capacity
 
@@ -715,14 +725,16 @@ class Event(models.Model):
         ensure_no_conflict(self)
 
     def save(self, *args, **kwargs):
-        if not self.capacity:
-            if self.event_type == self.EventType.GROUP_CLASS and self.class_group:
+        if self.event_type == self.EventType.GROUP_CLASS and self.class_group:
+            if not self.capacity:
                 self.capacity = self.class_group.max_students
-            elif self.event_type == self.EventType.INDIVIDUAL:
+        elif self.event_type == self.EventType.INDIVIDUAL:
+            if not self.capacity:
                 self.capacity = 1
-            elif hasattr(self, 'resource') and self.resource:
+        elif hasattr(self, 'resource') and self.resource:
+            if self.capacity is None:
                 self.capacity = self.resource.capacity
-        if not self.capacity and self.max_capacity:
+        if self.capacity is None and self.max_capacity:
             self.capacity = self.max_capacity
         self.max_capacity = self.capacity
         self.full_clean()
@@ -1368,13 +1380,29 @@ class UserProfile(models.Model):
     """Perfil de utilizador com permissões específicas."""
     class UserType(models.TextChoices):
         ADMIN = "admin", "Administrador Total"
-        STAFF = "staff", "Staff (Leitura + Marcações)"
-        INSTRUCTOR = "instructor", "Instrutor"
-        CLIENT = "client", "Cliente"
+        ACR_DIRECTION = "acr_direction", "Direção Associação ACR"
+        ACR_STAFF = "acr_staff", "Staff Associação ACR"
+        PROFORM_DIRECTOR = "proform_director", "Direção Técnica ProForm"
+        PROFORM_STAFF = "proform_staff", "Staff ProForm"
+        INSTRUCTOR = "instructor", "Instrutor ProForm"
+        STAFF = "staff", "Staff Geral"
+        CLIENT = "client", "Cliente / Sócio"
+
+    class EntityAffiliation(models.TextChoices):
+        ACR_ONLY = "acr_only", "Associação ACR"
+        PROFORM_ONLY = "proform_only", "ProForm"
+        BOTH = "both", "Ambos (Administração Geral)"
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     user_type = models.CharField("Tipo de Utilizador", max_length=20, choices=UserType.choices, default=UserType.CLIENT)
+    entity_affiliation = models.CharField(
+        "Afiliação Institucional",
+        max_length=20,
+        choices=EntityAffiliation.choices,
+        default=EntityAffiliation.BOTH,
+        help_text="Entidade à qual o utilizador pertence: ACR, Proform ou Ambos"
+    )
 
     # Associação com Person/Instructor se aplicável
     person = models.OneToOneField(Person, on_delete=models.CASCADE, null=True, blank=True, related_name="user_profile")
@@ -1396,15 +1424,124 @@ class UserProfile(models.Model):
         verbose_name_plural = "Perfis de Utilizadores"
 
     def __str__(self) -> str:
-        return f"{self.user.get_full_name() or self.user.username} - {self.get_user_type_display()}"
+        return f"{self.user.get_full_name() or self.user.username} - {self.get_user_type_display()} ({self.get_entity_affiliation_display()})"
 
     def has_admin_access(self) -> bool:
         """Verifica se tem acesso total de administração."""
-        return self.user_type == self.UserType.ADMIN
+        return self.user.is_superuser or self.user_type == self.UserType.ADMIN
 
     def can_access_admin(self) -> bool:
         """Verifica se pode aceder ao painel admin."""
-        return self.user_type in [self.UserType.ADMIN, self.UserType.STAFF]
+        return (
+            self.user.is_superuser
+            or self.user.is_staff
+            or self.user_type in [
+                self.UserType.ADMIN,
+                self.UserType.STAFF,
+                self.UserType.ACR_DIRECTION,
+                self.UserType.ACR_STAFF,
+                self.UserType.PROFORM_DIRECTOR,
+                self.UserType.PROFORM_STAFF,
+            ]
+        )
+
+    @property
+    def is_acr(self) -> bool:
+        """Indica se o utilizador pertence à Associação ACR ou tem perfil de administração geral."""
+        if self.user.is_superuser:
+            return True
+        if self.entity_affiliation in [self.EntityAffiliation.ACR_ONLY, self.EntityAffiliation.BOTH]:
+            return True
+        return self.user_type in [self.UserType.ADMIN, self.UserType.ACR_DIRECTION, self.UserType.ACR_STAFF]
+
+    @property
+    def is_proform(self) -> bool:
+        """Indica se o utilizador pertence ao ProForm ou tem perfil de administração geral."""
+        if self.user.is_superuser:
+            return True
+        if self.entity_affiliation in [self.EntityAffiliation.PROFORM_ONLY, self.EntityAffiliation.BOTH]:
+            return True
+        return self.user_type in [
+            self.UserType.ADMIN,
+            self.UserType.PROFORM_DIRECTOR,
+            self.UserType.PROFORM_STAFF,
+            self.UserType.INSTRUCTOR,
+        ]
+
+    @property
+    def is_acr_direction(self) -> bool:
+        """Indica se é membro da Direção da Associação ACR."""
+        if self.user.is_superuser:
+            return True
+        if self.user_type in [self.UserType.ADMIN, self.UserType.ACR_DIRECTION]:
+            return True
+        return self.user.groups.filter(name="Direção ACR").exists()
+
+    @property
+    def is_proform_director(self) -> bool:
+        """Indica se é Diretor Técnico do ProForm."""
+        if self.user.is_superuser:
+            return True
+        if self.user_type in [self.UserType.ADMIN, self.UserType.PROFORM_DIRECTOR]:
+            return True
+        if self.instructor and self.instructor.is_technical_director:
+            return True
+        return self.user.groups.filter(name="Direção Técnica Proform").exists()
+
+    @property
+    def can_manage_association(self) -> bool:
+        """Verifica se tem permissão estatutária para gerir órgãos sociais, atas, quotas e eleições da ACR."""
+        if self.user.is_superuser:
+            return True
+        if self.user_type in [self.UserType.ADMIN, self.UserType.ACR_DIRECTION, self.UserType.ACR_STAFF]:
+            return True
+        if self.user.groups.filter(name__in=["Direção ACR", "Staff ACR"]).exists():
+            return True
+        return False
+
+    @property
+    def can_manage_sports(self) -> bool:
+        """Verifica se pode gerir treinos, quiosque, marcações e graduações desportivas."""
+        if self.user.is_superuser:
+            return True
+        if self.user_type in [
+            self.UserType.ADMIN,
+            self.UserType.PROFORM_DIRECTOR,
+            self.UserType.PROFORM_STAFF,
+            self.UserType.INSTRUCTOR,
+            self.UserType.STAFF,
+            self.UserType.ACR_DIRECTION,
+            self.UserType.ACR_STAFF,
+        ]:
+            return True
+        return self.user.groups.filter(
+            name__in=["Direção Técnica Proform", "Staff Proform", "Instrutores", "Direção ACR", "Staff ACR"]
+        ).exists()
+
+    @property
+    def can_supervise_protocol(self) -> bool:
+        """Verifica se pode consultar a supervisão financeira e operacional do protocolo."""
+        if self.user.is_superuser:
+            return True
+        if self.user_type in [
+            self.UserType.ADMIN,
+            self.UserType.ACR_DIRECTION,
+            self.UserType.PROFORM_DIRECTOR,
+        ]:
+            return True
+        if self.user.groups.filter(name__in=["Direção ACR", "Direção Técnica Proform"]).exists():
+            return True
+        return self.can_view_finances
+
+    @property
+    def can_approve_protocol(self) -> bool:
+        """Verifica se tem competência formal para aprovar o fecho de contas do protocolo (exclusivo Direção ACR / Admin)."""
+        if self.user.is_superuser:
+            return True
+        if self.user_type in [self.UserType.ADMIN, self.UserType.ACR_DIRECTION]:
+            return True
+        return self.user.groups.filter(name="Direção ACR").exists()
+
 
 
 # Modelo para histórico de consumo de créditos

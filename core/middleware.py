@@ -4,7 +4,8 @@ Funcionalidades multi-tenant e gestão de organizações.
 """
 
 from django.http import Http404
-from django.db import IntegrityError, ProgrammingError, OperationalError, connection
+from django.http.request import split_domain_port
+from django.db import IntegrityError, ProgrammingError, OperationalError, DatabaseError, connection
 from django.core.exceptions import ValidationError
 from uuid import uuid4
 from .models import Organization
@@ -12,6 +13,19 @@ from .logging_utils import set_request_id, reset_request_id
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class HealthCheckMiddleware:
+    """Permite health checks responderem com 200 mesmo quando invocados via IPs internos/containers."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path in ('/health', '/health/'):
+            from acr_gestao.urls import health
+            return health(request)
+        return self.get_response(request)
 
 
 class RequestIdMiddleware:
@@ -44,18 +58,22 @@ class OrganizationMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Skip para URLs administrativas e de autenticação
-        skip_paths = ['/admin/', '/login/', '/logout/', '/static/', '/media/']
+        # Skip para URLs administrativas, autenticação e health check
+        skip_paths = ['/admin/', '/login/', '/logout/', '/static/', '/media/', '/health/']
         if any(request.path.startswith(path) for path in skip_paths):
             response = self.get_response(request)
             return response
 
         # Determinar organização baseada no domínio
         try:
-            host = request.get_host().split(':')[0]  # Remove porta se existir
+            host_raw = request.get_host()
+            host, _ = split_domain_port(host_raw)
         except Exception:
             raw_host = request.META.get('HTTP_HOST', '') or request.META.get('SERVER_NAME', 'localhost')
-            host = raw_host.split(':')[0] if raw_host else 'localhost'
+            try:
+                host, _ = split_domain_port(raw_host) if raw_host else ('localhost', None)
+            except Exception:
+                host = 'localhost'
 
         organization = None
         try:

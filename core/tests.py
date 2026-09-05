@@ -1,27 +1,36 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from django.test import TestCase, Client, RequestFactory, override_settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from django.core import mail
 from notifications.models import NotificationLog
+
+import unittest.mock
+from django.db import DatabaseError
+from django.db.models import ProtectedError
+from django.contrib.messages import get_messages
 
 from .models import (
     Organization, Person, Event, Resource, Booking,
     Instructor, Modality, ClassGroup, PaymentPlan,
     ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog,
     InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration,
-    AthleteGraduation, GoverningBody, GoverningBodyMember
+    AthleteGraduation, GoverningBody, GoverningBodyMember,
+    UserProfile, Invoice
 )
 from .middleware import OrganizationMiddleware
 from .context_processors import organization_context
 from .services.kiosk import resolve_person, process_kiosk_checkin, get_active_event_for_facility
 from .services.membership_card import get_membership_card_data
+from .services.bookings import cancel_booking
+from .services.scheduling import ensure_capacity, ensure_no_conflict
 
 
 class SchedulingRulesTestCase(TestCase):
@@ -957,7 +966,7 @@ class ProtocolFinanceTestCase(TestCase):
         )
 
         # Aulas lecionadas
-        starts = timezone.now().replace(microsecond=0)
+        starts = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
         self.event_jj = Event.objects.create(
             organization=self.org,
             modality=self.mod_jj,
@@ -1755,4 +1764,1039 @@ class AssociationAndKioskTestCase(TestCase):
         res_kiosk = self.client.get("/kiosk/")
         self.assertEqual(res_kiosk.status_code, 200)
         self.assertContains(res_kiosk, "ACR DE BASTO")
+
+
+# ==============================================================================
+# E2E TRACK: TIER 1 - FUNCTIONAL AND PERMISSION TESTS (R1)
+# ==============================================================================
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class Tier1FunctionalAndPermissionsTestCase(TestCase):
+    """
+    Tier 1: Functional and Permission tests.
+    Audita restrições de papéis de utilizador (@role_required) e integridade
+    de rendering dos dashboards operacionais e de relatórios.
+    """
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_tier1",
+            password="password123",
+            email="admin1@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+
+        self.client_user = User.objects.create_user(
+            username="client_tier1",
+            password="password123",
+            email="client1@test.com"
+        )
+        self.client_person = Person.objects.create(
+            organization=self.org,
+            first_name="Atleta",
+            last_name="Teste",
+            email="client1@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.client_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.CLIENT,
+            person=self.client_person
+        )
+
+        self.inst_user = User.objects.create_user(
+            username="inst_tier1",
+            password="password123",
+            email="instructor1@test.com"
+        )
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Mestre",
+            last_name="Instrutor",
+            email="instructor1@test.com",
+            is_active=True
+        )
+        UserProfile.objects.create(
+            user=self.inst_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.INSTRUCTOR,
+            instructor=self.instructor
+        )
+
+        self.resource = Resource.objects.create(
+            organization=self.org,
+            name="Sala de Treino 1",
+            capacity=20,
+            is_available=True
+        )
+        self.modality = Modality.objects.create(
+            organization=self.org,
+            name="Judo",
+            is_active=True
+        )
+        self.event = Event.objects.create(
+            organization=self.org,
+            resource=self.resource,
+            modality=self.modality,
+            instructor=self.instructor,
+            title="Aula de Judo",
+            starts_at=timezone.now().replace(hour=10, minute=0, second=0, microsecond=0) + timedelta(days=1),
+            ends_at=timezone.now().replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1),
+            capacity=15
+        )
+        self.client = Client()
+
+    def test_unauthorized_client_role_accessing_reports_dashboard_returns_403(self):
+        """Clientes comuns não autorizados acedendo a /reports/dashboard/ devem receber HTTP 403 Forbidden."""
+        self.client.login(username="client_tier1", password="password123")
+        response = self.client.get("/reports/dashboard/")
+        self.assertEqual(response.status_code, 403, "Cliente comum não deve ter acesso ao dashboard de relatórios")
+
+    def test_unauthorized_client_role_accessing_reports_data_summary_returns_403(self):
+        """Clientes comuns não autorizados acedendo a /reports/data/summary/ devem receber HTTP 403 Forbidden."""
+        self.client.login(username="client_tier1", password="password123")
+        response = self.client.get("/reports/data/summary/")
+        self.assertEqual(response.status_code, 403, "Cliente comum não deve ter acesso aos dados sumários de relatórios")
+
+    def test_instructor_role_accessing_gantt_events_json_returns_200(self):
+        """Instrutores devem ter autorização legítima (HTTP 200) para aceder ao feed /gantt/events-json/."""
+        self.client.login(username="inst_tier1", password="password123")
+        response = self.client.get("/gantt/events-json/")
+        self.assertEqual(response.status_code, 200, "Instrutor deve conseguir aceder a /gantt/events-json/")
+
+    def test_admin_dashboard_renders_without_field_error(self):
+        """Dashboard administrativo (/dashboard/) deve renderizar com sucesso (HTTP 200)."""
+        self.client.login(username="admin_tier1", password="password123")
+        response = self.client.get("/dashboard/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_clients_overview_renders_without_field_error(self):
+        """Visão geral de clientes (/dashboard/clients/) deve renderizar com sucesso (HTTP 200)."""
+        self.client.login(username="admin_tier1", password="password123")
+        response = self.client.get("/dashboard/clients/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_instructors_overview_renders_without_field_error(self):
+        """Visão geral de instrutores (/dashboard/instructors/) não pode rebentar com FieldError no Count('events')."""
+        self.client.login(username="admin_tier1", password="password123")
+        response = self.client.get("/dashboard/instructors/")
+        self.assertEqual(response.status_code, 200, "instructors_overview não pode falhar com FieldError")
+
+
+# ==============================================================================
+# E2E TRACK: TIER 2 - BOUNDARY & INPUT ROBUSTNESS TESTS (R1 & R2)
+# ==============================================================================
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class Tier2BoundaryAndRobustnessTestCase(TestCase):
+    """
+    Tier 2: Boundary & Input Robustness tests.
+    Validação contra payloads malformatados, strings em campos de ID numérico,
+    colisões de unicidade e consistência de namespaces de redirecionamento.
+    """
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_tier2",
+            password="password123",
+            email="admin2@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+        self.client = Client()
+        self.client.login(username="admin_tier2", password="password123")
+
+        self.resource = Resource.objects.create(
+            organization=self.org,
+            name="Dojo Principal",
+            capacity=15,
+            is_available=True
+        )
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Manel",
+            last_name="Silva",
+            email="manel@test.com",
+            is_active=True
+        )
+        self.modality = Modality.objects.create(
+            organization=self.org,
+            name="Karaté",
+            is_active=True
+        )
+        self.person = Person.objects.create(
+            organization=self.org,
+            first_name="Carlos",
+            last_name="Atleta",
+            email="carlos@test.com"
+        )
+        self.now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
+        self.start = self.now + timedelta(days=2)
+        self.end = self.start + timedelta(hours=1)
+        self.event = Event.objects.create(
+            organization=self.org,
+            resource=self.resource,
+            instructor=self.instructor,
+            modality=self.modality,
+            title="Aula de Karaté",
+            starts_at=self.start,
+            ends_at=self.end,
+            capacity=10
+        )
+
+    def test_gantt_create_event_malformed_input_returns_400_not_500(self):
+        """Criação via Gantt com valores não-numéricos ou mal formatados devolve 400 ou 404, nunca HTTP 500."""
+        payload = {
+            "resource_id": "not_an_id",
+            "instructor_id": "not_an_id",
+            "date": "2026-09-10",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "capacity": "not_a_number"
+        }
+        res = self.client.post("/gantt/create-event/", json.dumps(payload), content_type="application/json")
+        self.assertNotEqual(res.status_code, 500, "Criação com IDs/capacidade inválidos não deve gerar 500")
+        self.assertIn(res.status_code, [400, 404])
+
+        payload_recur = {
+            "resource_id": self.resource.id,
+            "instructor_id": self.instructor.id,
+            "date": "2026-09-10",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "is_recurring": True,
+            "recurrence_end_date": "2026-09-30",
+            "recurrence_weekdays": ["segunda", "terca"]
+        }
+        res2 = self.client.post("/gantt/create-event/", json.dumps(payload_recur), content_type="application/json")
+        self.assertNotEqual(res2.status_code, 500, "Série recorrente com weekdays inválidos não deve gerar 500")
+        self.assertIn(res2.status_code, [400, 404])
+
+    def test_gantt_update_event_malformed_input_returns_400_or_404_not_500(self):
+        """Atualização via Gantt com ID não numérico ou capacidade inválida não deve gerar HTTP 500."""
+        payload = {
+            "event_id": "invalid_event_id",
+            "capacity": "non_integer"
+        }
+        res = self.client.post("/gantt/update-event/", json.dumps(payload), content_type="application/json")
+        self.assertNotEqual(res.status_code, 500)
+        self.assertIn(res.status_code, [400, 404])
+
+    def test_gantt_delete_event_malformed_id_returns_400_or_404_not_500(self):
+        """Eliminação via API do Gantt com event_id inválido devolve erro controlado, nunca 500."""
+        payload = {"event_id": "abc_xyz"}
+        res = self.client.post("/gantt/delete-event/", json.dumps(payload), content_type="application/json")
+        self.assertNotEqual(res.status_code, 500)
+        self.assertIn(res.status_code, [400, 404])
+
+    def test_validate_conflict_api_malformed_id_returns_400_not_500(self):
+        """Validação de conflitos com IDs de recurso/instrutor inválidos devolve 400, nunca 500."""
+        payload = {
+            "resource_id": "abc",
+            "instructor_id": "xyz",
+            "starts_at": "2026-09-10T10:00:00",
+            "ends_at": "2026-09-10T11:00:00"
+        }
+        res = self.client.post("/api/validate-conflict/", json.dumps(payload), content_type="application/json")
+        self.assertNotEqual(res.status_code, 500)
+        self.assertIn(res.status_code, [400, 404])
+
+    def test_event_quick_add_attendance_malformed_person_id_returns_400_or_404_not_500(self):
+        """Check-in rápido com person_id alfanumérico não tratado devolve erro controlado, nunca 500."""
+        res = self.client.post(f"/events/{self.event.id}/quick-add/", {"person_id": "not_an_int"})
+        self.assertNotEqual(res.status_code, 500)
+        self.assertIn(res.status_code, [400, 404])
+
+    def test_athlete_graduation_add_malformed_modality_id_returns_400_or_404_not_500(self):
+        """Adição de graduação com modalidade inválida não deve quebrar a aplicação com 500."""
+        res = self.client.post(f"/clients/{self.person.id}/graduation/add/", {
+            "modality": "not_a_number",
+            "rank_name": "Cinto Azul"
+        })
+        self.assertNotEqual(res.status_code, 500)
+        self.assertIn(res.status_code, [400, 404, 302])
+
+    def test_duplicate_modality_returns_form_error_not_500(self):
+        """Submissão de modalidade com nome duplicado na mesma organização devolve erro no form (200), não IntegrityError 500."""
+        Modality.objects.create(organization=self.org, name="Judo", entity_type="acr")
+        res = self.client.post("/modalities/add/", {
+            "name": "Judo",
+            "entity_type": "acr",
+            "max_capacity": 15
+        })
+        self.assertNotEqual(res.status_code, 500, "Submissão de modalidade duplicada não deve gerar IntegrityError 500")
+        self.assertEqual(res.status_code, 200)
+
+    def test_duplicate_resource_returns_form_error_not_500(self):
+        """Submissão de recurso com nome duplicado na mesma organização devolve erro no form (200), não IntegrityError 500."""
+        Resource.objects.create(organization=self.org, name="Estúdio Yoga", capacity=10)
+        res = self.client.post("/resources/add/", {
+            "name": "Estúdio Yoga",
+            "capacity": 10,
+            "entity_type": "acr"
+        })
+        self.assertNotEqual(res.status_code, 500, "Submissão de recurso duplicado não deve gerar IntegrityError 500")
+        self.assertEqual(res.status_code, 200)
+
+    def test_payment_create_with_none_plan_fields_does_not_raise_type_error(self):
+        """Criação de pagamento com plano tendo credits_validity_days ou duration_months como None não causa TypeError."""
+        plan = PaymentPlan.objects.create(
+            organization=self.org,
+            name="Pack Avulso Sem Validade",
+            plan_type=PaymentPlan.PlanType.CREDITS,
+            credits_included=5,
+            credits_validity_days=30,
+            price=Decimal("40.00")
+        )
+        with unittest.mock.patch.object(PaymentPlan, 'credits_validity_days', None):
+            res = self.client.post("/payments/add/", {
+                "person": self.person.id,
+                "payment_plan": plan.id,
+                "amount": "40.00",
+                "method": "cash",
+                "paid_date": timezone.now().date().isoformat(),
+                "auto_activate": "on"
+            })
+            self.assertNotEqual(res.status_code, 500, "payment_create não deve lançar TypeError com credits_validity_days=None")
+
+    def test_client_subscribe_with_none_plan_fields_does_not_raise_type_error(self):
+        """Subscrição direta de cliente em plano com valores de duração None não causa TypeError."""
+        plan = PaymentPlan.objects.create(
+            organization=self.org,
+            name="Mensalidade Sem Duracao Fixa",
+            plan_type=PaymentPlan.PlanType.MONTHLY,
+            duration_months=1,
+            price=Decimal("35.00")
+        )
+        with unittest.mock.patch.object(PaymentPlan, 'duration_months', None):
+            res = self.client.post(f"/clients/{self.person.id}/subscribe/", {
+                "payment_plan": plan.id,
+                "start_date": timezone.now().date().isoformat(),
+                "status": ClientSubscription.Status.ACTIVE
+            })
+            self.assertNotEqual(res.status_code, 500, "client_subscribe não deve lançar TypeError com duration_months=None")
+
+    def test_redirects_resolve_correctly_with_namespace(self):
+        """Garante que redirects em event_edit, event_create, instructor_edit e modality_edit usam namespace core:."""
+        # 1. event_edit POST redirect
+        edit_data = {
+            "title": "Karaté Editado",
+            "event_type": Event.EventType.OPEN_CLASS,
+            "resource": self.resource.id,
+            "instructor": self.instructor.id,
+            "modality": self.modality.id,
+            "starts_at": (self.start + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
+            "ends_at": (self.end + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
+            "capacity": 10
+        }
+        res_event = self.client.post(f"/events/{self.event.id}/edit/", edit_data)
+        self.assertNotEqual(res_event.status_code, 500, "event_edit não pode rebentar com NoReverseMatch")
+        self.assertEqual(res_event.status_code, 302)
+
+        # 2. instructor_edit POST redirect
+        inst_data = {
+            "first_name": "Manel",
+            "last_name": "Silva Editado",
+            "email": "manel_edit@test.com",
+            "is_active": True,
+            "entity_affiliation": "acr_only"
+        }
+        res_inst = self.client.post(f"/instructors/{self.instructor.id}/edit/", inst_data)
+        self.assertNotEqual(res_inst.status_code, 500, "instructor_edit não pode rebentar com NoReverseMatch")
+        self.assertEqual(res_inst.status_code, 302)
+
+        # 3. event_create POST redirect
+        create_data = {
+            "title": "Aula Nova Via Create",
+            "event_type": Event.EventType.OPEN_CLASS,
+            "resource": self.resource.id,
+            "starts_at": (self.start + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S"),
+            "ends_at": (self.end + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S"),
+            "capacity": 10
+        }
+        res_create = self.client.post("/events/create/", create_data)
+        self.assertNotEqual(res_create.status_code, 500, "event_create não pode rebentar com NoReverseMatch")
+        self.assertEqual(res_create.status_code, 302)
+
+        # 4. modality_add POST redirect
+        mod_data = {
+            "name": "Boxe Olímpico",
+            "entity_type": "acr",
+            "default_duration_minutes": 60,
+            "max_capacity": 15
+        }
+        res_mod = self.client.post("/modalities/add/", mod_data)
+        self.assertNotEqual(res_mod.status_code, 500, "modality_add não pode rebentar com NoReverseMatch")
+        self.assertEqual(res_mod.status_code, 302)
+
+        # 5. credit_history fallback redirect
+        res_credit = self.client.get("/credit-history/?client=999999")
+        self.assertNotEqual(res_credit.status_code, 500, "credit_history não pode rebentar com NoReverseMatch em core:dashboard")
+
+
+# ==============================================================================
+# E2E TRACK: TIER 3 - SCHEDULING & CONFLICT EDGE CASES (R2)
+# ==============================================================================
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class Tier3SchedulingAndConflictTestCase(TestCase):
+    """
+    Tier 3: Scheduling & Conflict Edge Cases.
+    Verifica limites físicos de espaço, sobreposições de recursos e instrutores,
+    lotação ativa com presenças, lista de espera e reembolso de créditos.
+    """
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_tier3",
+            password="password123",
+            email="admin3@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+        self.client = Client()
+        self.client.login(username="admin_tier3", password="password123")
+
+        self.sala1 = Resource.objects.create(organization=self.org, name="Sala Tatami 1", capacity=10, is_available=True)
+        self.sala2 = Resource.objects.create(organization=self.org, name="Sala Tatami 2", capacity=8, is_available=True)
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Pedro",
+            last_name="Alves",
+            email="pedro@test.com",
+            is_active=True
+        )
+        self.modality = Modality.objects.create(organization=self.org, name="Judo", is_active=True)
+
+        self.ath1 = Person.objects.create(organization=self.org, first_name="Atleta1", last_name="Teste", email="ath1@test.com")
+        self.ath2 = Person.objects.create(organization=self.org, first_name="Atleta2", last_name="Teste", email="ath2@test.com")
+        self.ath3 = Person.objects.create(organization=self.org, first_name="Atleta3", last_name="Teste", email="ath3@test.com")
+
+        self.base_start = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0) + timedelta(days=5)
+        self.base_end = self.base_start + timedelta(hours=1)
+
+    def test_room_overlap_in_event_add_returns_form_error_not_500(self):
+        """Conflito de sala na submissão web tradicional (/events/add/) deve devolver erro de formulário, nunca HTTP 500."""
+        Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            instructor=self.instructor,
+            title="Aula Base Sala 1",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=10
+        )
+        post_data = {
+            "title": "Aula Conflito Sala",
+            "event_type": Event.EventType.OPEN_CLASS,
+            "resource": self.sala1.id,
+            "instructor": self.instructor.id,
+            "starts_at": (self.base_start + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S"),
+            "ends_at": (self.base_end + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S"),
+            "capacity": 10
+        }
+        res = self.client.post("/events/add/", post_data)
+        self.assertNotEqual(res.status_code, 500, "Conflito de sala em event_add não pode resultar em 500 ValidationError")
+        self.assertEqual(res.status_code, 200)
+
+    def test_room_overlap_in_event_create_returns_form_error_not_500(self):
+        """Conflito de sala em /events/create/ deve devolver erro no formulário, nunca HTTP 500."""
+        Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula Prévia",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=10
+        )
+        post_data = {
+            "title": "Aula Nova Conflituosa",
+            "event_type": Event.EventType.OPEN_CLASS,
+            "resource": self.sala1.id,
+            "starts_at": (self.base_start + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S"),
+            "ends_at": (self.base_end + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S"),
+            "capacity": 8
+        }
+        res = self.client.post("/events/create/", post_data)
+        self.assertNotEqual(res.status_code, 500, "Conflito em event_create não pode gerar 500")
+        self.assertEqual(res.status_code, 200)
+
+    def test_instructor_overlap_across_different_rooms_returns_form_error_not_500(self):
+        """Mesmo instrutor agendado simultaneamente em salas distintas deve gerar erro no form, nunca 500."""
+        Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            instructor=self.instructor,
+            title="Aula Instrutor Sala 1",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=10
+        )
+        post_data = {
+            "title": "Aula Instrutor Sala 2",
+            "event_type": Event.EventType.OPEN_CLASS,
+            "resource": self.sala2.id,
+            "instructor": self.instructor.id,
+            "starts_at": (self.base_start + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S"),
+            "ends_at": (self.base_end + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S"),
+            "capacity": 8
+        }
+        res = self.client.post("/events/add/", post_data)
+        self.assertNotEqual(res.status_code, 500, "Conflito de instrutor não pode resultar em 500")
+        self.assertEqual(res.status_code, 200)
+
+    def test_event_capacity_cannot_exceed_resource_capacity(self):
+        """Capacidade configurada para o evento não pode exceder a capacidade física da sala associada."""
+        event = Event(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula com Excesso de Capacidade",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=25
+        )
+        with self.assertRaises(ValidationError) as cm:
+            event.full_clean()
+        self.assertIn("capacidade", str(cm.exception).lower())
+
+    def test_inactive_instructor_blocked_from_scheduling(self):
+        """Instrutores com is_active=False não podem ser atribuídos a novas aulas."""
+        inactive_inst = Instructor.objects.create(
+            organization=self.org,
+            first_name="Inativo",
+            last_name="Instrutor",
+            email="inativo@test.com",
+            is_active=False
+        )
+        event = Event(
+            organization=self.org,
+            resource=self.sala1,
+            instructor=inactive_inst,
+            title="Aula com Instrutor Inativo",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=5
+        )
+        with self.assertRaises(ValidationError) as cm:
+            event.full_clean()
+        self.assertIn("inativo", str(cm.exception).lower())
+
+    def test_unavailable_resource_blocked_from_scheduling(self):
+        """Salas/recursos com is_available=False não podem acolher novos agendamentos."""
+        unavail_room = Resource.objects.create(
+            organization=self.org,
+            name="Sala em Obras",
+            capacity=10,
+            is_available=False
+        )
+        event = Event(
+            organization=self.org,
+            resource=unavail_room,
+            title="Aula em Espaço Indisponível",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=5
+        )
+        with self.assertRaises(ValidationError) as cm:
+            event.full_clean()
+        self.assertIn("indispon", str(cm.exception).lower())
+
+    def test_capacity_enforcement_in_booking_add(self):
+        """Criação de reservas via vista tradicional (/bookings/add/) bloqueia inscrições quando a lotação atinge o limite."""
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula Lotação 1",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=1
+        )
+        Booking.objects.create(
+            organization=self.org,
+            event=event,
+            person=self.ath1,
+            status=Booking.Status.CONFIRMED
+        )
+        res = self.client.post("/bookings/add/", {
+            "event": event.id,
+            "person": self.ath2.id,
+            "status": Booking.Status.CONFIRMED
+        })
+        confirmed_count = event.bookings.filter(status=Booking.Status.CONFIRMED).count()
+        self.assertEqual(confirmed_count, 1, "Apenas 1 reserva confirmada deve existir para capacity=1")
+
+    def test_capacity_leak_checked_in_bookings_consume_capacity(self):
+        """Atletas com check-in realizado (status=CHECKED_IN) devem consumir lotação, impedindo novas reservas confirmadas."""
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula Checkin Lotação 1",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=1
+        )
+        Booking.objects.create(
+            organization=self.org,
+            event=event,
+            person=self.ath1,
+            status=Booking.Status.CHECKED_IN
+        )
+        new_booking = Booking(
+            organization=self.org,
+            event=event,
+            person=self.ath2,
+            status=Booking.Status.CONFIRMED
+        )
+        with self.assertRaises(ValidationError) as cm:
+            ensure_capacity(new_booking)
+        self.assertIn("sem vagas", str(cm.exception).lower())
+
+    def test_waitlist_paradox_waitlist_allowed_when_event_is_full(self):
+        """Inscrições com status WAITLIST devem ser permitidas mesmo quando a aula se encontra com lotação esgotada."""
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula Cheia",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=1
+        )
+        Booking.objects.create(
+            organization=self.org,
+            event=event,
+            person=self.ath1,
+            status=Booking.Status.CONFIRMED
+        )
+        waitlist_booking = Booking(
+            organization=self.org,
+            event=event,
+            person=self.ath2,
+            status=Booking.Status.WAITLIST
+        )
+        try:
+            ensure_capacity(waitlist_booking)
+        except ValidationError:
+            self.fail("ensure_capacity não deve bloquear reservas com status WAITLIST quando a aula está cheia")
+
+    def test_zero_capacity_event_respected_and_not_overwritten(self):
+        """Configurar capacity=0 deve ser respeitado e não sobrescrito automaticamente para a capacidade da sala."""
+        event = Event(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula Fechada a Reservas",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=0
+        )
+        event.clean()
+        self.assertEqual(event.capacity, 0, "Capacity=0 não pode ser sobrescrito pelo recurso")
+
+    def test_booking_cancellation_refunds_credits_to_subscription(self):
+        """Cancelamento regulamentar de reserva paga com créditos devolve o crédito à subscrição do atleta."""
+        plan = PaymentPlan.objects.create(
+            organization=self.org,
+            name="Pack 10",
+            plan_type=PaymentPlan.PlanType.CREDITS,
+            credits_included=10,
+            price=Decimal("50.00")
+        )
+        sub = ClientSubscription.objects.create(
+            organization=self.org,
+            person=self.ath1,
+            payment_plan=plan,
+            status=ClientSubscription.Status.ACTIVE,
+            remaining_credits=5
+        )
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.sala1,
+            title="Aula Crédito",
+            starts_at=self.base_start,
+            ends_at=self.base_end,
+            capacity=10
+        )
+        booking = Booking.objects.create(
+            organization=self.org,
+            event=event,
+            person=self.ath1,
+            status=Booking.Status.CONFIRMED,
+            subscription_used=sub,
+            credits_used=1,
+            is_paid=True
+        )
+        result = cancel_booking(booking, self.admin_user)
+        self.assertTrue(result.ok)
+        sub.refresh_from_db()
+        self.assertEqual(sub.remaining_credits, 6, "Crédito deve ser restituído à subscrição")
+        self.assertTrue(
+            CreditHistory.objects.filter(
+                person=self.ath1,
+                action=CreditHistory.Action.REFUND
+            ).exists(),
+            "Deve ser registado um movimento de reembolso no CreditHistory"
+        )
+
+
+# ==============================================================================
+# E2E TRACK: TIER 4 - MULTI-ENTITY, MIDDLEWARE & DELETION TESTS (R3)
+# ==============================================================================
+
+@override_settings(ALLOWED_HOSTS=['*'], SECURE_SSL_REDIRECT=False)
+class Tier4MultiEntityMiddlewareTestCase(TestCase):
+    """
+    Tier 4: Multi-Entity Integrity, Middleware & Deletion tests.
+    Audita filtros multi-entidade (ACR/Proform/Both), proteções de integridade referencial,
+    e robustez do middleware perante IPv6 e hosts internos.
+    """
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_tier4",
+            password="password123",
+            email="admin4@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+        self.client = Client()
+        self.client.login(username="admin_tier4", password="password123")
+
+        self.sala = Resource.objects.create(organization=self.org, name="Pavilhão", capacity=30)
+        self.now = timezone.now() + timedelta(days=3)
+        self.event = Event.objects.create(
+            organization=self.org,
+            resource=self.sala,
+            title="Aula Teste Deletions",
+            starts_at=self.now,
+            ends_at=self.now + timedelta(hours=1),
+            capacity=15
+        )
+
+    def test_client_list_filtering_entity_acr_includes_both(self):
+        """Filtro ?entity=acr deve retornar praticantes 'acr_only' e praticantes com dupla filiação 'both'."""
+        p_acr = Person.objects.create(organization=self.org, first_name="Acr", last_name="Only", entity_affiliation=Person.EntityAffiliation.ACR_ONLY)
+        p_proform = Person.objects.create(organization=self.org, first_name="Proform", last_name="Only", entity_affiliation=Person.EntityAffiliation.PROFORM_ONLY)
+        p_both = Person.objects.create(organization=self.org, first_name="Both", last_name="Entities", entity_affiliation=Person.EntityAffiliation.BOTH)
+
+        res = self.client.get("/clients/?entity=acr")
+        self.assertEqual(res.status_code, 200)
+        clients = list(res.context["clients"])
+        self.assertIn(p_acr, clients, "Atletas acr_only devem estar presentes ao filtrar por acr")
+        self.assertIn(p_both, clients, "Atletas both devem estar presentes ao filtrar por acr")
+        self.assertNotIn(p_proform, clients, "Atletas proform_only não devem estar presentes ao filtrar por acr")
+
+    def test_client_list_filtering_entity_proform_includes_both(self):
+        """Filtro ?entity=proform deve retornar praticantes 'proform_only' e praticantes com dupla filiação 'both'."""
+        p_acr = Person.objects.create(organization=self.org, first_name="Acr2", last_name="Only", entity_affiliation=Person.EntityAffiliation.ACR_ONLY)
+        p_proform = Person.objects.create(organization=self.org, first_name="Proform2", last_name="Only", entity_affiliation=Person.EntityAffiliation.PROFORM_ONLY)
+        p_both = Person.objects.create(organization=self.org, first_name="Both2", last_name="Entities", entity_affiliation=Person.EntityAffiliation.BOTH)
+
+        res = self.client.get("/clients/?entity=proform")
+        self.assertEqual(res.status_code, 200)
+        clients = list(res.context["clients"])
+        self.assertIn(p_proform, clients, "Atletas proform_only devem estar presentes ao filtrar por proform")
+        self.assertIn(p_both, clients, "Atletas both devem estar presentes ao filtrar por proform")
+        self.assertNotIn(p_acr, clients, "Atletas acr_only não devem estar presentes ao filtrar por proform")
+
+    def test_client_list_filtering_entity_both_returns_only_both(self):
+        """Filtro ?entity=both deve retornar estritamente os praticantes com dupla filiação."""
+        p_acr = Person.objects.create(organization=self.org, first_name="Acr3", last_name="Only", entity_affiliation=Person.EntityAffiliation.ACR_ONLY)
+        p_both = Person.objects.create(organization=self.org, first_name="Both3", last_name="Entities", entity_affiliation=Person.EntityAffiliation.BOTH)
+
+        res = self.client.get("/clients/?entity=both")
+        self.assertEqual(res.status_code, 200)
+        clients = list(res.context["clients"])
+        self.assertIn(p_both, clients)
+        self.assertNotIn(p_acr, clients)
+
+    def test_client_deletion_with_linked_invoices_catches_protected_error_and_redirects(self):
+        """Eliminar cliente com faturas associadas (ProtectedError) redireciona com mensagem amigável sem quebrar em 500."""
+        client = Person.objects.create(
+            organization=self.org,
+            first_name="Cliente",
+            last_name="Faturado",
+            email="faturado@test.com"
+        )
+        Invoice.objects.create(
+            organization=self.org,
+            person=client,
+            total=Decimal("120.00"),
+            status=Invoice.Status.ISSUED
+        )
+        res = self.client.post(f"/clients/{client.pk}/delete/")
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(Person.objects.filter(pk=client.pk).exists(), "Cliente com faturas não pode ser eliminado")
+        messages = list(get_messages(res.wsgi_request))
+        self.assertTrue(any("fatura" in m.message.lower() for m in messages), "Deve exibir mensagem informativa sobre faturas")
+
+    def test_event_deletion_handles_errors_cleanly_without_500(self):
+        """Eliminação de eventos trata erros de persistência/integridade devolvendo respostas controladas (não 500)."""
+        with unittest.mock.patch("core.models.Event.delete", side_effect=ProtectedError("Protected relation", [self.event])):
+            res_api = self.client.post(
+                "/gantt/delete-event/",
+                json.dumps({"event_id": self.event.id}),
+                content_type="application/json"
+            )
+            self.assertNotEqual(res_api.status_code, 500, "delete_event_api não deve retornar status 500 sob erro de eliminação")
+            self.assertIn(res_api.status_code, [400, 409])
+
+            res_web = self.client.post(f"/events/{self.event.id}/delete/")
+            self.assertNotEqual(res_web.status_code, 500, "event_delete não pode lançar 500 sob ProtectedError")
+            self.assertIn(res_web.status_code, [200, 302])
+
+    def test_middleware_database_error_defined_and_caught_without_name_error(self):
+        """Garante que DatabaseError está importado no namespace de core.middleware evitando NameError."""
+        from core import middleware
+        self.assertTrue(
+            hasattr(middleware, "DatabaseError"),
+            "DatabaseError deve estar importado em core.middleware para capturar exceções de base de dados"
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        mw = OrganizationMiddleware(lambda req: HttpResponse("ok"))
+        with unittest.mock.patch("core.models.Organization.objects.filter", side_effect=DatabaseError("DB Failure")):
+            with unittest.mock.patch("core.models.Organization.objects.first", side_effect=DatabaseError("DB Failure")):
+                try:
+                    mw(request)
+                except NameError as ne:
+                    self.fail(f"OrganizationMiddleware lançou NameError: {ne}")
+                except Exception:
+                    pass
+
+    def test_middleware_ipv6_host_parsed_properly(self):
+        """Host em formato IPv6 (RFC 2732 com parênteses retos [::1]) não pode ser truncado para '['."""
+        factory = RequestFactory()
+        request = factory.get("/dashboard/", HTTP_HOST="[::1]:8000")
+        mw = OrganizationMiddleware(lambda req: HttpResponse("ok"))
+        with unittest.mock.patch("core.models.Organization.objects.filter") as mock_filter:
+            mock_filter.return_value.first.return_value = self.org
+            mw(request)
+            if mock_filter.called:
+                _, called_kwargs = mock_filter.call_args
+                domain_searched = called_kwargs.get("domain", "")
+                self.assertNotEqual(
+                    domain_searched, "[",
+                    "Middleware não pode pesquisar por domain='[' ao receber host IPv6 bracketed"
+                )
+
+    @override_settings(ALLOWED_HOSTS=['127.0.0.1', 'localhost', 'testserver'])
+    def test_health_check_responds_200_with_internal_ip(self):
+        """Endpoint de verificação de saúde (/health/) deve responder com 200 mesmo quando invocado via IP de container/LAN."""
+        res = self.client.get("/health/", HTTP_HOST="10.0.1.25")
+        self.assertNotEqual(res.status_code, 400, "Health check não pode devolver 400 DisallowedHost para IPs internos")
+        self.assertEqual(res.status_code, 200)
+
+
+class AssociationVsProformPermissionsTestCase(TestCase):
+    """
+    Testes de Segregação de Permissões: Associação ACR vs ProForm.
+    Garante que utilizadores do ProForm não acedem a áreas exclusivas da Associação ACR
+    e que os membros da Direção da ACR mantêm a supervisão e controlo institucional.
+    """
+
+    def setUp(self):
+        self.org = Organization.objects.create(name="ACR & Proform Test", domain="testserver")
+
+        # 1. Utilizador da Direção ACR
+        self.acr_user = User.objects.create_user(
+            username="direcao_acr",
+            password="password123",
+            email="direcao@acr.local"
+        )
+        self.acr_profile = UserProfile.objects.create(
+            user=self.acr_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ACR_DIRECTION,
+            entity_affiliation=UserProfile.EntityAffiliation.ACR_ONLY,
+            can_view_finances=True,
+            can_manage_bookings=True,
+            can_view_all_clients=True,
+            can_create_events=True
+        )
+
+        # 2. Utilizador do ProForm (Diretor Técnico / Treinador)
+        self.proform_user = User.objects.create_user(
+            username="treinador_proform",
+            password="password123",
+            email="treinador@proform.local"
+        )
+        self.proform_instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Treinador",
+            last_name="Proform",
+            entity_affiliation=Instructor.EntityAffiliation.PROFORM_ONLY,
+            is_technical_director=True
+        )
+        self.proform_profile = UserProfile.objects.create(
+            user=self.proform_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.PROFORM_DIRECTOR,
+            entity_affiliation=UserProfile.EntityAffiliation.PROFORM_ONLY,
+            instructor=self.proform_instructor,
+            can_view_finances=True,
+            can_manage_bookings=True,
+            can_view_all_clients=True,
+            can_create_events=True
+        )
+
+        # 3. Utilizador Cliente / Praticante comum
+        self.client_user = User.objects.create_user(
+            username="cliente_comum",
+            password="password123",
+            email="cliente@test.local"
+        )
+        self.client_profile = UserProfile.objects.create(
+            user=self.client_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.CLIENT,
+            entity_affiliation=UserProfile.EntityAffiliation.BOTH
+        )
+
+        # Dados desportivos e associativos de teste
+        self.modality = Modality.objects.create(organization=self.org, name="Judo ACR")
+        self.athlete = Person.objects.create(
+            organization=self.org,
+            first_name="Atleta",
+            last_name="Sócio",
+            member_category=Person.MemberCategory.SOCIO,
+            member_number=10,
+            membership_fee_status=Person.MembershipFeeStatus.UP_TO_DATE,
+            entity_affiliation=Person.EntityAffiliation.BOTH
+        )
+
+        self.client = Client()
+
+    def test_acr_direction_can_access_governance(self):
+        """Membro da Direção ACR tem acesso total ao painel de órgãos sociais (HTTP 200)."""
+        self.client.login(username="direcao_acr", password="password123")
+        res = self.client.get(reverse("core:association_governance"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Órgãos Sociais")
+
+    def test_proform_user_blocked_from_governance(self):
+        """Membro do ProForm é rigorosamente bloqueado de aceder aos órgãos sociais da ACR (HTTP 403)."""
+        self.client.login(username="treinador_proform", password="password123")
+        res = self.client.get(reverse("core:association_governance"))
+        self.assertEqual(res.status_code, 403, "Utilizador do ProForm deve receber HTTP 403 em /association/governance/")
+
+    def test_proform_user_cannot_alter_acr_membership_fees(self):
+        """Formulário submetido por ProForm não altera o estatuto de quotas ou número de sócio da ACR."""
+        from core.forms import PersonForm
+
+        # Submissão por utilizador do ProForm tentando isentar quotas e mudar número de sócio
+        form = PersonForm(
+            data={
+                "first_name": "Atleta",
+                "last_name": "Sócio Alterado",
+                "member_category": Person.MemberCategory.SOCIO,
+                "member_number": 999,
+                "membership_fee_status": Person.MembershipFeeStatus.EXEMPT,
+                "entity_affiliation": Person.EntityAffiliation.BOTH,
+                "status": Person.Status.ACTIVE,
+                "regulation_accepted": True,
+            },
+            instance=self.athlete,
+            organization=self.org,
+            user=self.proform_user
+        )
+        self.assertTrue(form.is_valid(), f"Erros do formulário: {form.errors}")
+        saved_athlete = form.save()
+
+        # O nome é atualizado, mas os campos associativos preservam os valores originais da base de dados
+        self.assertEqual(saved_athlete.last_name, "Sócio Alterado")
+        self.assertEqual(saved_athlete.member_number, 10, "Número de sócio não pode ser adulterado por utilizador ProForm")
+        self.assertEqual(saved_athlete.membership_fee_status, Person.MembershipFeeStatus.UP_TO_DATE, "Estado de quotas não pode ser alterado por ProForm")
+
+    def test_proform_director_can_add_graduation(self):
+        """Diretor Técnico ProForm tem permissão para registar graduações / exames de cinto."""
+        self.client.login(username="treinador_proform", password="password123")
+        res = self.client.post(
+            reverse("core:athlete_graduation_add", kwargs={"pk": self.athlete.pk}),
+            {
+                "modality": self.modality.pk,
+                "rank_name": "Cinto Laranja (4º Kyu)",
+                "rank_order": "4",
+                "awarded_date": "2026-09-05",
+                "examiner_name": "Comissão Técnica ProForm",
+            }
+        )
+        self.assertEqual(res.status_code, 302)
+        self.athlete.refresh_from_db()
+        self.assertEqual(self.athlete.current_belt, "Cinto Laranja (4º Kyu)")
+
+    def test_protocol_supervision_access_matrix(self):
+        """
+        Direção ACR e Direção Técnica ProForm acedem à supervisão do protocolo (HTTP 200).
+        Mas apenas a Direção ACR tem competência para aprovar e alterar o estado do fecho (require_approval_power).
+        """
+        from core.models import ProtocolPeriodSettlement
+        settlement = ProtocolPeriodSettlement.objects.create(
+            organization=self.org,
+            period_start=timezone.now().date(),
+            period_end=timezone.now().date(),
+            status=ProtocolPeriodSettlement.Status.DRAFT
+        )
+
+        # 1. Direção ACR acede e aprova
+        self.client.login(username="direcao_acr", password="password123")
+        res_supervision = self.client.get(reverse("core:protocol_supervision"))
+        self.assertEqual(res_supervision.status_code, 200)
+
+        res_approve = self.client.post(reverse("core:protocol_settlement_toggle_status", kwargs={"settlement_id": settlement.pk}))
+        self.assertEqual(res_approve.status_code, 302)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, ProtocolPeriodSettlement.Status.APPROVED)
+
+        # 2. Direção ProForm acede à supervisão para conferência
+        self.client.login(username="treinador_proform", password="password123")
+        res_pf_supervision = self.client.get(reverse("core:protocol_supervision"))
+        self.assertEqual(res_pf_supervision.status_code, 200)
+
+        # 3. Mas Direção ProForm é bloqueada ao tentar alterar estado do fecho formal
+        res_pf_approve = self.client.post(reverse("core:protocol_settlement_toggle_status", kwargs={"settlement_id": settlement.pk}))
+        self.assertEqual(res_pf_approve.status_code, 403, "ProForm não pode aprovar/alterar fecho de contas do protocolo")
+
+    def test_navbar_visibility_per_role(self):
+        """O menu da Associação ACR não deve expor a governação estatutária a utilizadores ProForm."""
+        # ACR Direção
+        self.client.login(username="direcao_acr", password="password123")
+        res_acr = self.client.get("/")
+        self.assertContains(res_acr, "Órgãos Sociais & Mandatos")
+        self.assertContains(res_acr, "Direção ACR")
+
+        # ProForm
+        self.client.login(username="treinador_proform", password="password123")
+        res_pf = self.client.get("/")
+        self.assertNotContains(res_pf, "Órgãos Sociais & Mandatos")
+        self.assertContains(res_pf, "Dir. ProForm")
+
+
 

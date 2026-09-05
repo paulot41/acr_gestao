@@ -1,11 +1,13 @@
 from django.http import JsonResponse, Http404
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from core.auth_views import role_required
 
 from .services import get_summary_data
 
 
 @login_required
+@role_required(["admin", "staff"])
 def dashboard(request):
     if not getattr(request, "organization", None):
         raise Http404("Organização não encontrada.")
@@ -13,6 +15,7 @@ def dashboard(request):
 
 
 @login_required
+@role_required(["admin", "staff"])
 def summary_data(request):
     organization = getattr(request, "organization", None)
     if not organization:

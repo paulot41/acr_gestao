@@ -125,8 +125,8 @@ def instructors_overview(request):
         return render(request, 'core/dashboard/no_org.html')
 
     instructors = Instructor.objects.filter(organization=org).annotate(
-        total_events=Count('event'),
-        events_this_month=Count('event', filter=Q(event__starts_at__month=timezone.now().month))
+        total_events=Count('events'),
+        events_this_month=Count('events', filter=Q(events__starts_at__month=timezone.now().month))
     ).order_by('first_name', 'last_name')
 
     context = {
@@ -208,7 +208,7 @@ def dashboard_instructor(request):
         profile = request.user.profile
         if not hasattr(profile, 'instructor') or not profile.instructor:
             messages.error(request, "Perfil de instrutor não encontrado.")
-            return redirect('core:dashboard')
+            return redirect('core:admin_dashboard')
 
         instructor = profile.instructor
         org = request.organization
@@ -247,7 +247,7 @@ def dashboard_instructor(request):
     except (ObjectDoesNotExist, DatabaseError) as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
         logger.error("Erro no dashboard do instrutor: %s", e)
-        return redirect('core:dashboard')
+        return redirect('core:admin_dashboard')
 
 
 @login_required
@@ -257,7 +257,7 @@ def dashboard_client(request):
         profile = request.user.profile
         if not hasattr(profile, 'person') or not profile.person:
             messages.error(request, "Perfil de cliente não encontrado.")
-            return redirect('core:dashboard')
+            return redirect('core:admin_dashboard')
 
         person = profile.person
         org = request.organization
@@ -303,7 +303,7 @@ def dashboard_client(request):
     except (ObjectDoesNotExist, DatabaseError) as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
         logger.error("Erro no dashboard do cliente: %s", e)
-        return redirect('core:dashboard')
+        return redirect('core:admin_dashboard')
 
 
 @login_required
@@ -346,7 +346,7 @@ def dashboard_staff(request):
     except DatabaseError as e:
         messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
         logger.error("Erro no dashboard do staff: %s", e)
-        return redirect('core:dashboard')
+        return redirect('core:admin_dashboard')
 
 
 @login_required
@@ -356,7 +356,7 @@ def credit_history_view(request):
         profile = request.user.profile
         if not hasattr(profile, 'person') or not profile.person:
             messages.error(request, "Perfil de cliente não encontrado.")
-            return redirect('core:dashboard')
+            return redirect('core:admin_dashboard')
 
         person = profile.person
         org = request.organization
@@ -394,7 +394,7 @@ def credit_history_view(request):
     except (ObjectDoesNotExist, DatabaseError) as e:
         messages.error(request, f"Erro ao carregar histórico: {str(e)}")
         logger.error("Erro ao carregar histórico de créditos: %s", e)
-        return redirect('core:dashboard')
+        return redirect('core:admin_dashboard')
 
 
 @login_required
@@ -425,7 +425,7 @@ def alert_mark_read(request, alert_id):
         messages.error(request, f"Erro ao processar alerta: {str(e)}")
         logger.error("Erro ao processar alerta: %s", e)
 
-    return redirect(request.META.get('HTTP_REFERER', 'core:dashboard'))
+    return redirect(request.META.get('HTTP_REFERER', 'core:admin_dashboard'))
 
 
 @login_required
@@ -456,4 +456,4 @@ def alert_dismiss(request, alert_id):
         messages.error(request, f"Erro ao processar alerta: {str(e)}")
         logger.error("Erro ao processar alerta: %s", e)
 
-    return redirect(request.META.get('HTTP_REFERER', 'core:dashboard'))
+    return redirect(request.META.get('HTTP_REFERER', 'core:admin_dashboard'))

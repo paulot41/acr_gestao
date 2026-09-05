@@ -101,11 +101,17 @@ def get_user_role(user):
 
     if user.is_superuser:
         return "admin"
-    if user.is_staff:
-        return "staff"
+    if user.groups.filter(name="Direção ACR").exists():
+        return "acr_direction"
+    if user.groups.filter(name="Staff ACR").exists():
+        return "acr_staff"
+    if user.groups.filter(name="Direção Técnica Proform").exists():
+        return "proform_director"
+    if user.groups.filter(name="Staff Proform").exists():
+        return "proform_staff"
     if user.groups.filter(name="Instrutores").exists():
         return "instructor"
-    if user.groups.filter(name="Rececionistas").exists():
+    if user.is_staff or user.groups.filter(name="Rececionistas").exists():
         return "staff"
     return "client"
 
@@ -116,16 +122,147 @@ def role_required(allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
-            if get_user_role(request.user) in allowed_roles:
+            if not request.user.is_authenticated:
+                return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+            if request.user.is_superuser:
                 return view_func(request, *args, **kwargs)
+
+            user_role = get_user_role(request.user)
+            profile = getattr(request.user, "profile", None)
+
+            # Verificação direta
+            if user_role in allowed_roles:
+                return view_func(request, *args, **kwargs)
+
+            # Hierarquia: se 'staff' for permitido, todos os sub-papéis de staff têm acesso geral
+            staff_roles = {"staff", "acr_direction", "acr_staff", "proform_director", "proform_staff"}
+            if "staff" in allowed_roles:
+                if user_role in staff_roles or request.user.is_staff:
+                    return view_func(request, *args, **kwargs)
+
+            # Se 'instructor' for permitido, proform_director também tem acesso de instrutor
+            if "instructor" in allowed_roles:
+                if user_role in {"instructor", "proform_director"} or (profile and profile.instructor):
+                    return view_func(request, *args, **kwargs)
+
             raise PermissionDenied
 
         return login_required(_wrapped_view)
 
     return decorator
 
+
+def acr_required(require_direction=False):
+    """
+    Decorator para restringir acesso a utilizadores da Associação ACR.
+    Utilizadores do ProForm não afiliados à ACR recebem PermissionDenied (403).
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+            if request.user.is_superuser:
+                return view_func(request, *args, **kwargs)
+
+            profile = getattr(request.user, "profile", None)
+            if profile:
+                if require_direction and not profile.can_manage_association:
+                    raise PermissionDenied("Acesso reservado aos membros da Direção da Associação ACR.")
+                if not profile.is_acr:
+                    raise PermissionDenied("Acesso reservado aos membros afiliados à Associação ACR.")
+                return view_func(request, *args, **kwargs)
+
+            # Verificação alternativa via grupos Django
+            is_dir = request.user.groups.filter(name="Direção ACR").exists()
+            is_staff_acr = request.user.groups.filter(name="Staff ACR").exists()
+            if require_direction and is_dir:
+                return view_func(request, *args, **kwargs)
+            if not require_direction and (is_dir or is_staff_acr):
+                return view_func(request, *args, **kwargs)
+
+            raise PermissionDenied("Acesso reservado à Associação ACR.")
+
+        return login_required(_wrapped_view)
+
+    return decorator
+
+
+def proform_required(require_director=False):
+    """
+    Decorator para restringir acesso a utilizadores afiliados ao ProForm.
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+            if request.user.is_superuser:
+                return view_func(request, *args, **kwargs)
+
+            profile = getattr(request.user, "profile", None)
+            if profile:
+                if require_director and not profile.is_proform_director:
+                    raise PermissionDenied("Acesso reservado à Direção Técnica do ProForm.")
+                if not profile.is_proform:
+                    raise PermissionDenied("Acesso reservado a elementos do ProForm.")
+                return view_func(request, *args, **kwargs)
+
+            is_pf_dir = request.user.groups.filter(name="Direção Técnica Proform").exists()
+            is_pf_staff = request.user.groups.filter(name__in=["Staff Proform", "Instrutores"]).exists()
+            if require_director and is_pf_dir:
+                return view_func(request, *args, **kwargs)
+            if not require_director and (is_pf_dir or is_pf_staff):
+                return view_func(request, *args, **kwargs)
+
+            raise PermissionDenied("Acesso reservado à equipa ProForm.")
+
+        return login_required(_wrapped_view)
+
+    return decorator
+
+
+def protocol_access_required(require_approval_power=False):
+    """
+    Decorator para supervisão do Protocolo ACR & Proform SC.
+    Permite consulta à Direção ACR e à Direção Técnica ProForm.
+    A aprovação formal exige poder de aprovação estatutário (Direção ACR / Admin).
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+            if request.user.is_superuser:
+                return view_func(request, *args, **kwargs)
+
+            profile = getattr(request.user, "profile", None)
+            if profile:
+                if require_approval_power and not profile.can_approve_protocol:
+                    raise PermissionDenied("Apenas a Direção da Associação ACR pode aprovar o fecho financeiro do protocolo.")
+                if not profile.can_supervise_protocol:
+                    raise PermissionDenied("Sem permissões de supervisão do protocolo.")
+                return view_func(request, *args, **kwargs)
+
+            is_dir_acr = request.user.groups.filter(name="Direção ACR").exists()
+            is_dir_pf = request.user.groups.filter(name="Direção Técnica Proform").exists()
+            if require_approval_power and is_dir_acr:
+                return view_func(request, *args, **kwargs)
+            if not require_approval_power and (is_dir_acr or is_dir_pf):
+                return view_func(request, *args, **kwargs)
+
+            raise PermissionDenied("Sem autorização para aceder à supervisão do protocolo.")
+
+        return login_required(_wrapped_view)
+
+    return decorator
+
+
 class UserRoleMiddleware:
-    """Middleware para determinar e armazenar o papel do utilizador."""
+    """Middleware para determinar e armazenar o papel e permissões detalhadas do utilizador."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -133,13 +270,63 @@ class UserRoleMiddleware:
     def __call__(self, request):
         if request.user.is_authenticated:
             request.user_role = get_user_role(request.user)
+            request.user_profile = getattr(request.user, "profile", None)
             request.preferred_entity = request.session.get('preferred_entity', 'acr')
+
+            # Permissões booleanas convenientes para templates e views
+            if request.user.is_superuser:
+                request.is_management = True
+                request.is_acr = True
+                request.is_proform = True
+                request.is_acr_direction = True
+                request.is_proform_director = True
+                request.can_manage_association = True
+                request.can_manage_sports = True
+                request.can_supervise_protocol = True
+                request.can_approve_protocol = True
+                request.user_role_display = "Administrador Global"
+            elif request.user_profile:
+                p = request.user_profile
+                request.is_management = p.can_access_admin()
+                request.is_acr = p.is_acr
+                request.is_proform = p.is_proform
+                request.is_acr_direction = p.is_acr_direction
+                request.is_proform_director = p.is_proform_director
+                request.can_manage_association = p.can_manage_association
+                request.can_manage_sports = p.can_manage_sports
+                request.can_supervise_protocol = p.can_supervise_protocol
+                request.can_approve_protocol = p.can_approve_protocol
+                request.user_role_display = p.get_user_type_display()
+            else:
+                user_groups = set(request.user.groups.values_list('name', flat=True))
+                request.is_management = request.user.is_staff or bool(user_groups)
+                request.is_acr = bool(user_groups.intersection({"Direção ACR", "Staff ACR"}))
+                request.is_proform = bool(user_groups.intersection({"Direção Técnica Proform", "Staff Proform", "Instrutores"}))
+                request.is_acr_direction = "Direção ACR" in user_groups
+                request.is_proform_director = "Direção Técnica Proform" in user_groups
+                request.can_manage_association = "Direção ACR" in user_groups or "Staff ACR" in user_groups
+                request.can_manage_sports = bool(user_groups.intersection({"Direção Técnica Proform", "Staff Proform", "Instrutores", "Direção ACR"}))
+                request.can_supervise_protocol = bool(user_groups.intersection({"Direção ACR", "Direção Técnica Proform"}))
+                request.can_approve_protocol = "Direção ACR" in user_groups
+                request.user_role_display = request.user_role or "Utilizador"
         else:
             request.user_role = None
+            request.user_profile = None
             request.preferred_entity = 'acr'
+            request.is_management = False
+            request.is_acr = False
+            request.is_proform = False
+            request.is_acr_direction = False
+            request.is_proform_director = False
+            request.can_manage_association = False
+            request.can_manage_sports = False
+            request.can_supervise_protocol = False
+            request.can_approve_protocol = False
+            request.user_role_display = ""
 
         response = self.get_response(request)
         return response
+
 
 # Funções simples de autenticação
 def login_view(request):
