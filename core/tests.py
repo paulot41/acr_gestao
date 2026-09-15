@@ -1,12 +1,16 @@
 import json
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
+from django.conf import settings
 from django.test import TestCase, Client, RequestFactory, override_settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.http import HttpResponse
-from django.urls import reverse
+from django.urls import reverse, resolve
+from django.template.loader import render_to_string
 from rest_framework.test import APITestCase
 
 from django.core import mail
@@ -15,7 +19,8 @@ from notifications.models import NotificationLog
 import unittest.mock
 from django.db import DatabaseError
 from django.db.models import ProtectedError
-from django.contrib.messages import get_messages
+from django.contrib.messages import get_messages, add_message, constants as message_constants
+from django.contrib.messages.storage.fallback import FallbackStorage
 
 from .models import (
     Organization, Person, Event, Resource, Booking,
@@ -23,7 +28,7 @@ from .models import (
     ClientSubscription, CreditHistory, Payment, GoogleDriveSyncLog,
     InstructorCommission, ProtocolPeriodSettlement, ProtocolConfiguration,
     AthleteGraduation, GoverningBody, GoverningBodyMember,
-    UserProfile, Invoice
+    UserProfile, Invoice, SystemAlert
 )
 from .middleware import OrganizationMiddleware
 from .context_processors import organization_context
@@ -320,6 +325,53 @@ class GanttAPITestCase(TestCase):
             content_type="application/json"
         )
         self.assertEqual(res_no_csrf.status_code, 403)
+
+    def test_gantt_drag_update_preserves_local_hour(self):
+        """Ao arrastar/atualizar um evento para as 14:00, o gantt_data e update_event_details devem preservar 14:00 em hora local."""
+        from datetime import datetime
+        event = Event.objects.create(
+            organization=self.org,
+            resource=self.resource1,
+            instructor=self.instructor,
+            title="Aula Teste Drag",
+            starts_at=timezone.make_aware(datetime.strptime(f"{self.date_str} 10:00", "%Y-%m-%d %H:%M")),
+            ends_at=timezone.make_aware(datetime.strptime(f"{self.date_str} 11:00", "%Y-%m-%d %H:%M")),
+            capacity=10
+        )
+
+        # Simular arrastar para as 14:00
+        payload = {
+            "event_id": event.id,
+            "date": self.date_str,
+            "start_time": "14:00",
+            "end_time": "15:00",
+            "resource_id": self.resource1.id
+        }
+        res_update = self.client.post(
+            "/gantt/update-event/",
+            data=json.dumps(payload),
+            content_type="application/json"
+        )
+        self.assertEqual(res_update.status_code, 200)
+
+        # Consultar dados do Gantt
+        res_data = self.client.get(f"/gantt/data/?date={self.date_str}")
+        self.assertEqual(res_data.status_code, 200)
+        events = res_data.json()["events"]
+        updated_event = next(e for e in events if e["id"] == event.id)
+
+        # Verificar que a hora é exatamente 14:00 e não 13:00 (UTC)
+        self.assertEqual(updated_event["start_time"], "14:00")
+        self.assertEqual(updated_event["end_time"], "15:00")
+        self.assertEqual(updated_event["start_hour"], 14)
+        self.assertEqual(updated_event["end_hour"], 15)
+
+        # Consultar detalhes do evento
+        res_details = self.client.get(f"/gantt/event/{event.id}/details/")
+        self.assertEqual(res_details.status_code, 200)
+        details = res_details.json()
+        self.assertEqual(details["start_time"], "14:00")
+        self.assertEqual(details["end_time"], "15:00")
 
 
 class PersonConsentTestCase(APITestCase):
@@ -2799,4 +2851,587 @@ class AssociationVsProformPermissionsTestCase(TestCase):
         self.assertContains(res_pf, "Dir. ProForm")
 
 
+class UINavigationAndLayoutTestCase(TestCase):
+    """
+    Milestone 1 Test Suite:
+    - Route resolution & accessibility for newly added/fixed routes:
+      reverse('core:profile'), reverse('core:modality_edit'), reverse('core:modality_delete'),
+      reverse('core:alert_mark_read'), reverse('core:alert_dismiss').
+    - Defensive rendering of repaired templates:
+      core/credit_history.html (with person and without person in context),
+      core/event_confirm_delete.html, core/google_calendar/settings.html.
+    - Flash messages container rendering in core/templates/core/base.html.
+    """
 
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_ui_nav",
+            password="password123",
+            email="admin_ui_nav@test.com"
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+        self.client_user = User.objects.create_user(
+            username="client_ui_nav",
+            password="password123",
+            email="client_ui_nav@test.com"
+        )
+        self.client_person = Person.objects.create(
+            organization=self.org,
+            first_name="Mariana",
+            last_name="Costa",
+            email="mariana@test.com",
+            member_number=101,
+            status=Person.Status.ACTIVE
+        )
+        UserProfile.objects.create(
+            user=self.client_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.CLIENT,
+            person=self.client_person
+        )
+        self.modality = Modality.objects.create(
+            organization=self.org,
+            name="Judo Infantil",
+            entity_type="acr"
+        )
+        self.resource = Resource.objects.create(
+            organization=self.org,
+            name="Dojo Principal",
+            capacity=20
+        )
+        now = timezone.now().replace(microsecond=0)
+        self.event = Event.objects.create(
+            organization=self.org,
+            resource=self.resource,
+            modality=self.modality,
+            title="Treino de Graduados",
+            starts_at=now + timedelta(days=1),
+            ends_at=now + timedelta(days=1, hours=1),
+            capacity=15
+        )
+        self.alert = SystemAlert.objects.create(
+            organization=self.org,
+            user=self.admin_user,
+            title="Alerta de Manutenção",
+            message="O tapete do dojo será limpo.",
+            alert_type="info",
+            status=SystemAlert.Status.PENDING
+        )
+
+    def test_profile_route(self):
+        url = reverse('core:profile')
+        self.assertEqual(url, '/profile/')
+        resp_anon = self.client.get(url)
+        self.assertEqual(resp_anon.status_code, 302)
+        self.assertIn('login', resp_anon.url)
+
+        self.client.force_login(self.client_user)
+        resp_auth = self.client.get(url)
+        self.assertEqual(resp_auth.status_code, 200)
+        self.assertTemplateUsed(resp_auth, 'registration/profile.html')
+
+    def test_modality_edit_route(self):
+        url = reverse('core:modality_edit', args=[self.modality.pk])
+        self.assertEqual(url, f'/modalities/{self.modality.pk}/edit/')
+
+        self.client.force_login(self.admin_user)
+        resp_get = self.client.get(url)
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, 'Judo Infantil')
+
+        resp_post = self.client.post(url, {
+            'name': 'Judo Cadetes',
+            'entity_type': 'acr',
+            'default_duration_minutes': 60,
+            'max_capacity': 15,
+            'is_active': True
+        })
+        self.assertRedirects(resp_post, reverse('core:modality_list'))
+        self.modality.refresh_from_db()
+        self.assertEqual(self.modality.name, 'Judo Cadetes')
+
+    def test_modality_delete_route(self):
+        mod_to_del = Modality.objects.create(organization=self.org, name='Kendo', entity_type='acr')
+        url = reverse('core:modality_delete', args=[mod_to_del.pk])
+        self.assertEqual(url, f'/modalities/{mod_to_del.pk}/delete/')
+
+        self.client.force_login(self.admin_user)
+        resp = self.client.post(url)
+        self.assertRedirects(resp, reverse('core:modality_list'))
+        self.assertFalse(Modality.objects.filter(pk=mod_to_del.pk).exists())
+
+    def test_alert_mark_read_route(self):
+        url = reverse('core:alert_mark_read', args=[self.alert.id])
+        self.assertEqual(url, f'/alerts/{self.alert.id}/read/')
+
+        self.client.force_login(self.admin_user)
+        resp = self.client.get(url, HTTP_REFERER='/dashboard/')
+        self.assertRedirects(resp, '/dashboard/')
+        self.alert.refresh_from_db()
+        self.assertEqual(self.alert.status, SystemAlert.Status.READ)
+        self.assertIsNotNone(self.alert.read_at)
+
+    def test_alert_dismiss_route(self):
+        url = reverse('core:alert_dismiss', args=[self.alert.id])
+        self.assertEqual(url, f'/alerts/{self.alert.id}/dismiss/')
+
+        self.client.force_login(self.admin_user)
+        resp = self.client.get(url, HTTP_REFERER='/dashboard/')
+        self.assertRedirects(resp, '/dashboard/')
+        self.alert.refresh_from_db()
+        self.assertEqual(self.alert.status, SystemAlert.Status.DISMISSED)
+
+    def test_credit_history_template_rendering_with_person(self):
+        rf = RequestFactory()
+        request = rf.get(reverse('core:credit_history'))
+        request.user = self.admin_user
+        request.organization = self.org
+        html = render_to_string('core/credit_history.html', {
+            'person': self.client_person,
+            'credit_summary': {'total_credits': 12}
+        }, request=request)
+        self.assertIn(self.client_person.full_name, html)
+        self.assertIn(f'/clients/{self.client_person.pk}/', html)
+        self.assertIn('Histórico de Créditos', html)
+
+    def test_credit_history_template_rendering_without_person(self):
+        rf = RequestFactory()
+        request = rf.get(reverse('core:credit_history'))
+        request.user = self.admin_user
+        request.organization = self.org
+        html = render_to_string('core/credit_history.html', {
+            'person': None,
+            'credit_summary': {'total_credits': 0}
+        }, request=request)
+        self.assertIn('Histórico de Créditos', html)
+        self.assertIn('/clients/', html)
+
+    def test_event_confirm_delete_template_rendering(self):
+        rf = RequestFactory()
+        request = rf.get(reverse('core:event_delete', args=[self.event.pk]))
+        request.user = self.admin_user
+        request.organization = self.org
+        html = render_to_string('core/event_confirm_delete.html', {
+            'event': self.event
+        }, request=request)
+        self.assertIn('Confirmar Eliminação de Evento', html)
+        self.assertIn(self.event.title, html)
+        self.assertIn(self.resource.name, html)
+
+    def test_google_calendar_settings_template_rendering(self):
+        rf = RequestFactory()
+        request = rf.get(reverse('core:google_calendar_settings'))
+        request.user = self.admin_user
+        request.organization = self.org
+        html = render_to_string('core/google_calendar/settings.html', {
+            'organization': self.org,
+            'config': {'auto_sync_events': True}
+        }, request=request)
+        self.assertIn('Definições do Google Calendar', html)
+        self.assertIn('Sincronização Automática Ativa', html)
+
+    def test_flash_messages_rendering_in_base_template(self):
+        rf = RequestFactory()
+        request = rf.get('/')
+        request.user = self.admin_user
+        request.organization = self.org
+        setattr(request, 'session', {})
+        messages_storage = FallbackStorage(request)
+        setattr(request, '_messages', messages_storage)
+        add_message(request, message_constants.SUCCESS, 'Ação concluída com sucesso!')
+        add_message(request, message_constants.ERROR, 'Erro na submissão de dados!')
+
+        html = render_to_string('core/base.html', {
+            'title': 'Test Page',
+            'messages': get_messages(request),
+        }, request=request)
+        self.assertIn('messages-container', html)
+        self.assertIn('Ação concluída com sucesso!', html)
+        self.assertIn('alert-success', html)
+        self.assertIn('Erro na submissão de dados!', html)
+        self.assertIn('alert-danger', html)
+
+
+class UIFormsValidationTestCase(TestCase):
+    """
+    Milestone 2 Test Suite:
+    - Model clean guards:
+      * Booking.clean() without event attached (guards against RelatedObjectDoesNotExist).
+      * Event.clean() with null dates (guards against TypeError).
+    - BootstrapValidationMixin feedback across forms:
+      * Empty POST to /bookings/add/, /events/add/, /modalities/add/, /resources/add/,
+        /instructors/add/, /clients/add/.
+      * Verifies HTTP 200, 'is-invalid' class rendered on invalid fields, and '.invalid-feedback' in HTML.
+    - Scheduling conflict in EventForm:
+      * Triggers resource overlap conflict and verifies non_field_errors alert renders in event_form.html.
+    - Associative fields in ClientForm / PersonForm:
+      * Verifies member_number, admission_date, membership_fee_status, current_belt are present in HTML
+        and handled properly upon submission.
+    """
+
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_ui_forms",
+            password="password123",
+            email="admin_ui_forms@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+        self.resource = Resource.objects.create(
+            organization=self.org,
+            name="Sala Polivalente",
+            capacity=25
+        )
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Rui",
+            last_name="Santos",
+            email="rui.santos@test.com"
+        )
+        self.modality = Modality.objects.create(
+            organization=self.org,
+            name="Pilates",
+            entity_type="both"
+        )
+        self.client_person = Person.objects.create(
+            organization=self.org,
+            first_name="Ana",
+            last_name="Ferreira",
+            email="ana.ferreira@test.com",
+            status=Person.Status.ACTIVE
+        )
+        self.client.force_login(self.admin_user)
+
+    def test_booking_clean_guard_without_event(self):
+        booking = Booking(organization=self.org, person=self.client_person)
+        try:
+            booking.clean()
+        except Exception as e:
+            self.fail(f"Booking.clean() raised unexpected exception without event: {e}")
+
+    def test_event_clean_guard_with_null_dates(self):
+        event1 = Event(organization=self.org, title="Aula Sem Datas", starts_at=None, ends_at=None)
+        try:
+            event1.clean()
+        except TypeError as e:
+            self.fail(f"Event.clean() raised TypeError with null dates: {e}")
+
+        event2 = Event(organization=self.org, title="Aula Sem Fim", starts_at=timezone.now(), ends_at=None)
+        try:
+            event2.clean()
+        except TypeError as e:
+            self.fail(f"Event.clean() raised TypeError with null ends_at: {e}")
+
+    def test_bootstrap_validation_mixin_empty_posts(self):
+        urls = [
+            '/bookings/add/',
+            '/events/add/',
+            '/modalities/add/',
+            '/resources/add/',
+            '/instructors/add/',
+            '/clients/add/',
+        ]
+        for url in urls:
+            resp = self.client.post(url, {})
+            self.assertEqual(resp.status_code, 200, f"Failed for {url}: status {resp.status_code}")
+            content = resp.content.decode('utf-8')
+            self.assertIn('is-invalid', content, f"Missing 'is-invalid' class for {url}")
+            self.assertIn('invalid-feedback', content, f"Missing 'invalid-feedback' for {url}")
+
+    def test_event_form_scheduling_conflict_renders_non_field_errors(self):
+        now = timezone.now().replace(microsecond=0)
+        start1 = now + timedelta(days=2, hours=10)
+        end1 = start1 + timedelta(hours=1)
+        Event.objects.create(
+            organization=self.org,
+            resource=self.resource,
+            title="Aula de Pilates 1",
+            starts_at=start1,
+            ends_at=end1,
+            capacity=15
+        )
+
+        overlap_data = {
+            'title': 'Aula de Pilates 2 Conflito',
+            'resource': self.resource.pk,
+            'starts_at': (start1 + timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M'),
+            'ends_at': (end1 + timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M'),
+            'capacity': 15,
+            'event_type': Event.EventType.OPEN_CLASS,
+        }
+        resp = self.client.post('/events/add/', overlap_data)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode('utf-8')
+        self.assertIn('alert alert-danger', content)
+        self.assertIn('mesmo espaço', content.lower())
+
+    def test_client_form_associative_fields(self):
+        resp = self.client.get('/clients/add/')
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode('utf-8')
+        self.assertIn('member_number', content)
+        self.assertIn('admission_date', content)
+        self.assertIn('membership_fee_status', content)
+        self.assertIn('current_belt', content)
+
+        post_data = {
+            'first_name': 'Diogo',
+            'last_name': 'Almeida',
+            'email': 'diogo@test.com',
+            'member_category': Person.MemberCategory.SOCIO,
+            'member_number': 4321,
+            'admission_date': '2026-02-01',
+            'membership_fee_status': Person.MembershipFeeStatus.UP_TO_DATE,
+            'current_belt': 'Cinto Amarelo',
+            'status': Person.Status.ACTIVE,
+            'regulation_accepted': True,
+            'entity_affiliation': Person.EntityAffiliation.ACR_ONLY,
+        }
+        resp_post = self.client.post('/clients/add/', post_data)
+        self.assertEqual(resp_post.status_code, 302)
+        new_person = Person.objects.get(email='diogo@test.com')
+        self.assertEqual(new_person.member_number, 4321)
+        self.assertEqual(new_person.current_belt, 'Cinto Amarelo')
+        self.assertEqual(new_person.membership_fee_status, Person.MembershipFeeStatus.UP_TO_DATE)
+
+
+class UIInteractiveAJAXTestCase(TestCase):
+    """
+    Milestone 3 Test Suite:
+    - Event details REST/AJAX endpoints:
+      * core:get_event_details and core:api_event_details return JSON (HTTP 200) for valid event.
+      * Nonexistent event returns JSON HTTP 404.
+    - Admin dashboard statistics endpoint (/admin/dashboard-stats/):
+      * Route precedence: resolves to admin_dashboard_stats (not shadowed by admin.site.urls catch-all).
+      * Superuser / Staff access: returns HTTP 200 with JSON stats (active_members, bookings_today, occupancy_rate, pending_alerts).
+      * RBAC: unauthenticated returns HTTP 302, client user returns HTTP 403.
+    - CSRF security on state-changing endpoints:
+      * Verify POST without CSRF token is rejected with HTTP 403.
+    - Static Regex test:
+      * Verify ZERO broken jQuery '$' calls in:
+        event_form.html, client_list.html, dashboard_instructor.html, modality_form.html,
+        dashboard_admin.html, event_list.html, gantt_dynamic.html.
+    """
+
+    def setUp(self):
+        self.org = Organization.objects.create(
+            name="ACR & Proform SC",
+            domain="testserver",
+            org_type=Organization.Type.BOTH
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_ui_ajax",
+            password="password123",
+            email="admin_ui_ajax@test.com"
+        )
+        UserProfile.objects.create(
+            user=self.admin_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.ADMIN
+        )
+        self.staff_user = User.objects.create_user(
+            username="staff_ui_ajax",
+            password="password123",
+            email="staff_ui_ajax@test.com",
+            is_staff=True
+        )
+        UserProfile.objects.create(
+            user=self.staff_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.STAFF
+        )
+        self.client_user = User.objects.create_user(
+            username="client_ui_ajax",
+            password="password123",
+            email="client_ui_ajax@test.com"
+        )
+        self.client_person = Person.objects.create(
+            organization=self.org,
+            first_name="Beatriz",
+            last_name="Silva",
+            email="beatriz@test.com",
+            status=Person.Status.ACTIVE
+        )
+        UserProfile.objects.create(
+            user=self.client_user,
+            organization=self.org,
+            user_type=UserProfile.UserType.CLIENT,
+            person=self.client_person
+        )
+        self.resource = Resource.objects.create(
+            organization=self.org,
+            name="Tatami 1",
+            capacity=18
+        )
+        self.modality = Modality.objects.create(
+            organization=self.org,
+            name="Jiu-Jitsu",
+            entity_type="both"
+        )
+        self.instructor = Instructor.objects.create(
+            organization=self.org,
+            first_name="Mestre",
+            last_name="Alves",
+            email="mestre@test.com"
+        )
+        now = timezone.now().replace(microsecond=0)
+        self.event = Event.objects.create(
+            organization=self.org,
+            resource=self.resource,
+            modality=self.modality,
+            instructor=self.instructor,
+            title="Treino de Jiu-Jitsu",
+            description="Foco em finalizações",
+            starts_at=now + timedelta(hours=2),
+            ends_at=now + timedelta(hours=3, minutes=30),
+            capacity=18
+        )
+        Booking.objects.create(
+            organization=self.org,
+            event=self.event,
+            person=self.client_person,
+            status=Booking.Status.CONFIRMED
+        )
+        SystemAlert.objects.create(
+            organization=self.org,
+            title="Alerta Teste",
+            message="Alerta pendente para teste de estatísticas.",
+            status=SystemAlert.Status.PENDING
+        )
+
+    def test_get_event_details_and_api_event_details_success(self):
+        self.client.force_login(self.admin_user)
+        for route_name in ['core:get_event_details', 'core:api_event_details']:
+            url = reverse(route_name, args=[self.event.id])
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 200, f"Failed for {route_name}")
+            self.assertEqual(resp['Content-Type'], 'application/json')
+            data = json.loads(resp.content)
+            self.assertEqual(data['id'], self.event.id)
+            self.assertEqual(data['title'], 'Treino de Jiu-Jitsu')
+            self.assertEqual(data['resource_name'], 'Tatami 1')
+            self.assertEqual(data['modality_name'], 'Jiu-Jitsu')
+            self.assertEqual(data['instructor_name'], 'Mestre Alves')
+            self.assertEqual(data['bookings_count'], 1)
+            self.assertEqual(data['capacity'], 18)
+            self.assertAlmostEqual(data['occupancy_pct'], round(1/18*100, 1))
+
+    def test_get_event_details_nonexistent_returns_404(self):
+        self.client.force_login(self.admin_user)
+        for route_name in ['core:get_event_details', 'core:api_event_details']:
+            url = reverse(route_name, args=[999999])
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 404, f"Failed 404 for {route_name}")
+            data = json.loads(resp.content)
+            self.assertIn('error', data)
+
+    def test_admin_dashboard_stats_route_precedence(self):
+        match = resolve('/admin/dashboard-stats/')
+        self.assertIn('admin_dashboard_stats', str(match.func))
+
+    def test_admin_dashboard_stats_superuser_and_staff_access(self):
+        self.client.force_login(self.admin_user)
+        resp = self.client.get('/admin/dashboard-stats/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'application/json')
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'success')
+        self.assertIn('stats', data)
+        stats = data['stats']
+        for key in ['active_members', 'bookings_today', 'occupancy_rate', 'pending_alerts']:
+            self.assertIn(key, stats, f"Missing key {key} in stats payload")
+        self.assertGreaterEqual(stats['active_members'], 1)
+        self.assertGreaterEqual(stats['pending_alerts'], 1)
+
+        self.client.force_login(self.staff_user)
+        resp_staff = self.client.get('/admin/dashboard-stats/')
+        self.assertEqual(resp_staff.status_code, 200)
+        data_staff = json.loads(resp_staff.content)
+        self.assertEqual(data_staff['status'], 'success')
+
+    def test_admin_dashboard_stats_rbac_restrictions(self):
+        self.client.logout()
+        resp_unauth = self.client.get('/admin/dashboard-stats/')
+        self.assertEqual(resp_unauth.status_code, 302)
+        self.assertIn('login', resp_unauth.url)
+
+        self.client.force_login(self.client_user)
+        resp_client = self.client.get('/admin/dashboard-stats/')
+        self.assertEqual(resp_client.status_code, 403)
+
+    def test_csrf_security_on_state_changing_endpoints(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.admin_user)
+
+        resp = csrf_client.post('/modalities/add/', {
+            'name': 'Capoeira',
+            'entity_type': 'acr',
+            'default_duration_minutes': 60,
+            'max_capacity': 15,
+            'is_active': True
+        })
+        self.assertEqual(resp.status_code, 403, "State-changing POST without CSRF token must return 403")
+
+        csrf_client.get('/modalities/add/')
+        token = csrf_client.cookies['csrftoken'].value
+        resp_with_token = csrf_client.post(
+            '/modalities/add/',
+            {
+                'name': 'Capoeira',
+                'entity_type': 'acr',
+                'default_duration_minutes': 60,
+                'max_capacity': 15,
+                'is_active': True
+            },
+            HTTP_X_CSRFTOKEN=token
+        )
+        self.assertEqual(resp_with_token.status_code, 302)
+        self.assertTrue(Modality.objects.filter(name='Capoeira').exists())
+
+    def test_zero_broken_jquery_calls_in_templates(self):
+        template_files = [
+            'event_form.html',
+            'client_list.html',
+            'dashboard_instructor.html',
+            'modality_form.html',
+            'dashboard_admin.html',
+            'event_list.html',
+            'gantt_dynamic.html',
+        ]
+        template_dir = settings.BASE_DIR / 'core' / 'templates' / 'core'
+        jquery_dollar_pattern = re.compile(r'\$(?!\{)')
+        jquery_invocation_pattern = re.compile(r'(?:\$\s*\(|\$\.[a-zA-Z_])')
+
+        for filename in template_files:
+            fpath = template_dir / filename
+            self.assertTrue(fpath.exists(), f"Template file {filename} does not exist at {fpath}")
+            content = fpath.read_text(encoding='utf-8')
+
+            invocations = jquery_invocation_pattern.findall(content)
+            self.assertEqual(
+                len(invocations), 0,
+                f"Found {len(invocations)} broken jQuery invocations in {filename}: {invocations}"
+            )
+
+            non_template_dollars = jquery_dollar_pattern.findall(content)
+            self.assertEqual(
+                len(non_template_dollars), 0,
+                f"Found {len(non_template_dollars)} non-template-literal dollar signs in {filename}: {non_template_dollars}"
+            )

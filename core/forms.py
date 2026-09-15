@@ -7,7 +7,32 @@ from .models import (
 )
 
 
-class PersonForm(forms.ModelForm):
+class BootstrapValidationMixin:
+    """Aplica automaticamente 'is-invalid' aos widgets dos campos com erros de validação."""
+
+    def full_clean(self):
+        super().full_clean()
+        for field_name in self.errors:
+            if field_name in self.fields:
+                widget = self.fields[field_name].widget
+                existing_class = widget.attrs.get('class', '')
+                classes = existing_class.split()
+                if 'is-invalid' not in classes:
+                    classes.append('is-invalid')
+                    widget.attrs['class'] = ' '.join(classes)
+
+    def add_error(self, field, error):
+        super().add_error(field, error)
+        if field and field in self.fields:
+            widget = self.fields[field].widget
+            existing_class = widget.attrs.get('class', '')
+            classes = existing_class.split()
+            if 'is-invalid' not in classes:
+                classes.append('is-invalid')
+                widget.attrs['class'] = ' '.join(classes)
+
+
+class PersonForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de clientes e atletas com controlo de permissões ACR vs ProForm."""
 
     def __init__(self, *args, **kwargs):
@@ -69,18 +94,18 @@ class PersonForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@exemplo.com'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+351 912 345 678'}),
             'nif': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NIF'}),
-            'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Morada completa'}),
             'emergency_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome e telefone de emergência'}),
             'emergency_relationship': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Pai, Mãe, Cônjuge'}),
             'member_category': forms.Select(attrs={'class': 'form-select'}),
             'member_number': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'N.º de Sócio (auto se vazio)'}),
-            'admission_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'admission_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'membership_fee_status': forms.Select(attrs={'class': 'form-select'}),
             'current_belt': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Cinto Branco, Amarelo, etc.'}),
             'insurance_policy': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 0010189147'}),
-            'insurance_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'medical_certificate_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'insurance_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'medical_certificate_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'guardian_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do Encarregado de Educação'}),
             'guardian_phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Telefone do Encarregado'}),
             'guardian_nif': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NIF do Encarregado'}),
@@ -124,7 +149,7 @@ class PersonForm(forms.ModelForm):
         return nif
 
 
-class InstructorForm(forms.ModelForm):
+class InstructorForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de instrutores."""
 
     def __init__(self, *args, **kwargs):
@@ -173,7 +198,7 @@ class InstructorForm(forms.ModelForm):
             'proform_commission_rate': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'max': '100', 'step': '0.01'}),
             'is_technical_director': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'ipdj_license_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Cédula nº 97575 do IPDJ'}),
-            'ipdj_license_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'ipdj_license_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'ipdj_project_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Protocolo ACR-Proform / Projeto IPDJ Desporto para Todos'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
@@ -193,7 +218,7 @@ class InstructorForm(forms.ModelForm):
         return email
 
 
-class ModalityForm(forms.ModelForm):
+class ModalityForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de modalidades."""
 
     class Meta:
@@ -238,7 +263,7 @@ class ModalityForm(forms.ModelForm):
         return name
 
 
-class ClassGroupForm(forms.ModelForm):
+class ClassGroupForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de turmas."""
 
     class Meta:
@@ -255,8 +280,8 @@ class ClassGroupForm(forms.ModelForm):
             'instructor': forms.Select(attrs={'class': 'form-select'}),
             'max_students': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '50'}),
             'level': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: Iniciante, Intermédio, Avançado'}),
-            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'members': forms.SelectMultiple(attrs={'class': 'form-control', 'size': '10'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
@@ -271,7 +296,7 @@ class ClassGroupForm(forms.ModelForm):
             self.fields['members'].queryset = Person.objects.filter(organization=organization, status='active')
 
 
-class EventForm(forms.ModelForm):
+class EventForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de eventos."""
 
     class Meta:
@@ -290,8 +315,8 @@ class EventForm(forms.ModelForm):
             'instructor': forms.Select(attrs={'class': 'form-select'}),
             'class_group': forms.Select(attrs={'class': 'form-select'}),
             'individual_client': forms.Select(attrs={'class': 'form-select'}),
-            'starts_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-            'ends_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'starts_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'ends_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '100'}),
         }
 
@@ -342,7 +367,7 @@ class EventForm(forms.ModelForm):
         return cleaned_data
 
 
-class BookingForm(forms.ModelForm):
+class BookingForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de reservas."""
 
     class Meta:
@@ -363,7 +388,7 @@ class BookingForm(forms.ModelForm):
             self.fields["person"].queryset = Person.objects.filter(organization=organization)
 
 
-class ResourceForm(forms.ModelForm):
+class ResourceForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para criação/edição de recursos/espaços."""
 
     class Meta:
@@ -405,7 +430,7 @@ class ResourceForm(forms.ModelForm):
 
 
 # Formulário de filtros para listas
-class ClientFilterForm(forms.Form):
+class ClientFilterForm(BootstrapValidationMixin, forms.Form):
     """Formulário de filtros para lista de clientes."""
 
     ENTITY_CHOICES = [
@@ -443,7 +468,7 @@ class ClientFilterForm(forms.Form):
     )
 
 
-class EventFilterForm(forms.Form):
+class EventFilterForm(BootstrapValidationMixin, forms.Form):
     """Formulário de filtros para eventos."""
 
     search = forms.CharField(
@@ -456,12 +481,12 @@ class EventFilterForm(forms.Form):
 
     date_from = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d')
     )
 
     date_to = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d')
     )
 
     def __init__(self, *args, **kwargs):
@@ -482,7 +507,7 @@ class EventFilterForm(forms.Form):
             )
 
 
-class PaymentRegistrationForm(forms.Form):
+class PaymentRegistrationForm(BootstrapValidationMixin, forms.Form):
     """Formulário ágil de caixa para registo de pagamentos e atribuição de planos."""
     person = forms.ModelChoiceField(
         label="Atleta / Membro",
@@ -501,7 +526,7 @@ class PaymentRegistrationForm(forms.Form):
         max_digits=10,
         decimal_places=2,
         min_value=0,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'})
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'placeholder': '0.00'})
     )
     method = forms.ChoiceField(
         label="Método de Pagamento",
@@ -512,7 +537,7 @@ class PaymentRegistrationForm(forms.Form):
     paid_date = forms.DateField(
         label="Data de Pagamento",
         initial=timezone.now,
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d')
     )
     description = forms.CharField(
         label="Descrição",
@@ -543,15 +568,15 @@ class PaymentRegistrationForm(forms.Form):
             ).order_by('entity_type', 'name')
 
 
-class ClientSubscriptionForm(forms.ModelForm):
+class ClientSubscriptionForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para subscrever diretamente um atleta a um plano."""
     class Meta:
         model = ClientSubscription
         fields = ['payment_plan', 'start_date', 'end_date', 'is_paid', 'notes']
         widgets = {
             'payment_plan': forms.Select(attrs={'class': 'form-select'}),
-            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'is_paid': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Observações da subscrição...'}),
         }
@@ -565,7 +590,7 @@ class ClientSubscriptionForm(forms.ModelForm):
             ).order_by('entity_type', 'name')
 
 
-class ProtocolConfigurationForm(forms.ModelForm):
+class ProtocolConfigurationForm(BootstrapValidationMixin, forms.ModelForm):
     """Formulário para parametrização completa e dinâmica do Protocolo ACR & Proform SC."""
 
     def __init__(self, *args, **kwargs):
@@ -617,23 +642,23 @@ class ProtocolConfigurationForm(forms.ModelForm):
             'insurance_company': forms.TextInput(attrs={'class': 'form-control'}),
             'insurance_policy_number': forms.TextInput(attrs={'class': 'form-control'}),
             'insurance_product_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'insurance_policy_start': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'insurance_policy_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'insurance_annual_premium': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'insurance_base_insured_count': forms.NumberInput(attrs={'class': 'form-control'}),
-            'insurance_claim_deadline_days': forms.NumberInput(attrs={'class': 'form-control'}),
+            'insurance_policy_start': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'insurance_policy_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'insurance_annual_premium': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'insurance_base_insured_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'insurance_claim_deadline_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
 
-            'capital_death_disability': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'capital_treatment': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'treatment_deductible': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'capital_funeral': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'capital_death_disability': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'capital_treatment': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'treatment_deductible': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'capital_funeral': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
 
             'broker_name': forms.TextInput(attrs={'class': 'form-control'}),
             'broker_asf_number': forms.TextInput(attrs={'class': 'form-control'}),
             'broker_phone': forms.TextInput(attrs={'class': 'form-control'}),
             'broker_address': forms.TextInput(attrs={'class': 'form-control'}),
 
-            'acr_admin_fee_per_athlete': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'acr_admin_fee_per_athlete': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'insurance_split_mode': forms.Select(attrs={'class': 'form-select'}),
         }
 

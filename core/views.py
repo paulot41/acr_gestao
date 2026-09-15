@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.core.cache import cache
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import json
 import logging
 from django.db import IntegrityError, DatabaseError
@@ -57,9 +57,9 @@ def gantt_data(request):
         if date_param:
             selected_date = datetime.fromisoformat(date_param.replace('Z', '')).date()
         else:
-            selected_date = timezone.now().date()
+            selected_date = timezone.localdate()
     except ValueError:
-        selected_date = timezone.now().date()
+        selected_date = timezone.localdate()
 
     if view_type == 'week':
         # Segunda-feira da semana de selected_date até Domingo
@@ -102,6 +102,8 @@ def gantt_data(request):
     # Serializar eventos para o Gantt
     events_data = []
     for event in events:
+        starts_at_local = timezone.localtime(event.starts_at)
+        ends_at_local = timezone.localtime(event.ends_at)
         cap = event.capacity or (event.resource.capacity if event.resource else 0)
         confirmed = event.confirmed_bookings_count
         occ_pct = round((confirmed / cap * 100) if cap else 0, 1)
@@ -112,13 +114,13 @@ def gantt_data(request):
             'title': event.display_title,
             'resource_id': event.resource.id,
             'resource_name': event.resource.name,
-            'date': event.starts_at.date().isoformat(),
-            'weekday': event.starts_at.weekday(),  # 0=Segunda, ..., 6=Domingo
-            'start_time': event.starts_at.strftime('%H:%M'),
-            'end_time': event.ends_at.strftime('%H:%M'),
-            'start_hour': event.starts_at.hour,
-            'end_hour': event.ends_at.hour,
-            'duration_minutes': int((event.ends_at - event.starts_at).total_seconds() / 60),
+            'date': starts_at_local.date().isoformat(),
+            'weekday': starts_at_local.weekday(),  # 0=Segunda, ..., 6=Domingo
+            'start_time': starts_at_local.strftime('%H:%M'),
+            'end_time': ends_at_local.strftime('%H:%M'),
+            'start_hour': starts_at_local.hour,
+            'end_hour': ends_at_local.hour,
+            'duration_minutes': int((ends_at_local - starts_at_local).total_seconds() / 60),
             'modality': {
                 'id': event.modality.id if event.modality else None,
                 'name': event.modality.name if event.modality else None,
@@ -164,7 +166,7 @@ def gantt_data(request):
         'view_type': view_type,
         'week_start': week_start.isoformat(),
         'week_end': week_end.isoformat(),
-        'current_time': timezone.now().strftime('%H:%M')
+        'current_time': timezone.localtime().strftime('%H:%M')
     })
 
 
@@ -443,8 +445,10 @@ def update_event_details(request):
         resource_id = data.get('resource_id')
 
         if any([date_str, start_time, end_time, resource_id]):
-            # Usar valores atuais como defaults
-            event_date = event.starts_at.date()
+            # Usar valores atuais em horário local como defaults
+            current_starts_at_local = timezone.localtime(event.starts_at)
+            current_ends_at_local = timezone.localtime(event.ends_at)
+            event_date = current_starts_at_local.date()
             if date_str:
                 try:
                     event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -452,10 +456,10 @@ def update_event_details(request):
                     return JsonResponse({'error': 'Data inválida'}, status=400)
 
             # Parse horas
-            start_hour = event.starts_at.hour
-            start_minute = event.starts_at.minute
-            end_hour = event.ends_at.hour
-            end_minute = event.ends_at.minute
+            start_hour = current_starts_at_local.hour
+            start_minute = current_starts_at_local.minute
+            end_hour = current_ends_at_local.hour
+            end_minute = current_ends_at_local.minute
 
             if start_time:
                 try:
@@ -470,8 +474,15 @@ def update_event_details(request):
                 except Exception:
                     return JsonResponse({'error': 'Hora final inválida'}, status=400)
 
-            new_starts_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=start_hour, minute=start_minute)))
-            new_ends_at = timezone.make_aware(datetime.combine(event_date, datetime.min.time().replace(hour=end_hour, minute=end_minute)))
+            tz = timezone.get_current_timezone()
+            new_starts_at = timezone.make_aware(
+                datetime.combine(event_date, time(hour=start_hour, minute=start_minute)),
+                tz
+            )
+            new_ends_at = timezone.make_aware(
+                datetime.combine(event_date, time(hour=end_hour, minute=end_minute)),
+                tz
+            )
 
             if new_ends_at <= new_starts_at:
                 return JsonResponse({'error': 'Hora de fim deve ser posterior à hora de início'}, status=400)
@@ -596,6 +607,8 @@ def get_event_details(request, event_id):
         eff_capacity = event.capacity or (event.resource.capacity if event.resource else 0)
         occupancy_pct = round((confirmed_count / eff_capacity * 100) if eff_capacity else 0, 1)
 
+        starts_at_local = timezone.localtime(event.starts_at)
+        ends_at_local = timezone.localtime(event.ends_at)
         return JsonResponse({
             'id': event.id,
             'title': event.title,
@@ -612,11 +625,11 @@ def get_event_details(request, event_id):
             'occupancy_pct': occupancy_pct,
             'resource_id': event.resource.id,
             'resource_name': event.resource.name,
-            'starts_at': event.starts_at.isoformat(),
-            'ends_at': event.ends_at.isoformat(),
-            'start_time': event.starts_at.strftime('%H:%M'),
-            'end_time': event.ends_at.strftime('%H:%M'),
-            'date': event.starts_at.date().isoformat(),
+            'starts_at': starts_at_local.isoformat(),
+            'ends_at': ends_at_local.isoformat(),
+            'start_time': starts_at_local.strftime('%H:%M'),
+            'end_time': ends_at_local.strftime('%H:%M'),
+            'date': starts_at_local.date().isoformat(),
             'recurrence_group_id': str(event.recurrence_group_id) if event.recurrence_group_id else None,
             'is_recurring': bool(event.recurrence_group_id),
             'checkin_url': reverse('core:event_checkin', kwargs={'event_id': event.id})
@@ -718,8 +731,10 @@ class OptimizedGanttAPI:
         # Serialização otimizada
         events_data = []
         for event in events:
-            start_hour = event.starts_at.hour
-            duration_minutes = int((event.ends_at - event.starts_at).total_seconds() / 60)
+            starts_at_local = timezone.localtime(event.starts_at)
+            ends_at_local = timezone.localtime(event.ends_at)
+            start_hour = starts_at_local.hour
+            duration_minutes = int((ends_at_local - starts_at_local).total_seconds() / 60)
 
             event_data = {
                 'id': event.id,
@@ -727,8 +742,8 @@ class OptimizedGanttAPI:
                 'resource_id': event.resource_id,
                 'start_hour': start_hour,
                 'duration_minutes': duration_minutes,
-                'start_time': event.starts_at.strftime('%H:%M'),
-                'end_time': event.ends_at.strftime('%H:%M'),
+                'start_time': starts_at_local.strftime('%H:%M'),
+                'end_time': ends_at_local.strftime('%H:%M'),
                 'event_type': event.event_type,
                 'capacity': event.capacity,
                 'bookings_count': event.confirmed_bookings_count,
@@ -879,8 +894,8 @@ def validate_event_conflict(request):
                     {
                         'id': c.id,
                         'title': c.title,
-                        'starts_at': c.starts_at.isoformat(),
-                        'ends_at': c.ends_at.isoformat()
+                        'starts_at': timezone.localtime(c.starts_at).isoformat(),
+                        'ends_at': timezone.localtime(c.ends_at).isoformat()
                     } for c in conflicts
                 ]
                 return JsonResponse({
@@ -907,8 +922,8 @@ def validate_event_conflict(request):
                         'id': c.id,
                         'title': c.title,
                         'resource_name': c.resource.name if c.resource else '',
-                        'starts_at': c.starts_at.isoformat(),
-                        'ends_at': c.ends_at.isoformat()
+                        'starts_at': timezone.localtime(c.starts_at).isoformat(),
+                        'ends_at': timezone.localtime(c.ends_at).isoformat()
                     } for c in inst_conflicts
                 ]
                 return JsonResponse({
@@ -957,3 +972,103 @@ def cancel_booking_api(request, booking_id):
             'success': False,
             'message': f'Erro ao cancelar reserva: {str(e)}'
         }, status=500)
+
+
+@role_required(["admin", "staff"])
+def admin_dashboard_stats(request):
+    """API para estatísticas resumidas do Django Admin dashboard."""
+    try:
+        org = getattr(request, 'organization', None)
+        if not org:
+            from core.models import Organization
+            org = getattr(request.user, 'organization', None)
+            if not org:
+                try:
+                    org = Organization.objects.filter(is_active=True).first()
+                except Exception:
+                    org = Organization.objects.first()
+
+        now = timezone.now()
+        today = now.date()
+        tomorrow = now + timedelta(days=1)
+        month_start = today.replace(day=1)
+
+        from core.models import Person, Instructor, Modality, Event, Booking, SystemAlert, ClientSubscription
+        from django.db.models import Sum
+
+        if org:
+            clients_qs = Person.objects.filter(organization=org)
+            instructors_qs = Instructor.objects.filter(organization=org)
+            modalities_qs = Modality.objects.filter(organization=org)
+            events_qs = Event.objects.filter(organization=org)
+            bookings_qs = Booking.objects.filter(organization=org)
+            alerts_qs = SystemAlert.objects.filter(organization=org)
+            subs_qs = ClientSubscription.objects.filter(organization=org)
+        else:
+            clients_qs = Person.objects.all()
+            instructors_qs = Instructor.objects.all()
+            modalities_qs = Modality.objects.all()
+            events_qs = Event.objects.all()
+            bookings_qs = Booking.objects.all()
+            alerts_qs = SystemAlert.objects.all()
+            subs_qs = ClientSubscription.objects.all()
+
+        total_clients = clients_qs.filter(status='active').count()
+        total_instructors = instructors_qs.filter(is_active=True).count()
+        total_modalities = modalities_qs.filter(is_active=True).count()
+        upcoming_events_count = events_qs.filter(
+            starts_at__range=(now, tomorrow)
+        ).count()
+
+        bookings_today = bookings_qs.filter(
+            event__starts_at__date=today
+        ).exclude(status=Booking.Status.CANCELLED).count()
+
+        events_today = events_qs.filter(starts_at__date=today)
+        total_capacity = sum(e.capacity for e in events_today if e.capacity)
+        occupancy_rate = round((bookings_today / total_capacity * 100), 1) if total_capacity > 0 else 0.0
+
+        pending_alerts = alerts_qs.filter(
+            status=SystemAlert.Status.PENDING
+        ).count()
+
+        acr_clients = clients_qs.filter(status='active', entity_affiliation__in=['acr_only', 'both']).count()
+        proform_clients = clients_qs.filter(status='active', entity_affiliation__in=['proform_only', 'both']).count()
+        acr_instructors = instructors_qs.filter(is_active=True, entity_affiliation__in=['acr_only', 'both']).count()
+        proform_instructors = instructors_qs.filter(is_active=True, entity_affiliation__in=['proform_only', 'both']).count()
+        acr_modalities = modalities_qs.filter(is_active=True, entity_type__in=['acr', 'both']).count()
+        proform_modalities = modalities_qs.filter(is_active=True, entity_type__in=['proform', 'both']).count()
+
+        monthly_rev_aggr = subs_qs.filter(
+            payment_date__gte=month_start,
+            is_paid=True
+        ).aggregate(total=Sum('payment_plan__price'))['total'] or 0
+        monthly_revenue = float(monthly_rev_aggr)
+
+        stats = {
+            'total_clients': total_clients,
+            'total_instructors': total_instructors,
+            'total_modalities': total_modalities,
+            'upcoming_events_count': upcoming_events_count,
+            'active_members': total_clients,
+            'bookings_today': bookings_today,
+            'occupancy_rate': occupancy_rate,
+            'pending_alerts': pending_alerts,
+            'acr_clients': acr_clients,
+            'proform_clients': proform_clients,
+            'acr_instructors': acr_instructors,
+            'proform_instructors': proform_instructors,
+            'acr_modalities': acr_modalities,
+            'proform_modalities': proform_modalities,
+            'monthly_revenue': monthly_revenue,
+        }
+
+        return JsonResponse({
+            'status': 'success',
+            'stats': stats,
+            **stats,
+        })
+    except Exception as e:
+        logger.error("Erro ao obter estatísticas do admin: %s", e)
+        return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
+

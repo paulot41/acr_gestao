@@ -173,7 +173,7 @@
                                 <span class="small">{{ payment.paid_date|date:"d/m/Y"|default:payment.created_at|date:"d/m/Y" }}</span>
                             </td>
                             <td>
-                                <span class="badge bg-{{ payment.status|yesno:'success,warning,secondary' }}">
+                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'pending' %}bg-warning text-dark{% elif payment.status == 'cancelled' or payment.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
                                     {{ payment.get_status_display }}
                                 </span>
                             </td>

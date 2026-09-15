@@ -234,9 +234,15 @@
                 <a href="{% url 'core:gantt_view' %}" class="btn btn-outline-info">
                     <i class="fas fa-calendar me-2"></i>Ver Horários
                 </a>
+                {% if instructor and instructor.id %}
                 <a href="{% url 'core:instructor_detail' instructor.id %}" class="btn btn-outline-secondary">
                     <i class="fas fa-edit me-2"></i>Editar Perfil
                 </a>
+                {% else %}
+                <a href="{% url 'core:profile' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-edit me-2"></i>Editar Perfil
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -268,6 +274,23 @@
                 </small>
             </div>
         </div>
+    <!-- Modal de Detalhes do Evento -->
+    <div class="modal fade" id="eventDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detalhes da Aula</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">A carregar...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -276,34 +299,61 @@
 {{ block.super }}
 <script>
 function viewClassDetails(eventId) {
-    // Implementar modal com detalhes da aula
-    fetch(`/api/events/${eventId}/details/`)
-        .then(response => response.json())
+    const modalEl = document.getElementById('eventDetailModal') || document.getElementById('quickActionModal');
+    if (!modalEl) return;
+
+    const titleEl = modalEl.querySelector('.modal-title');
+    const bodyEl = modalEl.querySelector('.modal-body');
+    if (titleEl) titleEl.textContent = 'Detalhes da Aula';
+    if (bodyEl) {
+        bodyEl.innerHTML = `
+            <div class="text-center py-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">A carregar...</span>
+                </div>
+            </div>
+        `;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    const detailsUrl = "{% url 'core:get_event_details' 0 %}".replace('/0/', `/${eventId}/`);
+    fetch(detailsUrl, { credentials: 'same-origin' })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
         .then(data => {
-            // Mostrar modal com detalhes
-            $('#quickActionModal .modal-title').text('Detalhes da Aula');
-            $('#quickActionModal .modal-body').html(`
-                <h6>${data.title}</h6>
-                <p><strong>Local:</strong> ${data.resource}</p>
-                <p><strong>Horário:</strong> ${data.start_time} - ${data.end_time}</p>
-                <p><strong>Participantes:</strong> ${data.bookings_count}/${data.capacity}</p>
-                <hr>
-                <h6>Lista de Participantes:</h6>
-                <ul class="list-unstyled">
-                    ${data.participants.map(p => `<li><i class="fas fa-user me-2"></i>${p.name}</li>`).join('')}
-                </ul>
-            `);
-            $('#quickActionModal').modal('show');
+            if (bodyEl) {
+                bodyEl.innerHTML = `
+                    <h6>${data.title || 'Aula'}</h6>
+                    <p class="mb-1"><strong>Local:</strong> ${data.resource_name || 'N/A'}</p>
+                    <p class="mb-1"><strong>Data:</strong> ${data.date || ''}</p>
+                    <p class="mb-1"><strong>Horário:</strong> ${data.start_time || ''} - ${data.end_time || ''}</p>
+                    <p class="mb-1"><strong>Ocupação:</strong> ${data.bookings_count || 0} / ${data.capacity || 0} (${data.occupancy_pct || 0}%)</p>
+                    ${data.instructor_name ? `<p class="mb-1"><strong>Instrutor:</strong> ${data.instructor_name}</p>` : ''}
+                    ${data.description ? `<p class="text-muted small mt-2">${data.description}</p>` : ''}
+                    ${data.checkin_url ? `
+                    <div class="mt-3">
+                        <a href="${data.checkin_url}" class="btn btn-sm btn-success" target="_blank">
+                            <i class="fas fa-clipboard-check me-1"></i>Abrir Check-in no Tapete
+                        </a>
+                    </div>` : ''}
+                `;
+            }
         })
         .catch(error => {
             console.error('Erro ao carregar detalhes:', error);
-            alert('Erro ao carregar detalhes da aula');
+            if (bodyEl) {
+                bodyEl.innerHTML = `<div class="alert alert-danger mb-0">Não foi possível carregar os detalhes da aula.</div>`;
+            }
         });
 }
 
 // Auto-refresh das aulas de hoje a cada 2 minutos
 setInterval(function() {
-    // Implementar se necessário
+    // Refresh periódico quando ativo
 }, 120000);
 </script>
 {% endblock %}

@@ -4,7 +4,7 @@
 .PHONY: help validate quick-start deploy status logs clean test lint format format-check
 
 # Configurações
-COMPOSE_FILE = docker-compose.base-nginx.yml
+COMPOSE_FILE = docker-compose.yml
 
 help: ## Mostrar esta ajuda
 	@echo "🚀 ACR Gestão - Comandos Docker Desktop"

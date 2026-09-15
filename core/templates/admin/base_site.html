@@ -182,19 +182,67 @@ document.addEventListener('DOMContentLoaded', function() {
     document.body.appendChild(refreshIndicator);
 
     // Auto-refresh das estatísticas a cada 5 minutos (apenas no dashboard)
-    if (window.location.pathname === '/admin/') {
-        setInterval(function() {
+    if (window.location.pathname === '/admin/' || window.location.pathname === '/admin') {
+        const updateDashboardStats = function() {
             fetch('/admin/dashboard-stats/')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP error ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    // Atualizar números nas estatísticas se existirem
-                    const statsElements = document.querySelectorAll('.stat-card h3');
-                    if (statsElements.length > 0) {
+                    if (!data || data.status !== 'success') return;
+                    const s = data.stats || data;
+                    const statCards = document.querySelectorAll('.dashboard-stats .stat-card');
+                    if (statCards.length > 0) {
+                        if (statCards[0]) {
+                            const h3 = statCards[0].querySelector('h3');
+                            if (h3 && (s.total_clients !== undefined || s.active_members !== undefined)) {
+                                h3.textContent = s.total_clients !== undefined ? s.total_clients : s.active_members;
+                            }
+                            const acrBadge = statCards[0].querySelector('.entity-badge.acr');
+                            if (acrBadge && s.acr_clients !== undefined) acrBadge.textContent = 'ACR: ' + s.acr_clients;
+                            const proBadge = statCards[0].querySelector('.entity-badge.proform');
+                            if (proBadge && s.proform_clients !== undefined) proBadge.textContent = 'Proform: ' + s.proform_clients;
+                        }
+                        if (statCards[1]) {
+                            const h3 = statCards[1].querySelector('h3');
+                            if (h3 && s.total_instructors !== undefined) h3.textContent = s.total_instructors;
+                            const acrBadge = statCards[1].querySelector('.entity-badge.acr');
+                            if (acrBadge && s.acr_instructors !== undefined) acrBadge.textContent = 'ACR: ' + s.acr_instructors;
+                            const proBadge = statCards[1].querySelector('.entity-badge.proform');
+                            if (proBadge && s.proform_instructors !== undefined) proBadge.textContent = 'Proform: ' + s.proform_instructors;
+                        }
+                        if (statCards[2]) {
+                            const h3 = statCards[2].querySelector('h3');
+                            if (h3 && s.total_modalities !== undefined) h3.textContent = s.total_modalities;
+                            const acrBadge = statCards[2].querySelector('.entity-badge.acr');
+                            if (acrBadge && s.acr_modalities !== undefined) acrBadge.textContent = 'ACR: ' + s.acr_modalities;
+                            const proBadge = statCards[2].querySelector('.entity-badge.proform');
+                            if (proBadge && s.proform_modalities !== undefined) proBadge.textContent = 'Proform: ' + s.proform_modalities;
+                        }
+                        if (statCards[3]) {
+                            const h3 = statCards[3].querySelector('h3');
+                            if (h3 && s.monthly_revenue !== undefined) h3.textContent = '€' + Math.round(s.monthly_revenue);
+                        }
                         showRefreshIndicator();
                     }
+
+                    ['total_clients', 'total_instructors', 'total_modalities', 'upcoming_events_count',
+                     'active_members', 'bookings_today', 'occupancy_rate', 'pending_alerts'].forEach(key => {
+                        const el = document.getElementById('stat-' + key) || document.querySelector('[data-stat="' + key + '"]');
+                        if (el && s[key] !== undefined) {
+                            el.textContent = s[key];
+                        }
+                    });
                 })
-                .catch(error => console.log('Refresh error:', error));
-        }, 300000); // 5 minutos
+                .catch(err => {
+                    console.warn('Erro ao carregar estatísticas do admin:', err);
+                });
+        };
+
+        setInterval(updateDashboardStats, 300000); // 5 minutos
     }
 
     function showRefreshIndicator() {

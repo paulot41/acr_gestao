@@ -26,6 +26,16 @@
                 <form method="post" enctype="multipart/form-data" novalidate>
                     {% csrf_token %}
 
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
+
                     <!-- Informações Básicas -->
                     <div class="row mb-4">
                         <div class="col-12">
@@ -249,6 +259,9 @@
                                 <small class="form-text text-muted d-block">
                                     Instrutores inativos não poderão ser alocados a novas aulas ou eventos.
                                 </small>
+                                {% if form.is_active.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.is_active.errors.0 }}</div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -283,7 +296,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const formControls = document.querySelectorAll('input, select, textarea');
     formControls.forEach(function(field) {
         if (!field.classList.contains('btn') && !field.classList.contains('form-check-input')) {
-            field.classList.add('form-control');
+            if (field.tagName.toLowerCase() === 'select') {
+                field.classList.remove('form-control');
+                field.classList.add('form-select');
+            } else if (field.type !== 'checkbox' && field.type !== 'radio') {
+                field.classList.add('form-control');
+            }
         }
     });
 
@@ -354,7 +372,11 @@ document.querySelector('form').addEventListener('submit', function(e) {
 
     if (!isValid) {
         e.preventDefault();
-        alert('Por favor, preencha todos os campos obrigatórios.');
+        const firstInvalid = document.querySelector('.is-invalid');
+        if (firstInvalid) {
+            firstInvalid.focus();
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         return false;
     }
 });

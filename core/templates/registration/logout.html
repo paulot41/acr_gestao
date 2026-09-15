@@ -112,10 +112,10 @@
             <p class="text-muted mb-4">A sua sessão foi terminada em segurança. Obrigado por utilizar o ACR Gestão.</p>
 
             <div class="d-grid gap-2">
-                <a href="{% url 'login' %}" class="btn btn-primary">
+                <a href="{% url 'core:login' %}" class="btn btn-primary">
                     <i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Nova Sessão
                 </a>
-                <a href="/" class="btn btn-secondary">
+                <a href="{% url 'core:home' %}" class="btn btn-secondary">
                     <i class="bi bi-house me-2"></i>Página Inicial
                 </a>
             </div>
@@ -141,7 +141,7 @@
             document.querySelector('.logout-body').appendChild(redirectInfo);
 
             setTimeout(() => {
-                window.location.href = "{% url 'login' %}";
+                window.location.href = "{% url 'core:login' %}";
             }, 10000);
         }, 5000);
     </script>

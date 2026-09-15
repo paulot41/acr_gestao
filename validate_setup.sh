@@ -65,7 +65,7 @@ fi
 print_info "Verificando ficheiros necessários..."
 
 required_files=(
-    "docker-compose.base-nginx.yml"
+    "docker-compose.yml"
     ".env.local"
     "nginx.conf"
     "Dockerfile"
@@ -108,7 +108,7 @@ if command -v lsof >/dev/null 2>&1; then
     if lsof -i :80 >/dev/null 2>&1; then
         print_warning "Porta 80 está ocupada"
         print_info "Pode ser necessário parar outros serviços web"
-        print_info "Ou alterar a porta no docker-compose.base-nginx.yml"
+        print_info "Ou alterar a porta no docker-compose.yml"
     else
         print_success "Porta 80 está disponível"
     fi
@@ -148,6 +148,7 @@ else
     print_error "❌ Encontrados $errors erro(s). Corrija antes de continuar."
     echo
     print_info "Após corrigir os erros, execute novamente este script."
+    exit 1
 fi
 echo "==========================================="
 echo

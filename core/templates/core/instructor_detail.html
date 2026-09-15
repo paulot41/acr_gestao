@@ -338,7 +338,7 @@ function toggleStatus() {
     if (confirm(`Tem certeza que deseja ${action} este instrutor?`)) {
         // Aqui seria feita a chamada AJAX para toggle do status
         // Por agora, redirect para a página de edição
-        window.location.href = "{% url 'instructor_edit' instructor.pk %}";
+        window.location.href = "{% url 'core:instructor_edit' instructor.pk %}";
     }
 }
 

@@ -387,7 +387,7 @@ def instructor_create(request):
             instructor.organization = request.organization
             instructor.save()
             messages.success(request, f'Instrutor {instructor.full_name} criado com sucesso!')
-            return redirect('instructor_list')
+            return redirect('core:instructor_list')
     else:
         form = InstructorForm(organization=request.organization)
 
@@ -517,6 +517,24 @@ def modality_add(request):
         'title': 'Adicionar Modalidade',
         'action': 'add'
     })
+
+
+@role_required(["admin", "staff"])
+def modality_delete(request, pk):
+    """Eliminar ou desativar modalidade."""
+    org = request.organization
+    modality = get_object_or_404(Modality, pk=pk, organization=org)
+
+    name = modality.name
+    try:
+        modality.delete()
+        messages.success(request, f'Modalidade "{name}" eliminada com sucesso!')
+    except (ProtectedError, DatabaseError):
+        modality.is_active = False
+        modality.save()
+        messages.warning(request, f'Modalidade "{name}" desativada (existem registos associados).')
+
+    return redirect('core:modality_list')
 
 
 # ESPAÇOS (RESOURCES) VIEWS
@@ -661,11 +679,13 @@ def events_json(request):
         if event.instructor:
             title += f' - {event.instructor.first_name}'
 
+        starts_at_local = timezone.localtime(event.starts_at)
+        ends_at_local = timezone.localtime(event.ends_at)
         events_data.append({
             'id': event.id,
             'title': title,
-            'start': event.starts_at.isoformat(),
-            'end': event.ends_at.isoformat(),
+            'start': starts_at_local.isoformat(),
+            'end': ends_at_local.isoformat(),
             'resourceId': str(event.resource_id),  # Usar FK diretamente
             'backgroundColor': color,
             'borderColor': color,
@@ -955,9 +975,14 @@ def booking_add(request):
         if form.is_valid():
             booking = form.save(commit=False)
             booking.organization = org
-            booking.save()
-            messages.success(request, 'Reserva criada com sucesso!')
-            return redirect('core:booking_list')
+            try:
+                booking.save()
+                messages.success(request, 'Reserva criada com sucesso!')
+                return redirect('core:booking_list')
+            except ValidationError as e:
+                form.add_error(None, e)
+            except IntegrityError:
+                form.add_error(None, 'Já existe uma reserva deste atleta para esta aula.')
     else:
         form = BookingForm(organization=org)
 

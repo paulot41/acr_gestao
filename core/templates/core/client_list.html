@@ -332,20 +332,26 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Toggle entre vista de tabela e grid
-    $('[data-view]').click(function() {
-        const view = $(this).data('view');
-        $('[data-view]').removeClass('active');
-        $(this).addClass('active');
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle entre vista de tabela e grid (Vanilla ES6)
+    const viewButtons = document.querySelectorAll('[data-view]');
+    const tableView = document.getElementById('table-view');
+    const gridView = document.getElementById('grid-view');
 
-        if (view === 'table') {
-            $('#table-view').removeClass('d-none');
-            $('#grid-view').addClass('d-none');
-        } else {
-            $('#table-view').addClass('d-none');
-            $('#grid-view').removeClass('d-none');
-        }
+    viewButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            viewButtons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            if (view === 'table') {
+                if (tableView) tableView.classList.remove('d-none');
+                if (gridView) gridView.classList.add('d-none');
+            } else {
+                if (tableView) tableView.classList.add('d-none');
+                if (gridView) gridView.classList.remove('d-none');
+            }
+        });
     });
 });
 </script>

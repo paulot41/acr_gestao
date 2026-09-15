@@ -7,10 +7,10 @@
 
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <!-- FullCalendar CSS (para Sistema Gantt) -->
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet' />
 
     <style>
         :root {
@@ -72,6 +72,7 @@
         .main-content {
             padding-top: 20px;
             padding-bottom: 40px;
+            overflow-x: hidden;
         }
     </style>
 
@@ -81,7 +82,7 @@
     <!-- Navegação Superior -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">
+            <a class="navbar-brand" href="{% url 'core:home' %}">
                 <i class="fas fa-chart-line"></i> ACR Gestão
             </a>
 
@@ -92,7 +93,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="/">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'core:home' %}">
                             <i class="fas fa-tachometer-alt"></i> Dashboard
                         </a>
                     </li>
@@ -186,6 +187,11 @@
                               <li><a class="dropdown-item" href="{% url 'core:booking_add' %}"><i class="fas fa-plus"></i> Criar Reserva</a></li>
                               </ul>
                       </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'reports' in request.resolver_match.app_name or 'reports' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'reports:dashboard' %}">
+                            <i class="fas fa-chart-pie"></i> Relatórios
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="googleCalendarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fab fa-google"></i> Google & Drive
@@ -220,11 +226,12 @@
                             {% endif %}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow">
+                            <li><a class="dropdown-item" href="{% url 'core:profile' %}"><i class="fas fa-user-cog me-2 text-primary"></i>Meu Perfil</a></li>
                             {% if request.can_supervise_protocol or request.can_manage_association or user.is_superuser %}
                             <li><a class="dropdown-item" href="{% url 'core:settings' %}"><i class="fas fa-sliders-h me-2 text-secondary"></i>Parametrização Protocolo</a></li>
                             {% endif %}
                             {% if user.is_superuser or user.is_staff %}
-                            <li><a class="dropdown-item" href="/admin/"><i class="fas fa-cogs me-2 text-secondary"></i>Admin Django</a></li>
+                            <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="fas fa-cogs me-2 text-secondary"></i>Admin Django</a></li>
                             {% endif %}
                             {% if request.can_supervise_protocol or request.can_manage_association or user.is_superuser or user.is_staff %}
                             <li><hr class="dropdown-divider"></li>
@@ -245,7 +252,29 @@
     </nav>
 
     <!-- Conteúdo Principal -->
-    <main class="main-content">
+    <main class="main-content container-fluid px-3 px-md-4 py-3">
+        {% block breadcrumbs %}{% endblock %}
+
+        {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                {% if message.tags == 'error' or message.tags == 'danger' %}
+                    <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                {% elif message.tags == 'success' %}
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                {% elif message.tags == 'warning' %}
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                {% else %}
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                {% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% block content %}
         <div class="row">
             <div class="col-12">
@@ -258,7 +287,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js'></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

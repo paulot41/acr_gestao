@@ -405,14 +405,16 @@ def alert_mark_read(request, alert_id):
 
         # Verificar permissões básicas
         can_access = False
-        if hasattr(request.user, 'profile'):
+        if getattr(request.user, 'is_superuser', False) or getattr(request.user, 'is_staff', False):
+            can_access = True
+        elif alert.user and alert.user == request.user:
+            can_access = True
+        elif hasattr(request.user, 'profile'):
             profile = request.user.profile
             if (hasattr(profile, 'user_type') and
                 profile.user_type in [UserProfile.UserType.ADMIN, UserProfile.UserType.STAFF]):
                 can_access = True
             elif alert.person and hasattr(profile, 'person') and alert.person == profile.person:
-                can_access = True
-            elif alert.user and alert.user == request.user:
                 can_access = True
 
         if can_access and hasattr(alert, 'mark_as_read'):
@@ -425,7 +427,8 @@ def alert_mark_read(request, alert_id):
         messages.error(request, f"Erro ao processar alerta: {str(e)}")
         logger.error("Erro ao processar alerta: %s", e)
 
-    return redirect(request.META.get('HTTP_REFERER', 'core:admin_dashboard'))
+    redirect_url = request.META.get('HTTP_REFERER') or 'core:admin_dashboard'
+    return redirect(redirect_url)
 
 
 @login_required
@@ -436,14 +439,16 @@ def alert_dismiss(request, alert_id):
 
         # Verificar permissões básicas (mesmo que mark_read)
         can_access = False
-        if hasattr(request.user, 'profile'):
+        if getattr(request.user, 'is_superuser', False) or getattr(request.user, 'is_staff', False):
+            can_access = True
+        elif alert.user and alert.user == request.user:
+            can_access = True
+        elif hasattr(request.user, 'profile'):
             profile = request.user.profile
             if (hasattr(profile, 'user_type') and
                 profile.user_type in [UserProfile.UserType.ADMIN, UserProfile.UserType.STAFF]):
                 can_access = True
             elif alert.person and hasattr(profile, 'person') and alert.person == profile.person:
-                can_access = True
-            elif alert.user and alert.user == request.user:
                 can_access = True
 
         if can_access and hasattr(alert, 'dismiss'):
@@ -456,4 +461,5 @@ def alert_dismiss(request, alert_id):
         messages.error(request, f"Erro ao processar alerta: {str(e)}")
         logger.error("Erro ao processar alerta: %s", e)
 
-    return redirect(request.META.get('HTTP_REFERER', 'core:admin_dashboard'))
+    redirect_url = request.META.get('HTTP_REFERER') or 'core:admin_dashboard'
+    return redirect(redirect_url)

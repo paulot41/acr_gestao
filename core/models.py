@@ -689,17 +689,30 @@ class Event(models.Model):
 
     def clean(self) -> None:
         """Validate chronological order, default capacity, and overlap."""
-        if self.ends_at <= self.starts_at:
-            raise ValidationError("ends_at must be after starts_at")
+        if self.starts_at and self.ends_at:
+            if self.ends_at <= self.starts_at:
+                raise ValidationError("ends_at must be after starts_at")
 
-        if self.resource_id:
-            if not self.resource.is_available:
-                raise ValidationError("O espaço selecionado está indisponível.")
-            if self.resource.capacity is not None and self.capacity is not None and self.capacity > self.resource.capacity:
-                raise ValidationError(f"A capacidade da aula ({self.capacity}) não pode exceder a capacidade da sala ({self.resource.capacity}).")
+        if getattr(self, 'resource_id', None):
+            try:
+                if hasattr(self, 'resource') and self.resource:
+                    if not self.resource.is_available:
+                        raise ValidationError("O espaço selecionado está indisponível.")
+                    if self.resource.capacity is not None and self.capacity is not None and self.capacity > self.resource.capacity:
+                        raise ValidationError(f"A capacidade da aula ({self.capacity}) não pode exceder a capacidade da sala ({self.resource.capacity}).")
+            except ValidationError:
+                raise
+            except Exception:
+                pass
 
-        if self.instructor_id and not self.instructor.is_active:
-            raise ValidationError("O instrutor selecionado está inativo.")
+        if getattr(self, 'instructor_id', None):
+            try:
+                if hasattr(self, 'instructor') and self.instructor and not self.instructor.is_active:
+                    raise ValidationError("O instrutor selecionado está inativo.")
+            except ValidationError:
+                raise
+            except Exception:
+                pass
 
         # Validações específicas por tipo de evento
         if self.event_type == self.EventType.GROUP_CLASS:
@@ -798,12 +811,25 @@ class Booking(models.Model):
         return f"{self.person} => {self.event} ({self.status})"
 
     def clean(self):
+        try:
+            if not hasattr(self, 'event') or not self.event:
+                return
+        except Exception:
+            return
+        if not getattr(self, 'event_id', None):
+            return
         ensure_no_conflict(self.event)
-        ensure_capacity(self)
+        if getattr(self, 'person_id', None):
+            ensure_capacity(self)
         # Validar créditos se usar subscrição
-        if self.subscription_used and self.status == self.Status.CONFIRMED:
-            if not self.subscription_used.has_credits():
-                raise ValidationError("Subscrição não tem créditos suficientes.")
+        try:
+            if getattr(self, 'subscription_used_id', None) and self.status == self.Status.CONFIRMED:
+                if hasattr(self, 'subscription_used') and self.subscription_used and not self.subscription_used.has_credits():
+                    raise ValidationError("Subscrição não tem créditos suficientes.")
+        except ValidationError:
+            raise
+        except Exception:
+            pass
 
     def mark_checked_in(self):
         self.status = "checked_in"

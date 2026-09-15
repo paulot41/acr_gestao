@@ -32,30 +32,57 @@
                 <h5 class="mb-0">Dados da Aula</h5>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" novalidate>
                     {% csrf_token %}
 
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
+
                     <div class="mb-3">
-                        <label for="{{ form.title.id_for_label }}" class="form-label">Título da Aula *</label>
+                        <label for="{{ form.title.id_for_label }}" class="form-label">Título da Aula <span class="text-danger">*</span></label>
                         {{ form.title }}
                         {% if form.title.errors %}
-                            <div class="text-danger small">{{ form.title.errors.0 }}</div>
+                            <div class="invalid-feedback d-block">{{ form.title.errors.0 }}</div>
                         {% endif %}
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="{{ form.resource.id_for_label }}" class="form-label">Espaço *</label>
+                            <label for="{{ form.modality.id_for_label }}" class="form-label">Modalidade</label>
+                            {{ form.modality }}
+                            {% if form.modality.errors %}
+                                <div class="invalid-feedback d-block">{{ form.modality.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.instructor.id_for_label }}" class="form-label">Instrutor</label>
+                            {{ form.instructor }}
+                            {% if form.instructor.errors %}
+                                <div class="invalid-feedback d-block">{{ form.instructor.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.resource.id_for_label }}" class="form-label">Espaço <span class="text-danger">*</span></label>
                             {{ form.resource }}
                             {% if form.resource.errors %}
-                                <div class="text-danger small">{{ form.resource.errors.0 }}</div>
+                                <div class="invalid-feedback d-block">{{ form.resource.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.capacity.id_for_label }}" class="form-label">Capacidade</label>
                             {{ form.capacity }}
                             {% if form.capacity.errors %}
-                                <div class="text-danger small">{{ form.capacity.errors.0 }}</div>
+                                <div class="invalid-feedback d-block">{{ form.capacity.errors.0 }}</div>
                             {% endif %}
                             <small class="form-text text-muted">Deixe vazio para usar a capacidade padrão do espaço</small>
                         </div>
@@ -63,25 +90,64 @@
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="{{ form.starts_at.id_for_label }}" class="form-label">Data/Hora de Início *</label>
+                            <label for="{{ form.starts_at.id_for_label }}" class="form-label">Data/Hora de Início <span class="text-danger">*</span></label>
                             {{ form.starts_at }}
                             {% if form.starts_at.errors %}
-                                <div class="text-danger small">{{ form.starts_at.errors.0 }}</div>
+                                <div class="invalid-feedback d-block">{{ form.starts_at.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="{{ form.ends_at.id_for_label }}" class="form-label">Data/Hora de Fim *</label>
+                            <label for="{{ form.ends_at.id_for_label }}" class="form-label">Data/Hora de Fim <span class="text-danger">*</span></label>
                             {{ form.ends_at }}
                             {% if form.ends_at.errors %}
-                                <div class="text-danger small">{{ form.ends_at.errors.0 }}</div>
+                                <div class="invalid-feedback d-block">{{ form.ends_at.errors.0 }}</div>
                             {% endif %}
                         </div>
+                    </div>
+
+                    {% if form.event_type %}
+                    <div class="mb-3">
+                        <label for="{{ form.event_type.id_for_label }}" class="form-label">Tipo de Evento</label>
+                        {{ form.event_type }}
+                        {% if form.event_type.errors %}
+                            <div class="invalid-feedback d-block">{{ form.event_type.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        {% if form.class_group %}
+                        <div class="col-md-6 mb-3" id="class_group_group">
+                            <label for="{{ form.class_group.id_for_label }}" class="form-label">Turma (Aulas de Grupo)</label>
+                            {{ form.class_group }}
+                            {% if form.class_group.errors %}
+                                <div class="invalid-feedback d-block">{{ form.class_group.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% if form.individual_client %}
+                        <div class="col-md-6 mb-3" id="client_group">
+                            <label for="{{ form.individual_client.id_for_label }}" class="form-label">Atleta (Aulas Individuais)</label>
+                            {{ form.individual_client }}
+                            {% if form.individual_client.errors %}
+                                <div class="invalid-feedback d-block">{{ form.individual_client.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Descrição</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
                         <a href="{% url 'core:gantt' %}" class="btn btn-outline-secondary">Cancelar</a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle me-1"></i>Criar Aula
+                            <i class="bi bi-check-circle me-1"></i>{% if event %}Guardar Alterações{% else %}Criar Aula{% endif %}
                         </button>
                     </div>
                 </form>
@@ -150,33 +216,69 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // Auto-calcular hora de fim baseada na duração típica
-    $('#{{ form.starts_at.id_for_label }}').on('change', function() {
-        const startTime = new Date($(this).val());
-        if (startTime && !$('#{{ form.ends_at.id_for_label }}').val()) {
-            // Adicionar 1 hora por defeito
-            startTime.setHours(startTime.getHours() + 1);
-            const endTimeString = startTime.toISOString().slice(0, 16);
-            $('#{{ form.ends_at.id_for_label }}').val(endTimeString);
-        }
-    });
+    const startsAt = document.getElementById('{{ form.starts_at.id_for_label }}');
+    const endsAt = document.getElementById('{{ form.ends_at.id_for_label }}');
+    if (startsAt && endsAt) {
+        startsAt.addEventListener('change', function() {
+            if (this.value && !endsAt.value) {
+                const startTime = new Date(this.value);
+                if (!isNaN(startTime.getTime())) {
+                    startTime.setHours(startTime.getHours() + 1);
+                    const year = startTime.getFullYear();
+                    const month = String(startTime.getMonth() + 1).padStart(2, '0');
+                    const day = String(startTime.getDate()).padStart(2, '0');
+                    const hours = String(startTime.getHours()).padStart(2, '0');
+                    const mins = String(startTime.getMinutes()).padStart(2, '0');
+                    endsAt.value = `${year}-${month}-${day}T${hours}:${mins}`;
+                }
+            }
+        });
+    }
 
     // Atualizar capacidade baseada no espaço selecionado
-    $('#{{ form.resource.id_for_label }}').on('change', function() {
+    const resourceSelect = document.getElementById('{{ form.resource.id_for_label }}');
+    const capacityInput = document.getElementById('{{ form.capacity.id_for_label }}');
+    if (resourceSelect && capacityInput) {
         const capacities = {
             'Ginásio': 20,
             'Sala de Pilates': 15,
             'Pavilhão': 30
         };
 
-        const selectedOption = $(this).find('option:selected');
-        const resourceName = selectedOption.text();
+        resourceSelect.addEventListener('change', function() {
+            const selectedText = this.options[this.selectedIndex] ? this.options[this.selectedIndex].text : '';
+            if (capacities[selectedText] && !capacityInput.value) {
+                capacityInput.value = capacities[selectedText];
+            }
+        });
+    }
 
-        if (capacities[resourceName] && !$('#{{ form.capacity.id_for_label }}').val()) {
-            $('#{{ form.capacity.id_for_label }}').val(capacities[resourceName]);
+    // Alternar visibilidade de turma vs atleta conforme o tipo de evento (Vanilla ES6)
+    const eventTypeSelect = document.getElementById('{{ form.event_type.id_for_label }}') || document.getElementById('id_event_type');
+    const classGroupGroup = document.getElementById('class_group_group');
+    const clientGroup = document.getElementById('client_group');
+
+    function updateEventTypeFields() {
+        if (!eventTypeSelect) return;
+        const val = eventTypeSelect.value;
+        if (val === 'group_class') {
+            if (classGroupGroup) classGroupGroup.style.display = '';
+            if (clientGroup) clientGroup.style.display = 'none';
+        } else if (val === 'individual') {
+            if (classGroupGroup) classGroupGroup.style.display = 'none';
+            if (clientGroup) clientGroup.style.display = '';
+        } else {
+            if (classGroupGroup) classGroupGroup.style.display = 'none';
+            if (clientGroup) clientGroup.style.display = 'none';
         }
-    });
+    }
+
+    if (eventTypeSelect) {
+        eventTypeSelect.addEventListener('change', updateEventTypeFields);
+        updateEventTypeFields();
+    }
 });
 </script>
 {% endblock %}

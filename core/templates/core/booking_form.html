@@ -1,23 +1,122 @@
 {% extends 'core/base.html' %}
+{% load static %}
+
 {% block title %}Nova Reserva - ACR Gestão{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:booking_list' %}">Reservas</a></li>
+        <li class="breadcrumb-item active">Nova Reserva</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
-<h1>Nova Reserva</h1>
-<form method="post">
-  {% csrf_token %}
-  <div class="mb-3">
-    {{ form.event.label_tag }}
-    {{ form.event }}
-  </div>
-  <div class="mb-3">
-    {{ form.person.label_tag }}
-    {{ form.person }}
-  </div>
-  <div class="mb-3">
-    {{ form.status.label_tag }}
-    {{ form.status }}
-  </div>
-  <button type="submit" class="btn btn-primary">Salvar</button>
-  <a href="{% url 'core:booking_list' %}" class="btn btn-secondary">Cancelar</a>
-</form>
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card modern-card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="m-0">
+                    <i class="bi bi-bookmark-plus me-2"></i>Nova Reserva
+                </h5>
+                <a href="{% url 'core:booking_list' %}" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-arrow-left me-1"></i>Voltar
+                </a>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.event.id_for_label }}" class="form-label fw-semibold">
+                            Aula / Evento <span class="text-danger">*</span>
+                        </label>
+                        {{ form.event }}
+                        {% if form.event.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.event.errors.0 }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">Selecione a aula para a qual pretende registar a reserva.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.person.id_for_label }}" class="form-label fw-semibold">
+                            Atleta / Membro <span class="text-danger">*</span>
+                        </label>
+                        {{ form.person }}
+                        {% if form.person.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.person.errors.0 }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">Selecione o atleta que irá participar na aula.</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.status.id_for_label }}" class="form-label fw-semibold">
+                            Estado da Reserva
+                        </label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.status.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{% url 'core:booking_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i>Guardar Reserva
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            let isValid = true;
+            const requiredFields = form.querySelectorAll('select[required], input[required]');
+            requiredFields.forEach(function(field) {
+                if (!field.value) {
+                    isValid = false;
+                    field.classList.add('is-invalid');
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+            if (!isValid) {
+                e.preventDefault();
+                const firstInvalid = form.querySelector('.is-invalid');
+                if (firstInvalid) {
+                    firstInvalid.focus();
+                }
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

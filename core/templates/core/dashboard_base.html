@@ -92,10 +92,10 @@
                                 <small class="text-muted">{{ alert.created_at|timesince }} atrás</small>
                             </div>
                             <div class="btn-group btn-group-sm">
-                                <a href="{% url 'core:alert_mark_read' alert.id %}" class="btn btn-outline-success btn-sm">
+                                <a href="{% url 'core:alert_mark_read' alert.id %}" class="btn btn-outline-success btn-sm" title="Marcar como lido" data-bs-toggle="tooltip">
                                     <i class="fas fa-check"></i>
                                 </a>
-                                <a href="{% url 'core:alert_dismiss' alert.id %}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{% url 'core:alert_dismiss' alert.id %}" class="btn btn-outline-secondary btn-sm" title="Dispensar alerta" data-bs-toggle="tooltip">
                                     <i class="fas fa-times"></i>
                                 </a>
                             </div>

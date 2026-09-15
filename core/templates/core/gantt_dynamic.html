@@ -51,22 +51,18 @@
        Vista 1: Timeline Diária (Horizontal por Salas)
        ========================================================================== */
     .gantt-container {
-        display: flex;
+        display: block;
         height: calc(100vh - 215px);
+        min-height: 520px;
         overflow: hidden;
         background: #ffffff;
-    }
-
-    .gantt-sidebar {
-        width: 260px;
-        background: #f8fafc;
-        border-right: 2px solid #e2e8f0;
-        overflow-y: auto;
-        flex-shrink: 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
     }
 
     .gantt-main {
-        flex: 1;
+        width: 100%;
+        height: 100%;
         overflow: auto;
         position: relative;
     }
@@ -78,16 +74,42 @@
         z-index: 100;
         border-bottom: 2px solid #cbd5e1;
         display: flex;
+        width: max-content;
+        min-width: 100%;
+    }
+
+    .gantt-corner-header {
+        width: 240px;
+        min-width: 240px;
+        max-width: 240px;
+        height: 52px;
+        background: #f8fafc;
+        border-right: 2px solid #cbd5e1;
+        position: sticky;
+        left: 0;
+        top: 0;
+        z-index: 120;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        box-sizing: border-box;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.02);
+        flex-shrink: 0;
     }
 
     .gantt-time-header {
         display: flex;
         height: 52px;
-        margin-left: 0;
+        flex-shrink: 0;
     }
 
     .time-slot {
+        width: 80px;
         min-width: 80px;
+        max-width: 80px;
+        height: 52px;
+        box-sizing: border-box;
         border-right: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
@@ -97,11 +119,14 @@
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: white;
         text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+        flex-shrink: 0;
     }
 
     .gantt-grid {
         position: relative;
-        min-height: 600px;
+        min-height: 500px;
+        width: max-content;
+        min-width: 100%;
     }
 
     .resource-row {
@@ -109,45 +134,70 @@
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         position: relative;
+        width: max-content;
+        min-width: 100%;
     }
 
     .resource-label {
-        width: 260px;
-        padding: 12px 16px;
+        width: 240px;
+        min-width: 240px;
+        max-width: 240px;
+        height: 84px;
+        padding: 10px 14px;
         background: #f8fafc;
-        border-right: 2px solid #e2e8f0;
+        border-right: 2px solid #cbd5e1;
         position: sticky;
         left: 0;
         z-index: 50;
         display: flex;
         align-items: center;
         box-shadow: 2px 0 4px rgba(0,0,0,0.02);
+        box-sizing: border-box;
+        flex-shrink: 0;
+    }
+
+    .resource-info {
+        width: 100%;
+        overflow: hidden;
     }
 
     .resource-info h6 {
-        margin: 0;
-        font-size: 14px;
+        margin: 0 0 3px 0;
+        font-size: 13px;
         font-weight: 600;
         color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .resource-info small {
         color: #64748b;
         font-size: 11px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
     .time-grid {
         display: flex;
         flex: 1;
         position: relative;
+        height: 84px;
+        flex-shrink: 0;
     }
 
     .time-cell {
+        width: 80px;
         min-width: 80px;
+        max-width: 80px;
+        height: 84px;
+        box-sizing: border-box;
         border-right: 1px solid #f1f5f9;
         position: relative;
         cursor: crosshair;
         transition: background-color 0.15s;
+        flex-shrink: 0;
     }
 
     .time-cell:hover {
@@ -197,16 +247,15 @@
     .current-time-line {
         position: absolute;
         top: 0;
-        bottom: 0;
         width: 2px;
         background: #ef4444;
-        z-index: 200;
+        z-index: 95;
         pointer-events: none;
     }
 
     .current-time-indicator {
         position: absolute;
-        top: -8px;
+        top: 0;
         left: -7px;
         width: 16px;
         height: 16px;
@@ -388,16 +437,10 @@
     }
 
     @media (max-width: 768px) {
-        .gantt-container {
-            flex-direction: column;
-            height: auto;
-        }
-        .gantt-sidebar {
-            width: 100%;
-            height: 180px;
-        }
-        .resource-label {
-            width: 100%;
+        .gantt-corner-header, .resource-label {
+            width: 180px;
+            min-width: 180px;
+            max-width: 180px;
         }
         .weekly-grid {
             grid-template-columns: 1fr;
@@ -531,32 +574,15 @@
     <!-- CONTAINER 1: Vista Diária (Timeline Horizontal por Salas) -->
     <div id="daily-view-container">
         <div class="gantt-container">
-            <!-- Sidebar com Recursos -->
-            <div class="gantt-sidebar">
-                <div class="p-3 bg-light border-bottom fw-bold text-dark d-flex align-items-center justify-content-between">
-                    <span><i class="fas fa-door-open me-2 text-primary"></i>Instalações</span>
-                    <span class="badge bg-secondary rounded-pill" id="resource-count-badge">{{ resources|length }}</span>
-                </div>
-                <div id="resources-list">
-                    {% for resource in resources %}
-                    <div class="resource-item p-3 border-bottom" data-resource-id="{{ resource.id }}">
-                        <div class="resource-info">
-                            <h6 class="mb-1">{{ resource.name }}</h6>
-                            <small class="text-muted d-block">
-                                Lotação: <strong>{{ resource.capacity }}</strong>
-                                <span class="entity-badge entity-{{ resource.entity_type }}">
-                                    {{ resource.get_entity_type_display }}
-                                </span>
-                            </small>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Área Principal da Timeline -->
-            <div class="gantt-main">
+            <!-- Área Principal da Timeline com Coluna de Recursos Sticky -->
+            <div class="gantt-main" id="gantt-main">
                 <div class="gantt-header">
+                    <div class="gantt-corner-header">
+                        <span class="fw-bold text-dark d-flex align-items-center">
+                            <i class="fas fa-door-open me-2 text-primary"></i>Instalações
+                        </span>
+                        <span class="badge bg-primary rounded-pill" id="resource-count-badge">{{ resources|length }}</span>
+                    </div>
                     <div class="gantt-time-header" id="time-header"></div>
                 </div>
 
@@ -806,7 +832,7 @@ class GanttDynamic {
     constructor() {
         this.currentMode = 'daily'; // 'daily' ou 'weekly'
         this.currentView = 'standard'; // 'standard' (6-22h) ou 'extended' (0-23h)
-        this.selectedDate = new Date().toISOString().split('T')[0];
+        this.selectedDate = this.formatDate(new Date());
         
         // Filtros
         this.filterResource = '';
@@ -827,6 +853,23 @@ class GanttDynamic {
         this.meta = {};
 
         this.init();
+    }
+
+    formatDate(d) {
+        if (!d || isNaN(d.getTime())) return '';
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    parseDate(str) {
+        if (!str || typeof str !== 'string' || !str.includes('-')) {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+        }
+        const parts = str.split('-').map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
     }
 
     init() {
@@ -864,7 +907,7 @@ class GanttDynamic {
         });
 
         document.getElementById('gantt-today-btn').addEventListener('click', () => {
-            this.selectedDate = new Date().toISOString().split('T')[0];
+            this.selectedDate = this.formatDate(new Date());
             document.getElementById('gantt-date').value = this.selectedDate;
             this.loadGanttData();
         });
@@ -936,6 +979,43 @@ class GanttDynamic {
         document.getElementById('delete-series').addEventListener('click', () => {
             this.deleteEvent(true);
         });
+
+        // Limpeza e reset de estado ao fechar o modal
+        const modalEl = document.getElementById('eventModal');
+        if (modalEl) {
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                const form = document.getElementById('event-form');
+                if (form) form.reset();
+                const idInput = document.getElementById('event-id');
+                if (idInput) idInput.value = '';
+                const occInfo = document.getElementById('event-occupancy-info');
+                if (occInfo) occInfo.style.display = 'none';
+                const checkinLink = document.getElementById('modal-checkin-link');
+                if (checkinLink) checkinLink.style.display = 'none';
+                const deleteSeriesBtn = document.getElementById('delete-series');
+                if (deleteSeriesBtn) deleteSeriesBtn.style.display = 'none';
+                const deleteBtn = document.getElementById('delete-event');
+                if (deleteBtn) deleteBtn.style.display = 'none';
+                const titleText = document.getElementById('modal-title-text');
+                if (titleText) titleText.textContent = 'Agendar Nova Aula';
+                const recSection = document.getElementById('recurrence-section');
+                if (recSection) recSection.style.display = 'block';
+
+                // Remover classes de validação
+                modalEl.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+                modalEl.querySelectorAll('.is-valid').forEach(el => el.classList.remove('is-valid'));
+
+                // Garantir limpeza de backdrops residuais
+                document.querySelectorAll('.modal-backdrop').forEach(bd => {
+                    if (!document.querySelector('.modal.show')) {
+                        bd.remove();
+                    }
+                });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            });
+        }
     }
 
     switchMode(mode) {
@@ -957,11 +1037,11 @@ class GanttDynamic {
     }
 
     shiftDate(days) {
-        const parts = this.selectedDate.split('-').map(Number);
-        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        const d = this.parseDate(this.selectedDate);
         d.setDate(d.getDate() + days);
-        this.selectedDate = d.toISOString().split('T')[0];
-        document.getElementById('gantt-date').value = this.selectedDate;
+        this.selectedDate = this.formatDate(d);
+        const dateInput = document.getElementById('gantt-date');
+        if (dateInput) dateInput.value = this.selectedDate;
         this.loadGanttData();
     }
 
@@ -1179,7 +1259,7 @@ class GanttDynamic {
         grid.appendChild(timeColHeader);
 
         // 2. Cabeçalhos dos 7 dias
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = this.formatDate(new Date());
         weekDays.forEach((dayName, idx) => {
             const dateStr = weekDates[idx];
             const isToday = dateStr === todayStr;
@@ -1272,13 +1352,17 @@ class GanttDynamic {
     }
 
     calculateWeekDates(weekStartStr) {
-        const parts = weekStartStr.split('-').map(Number);
+        let base = this.parseDate(weekStartStr || this.selectedDate);
+        if (!this.meta || !this.meta.week_start || this.meta.view_type !== 'week') {
+            const day = base.getDay(); // 0 = Domingo, 1 = Segunda
+            const diff = day === 0 ? -6 : 1 - day;
+            base.setDate(base.getDate() + diff);
+        }
         const dates = [];
-        const base = new Date(parts[0], parts[1] - 1, parts[2]);
         for (let i = 0; i < 7; i++) {
             const d = new Date(base);
             d.setDate(base.getDate() + i);
-            dates.push(d.toISOString().split('T')[0]);
+            dates.push(this.formatDate(d));
         }
         return dates;
     }
@@ -1327,12 +1411,16 @@ class GanttDynamic {
         const startHourView = this.currentView === 'standard' ? 6 : 0;
         const left = parseFloat(eventBlock.style.left) || 0;
         let minutesFromView = Math.round((left / 80) * 60);
-        minutesFromView = Math.round(minutesFromView / 5) * 5;
+        minutesFromView = Math.max(0, Math.round(minutesFromView / 5) * 5);
         const startHour = startHourView + Math.floor(minutesFromView / 60);
         const startMinute = minutesFromView % 60;
         const endMinutesFromView = minutesFromView + (event.duration_minutes || Math.round(parseFloat(eventBlock.style.width) / 80 * 60));
         const endHour = startHourView + Math.floor(endMinutesFromView / 60);
         const endMinute = endMinutesFromView % 60;
+
+        // Fixar imediatamente a posição visual ajustada
+        const snappedLeft = (minutesFromView / 60) * 80;
+        eventBlock.style.left = `${snappedLeft}px`;
 
         const payload = {
             event_id: event.id,
@@ -1350,7 +1438,10 @@ class GanttDynamic {
             },
             body: JSON.stringify(payload)
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(res => {
             if (res && res.success) {
                 this.showAlert('Horário da aula atualizado com sucesso.', 'success');
@@ -1477,12 +1568,12 @@ class GanttDynamic {
         document.getElementById('event-end-time').value = options.endTime || '10:00';
 
         // Sugerir fim da recorrência a 3 meses
-        const baseD = new Date(document.getElementById('event-date').value);
+        const baseD = this.parseDate(document.getElementById('event-date').value);
         baseD.setMonth(baseD.getMonth() + 3);
-        document.getElementById('event-recurrence-end').value = baseD.toISOString().split('T')[0];
+        document.getElementById('event-recurrence-end').value = this.formatDate(baseD);
 
         // Marcar o dia da semana do evento inicial
-        const evWeekday = new Date(document.getElementById('event-date').value).getDay();
+        const evWeekday = this.parseDate(document.getElementById('event-date').value).getDay();
         const pythonWeekday = evWeekday === 0 ? 6 : evWeekday - 1; // JS 0=Dom vs Python 0=Seg
         document.querySelectorAll('.rec-weekday').forEach(cb => {
             cb.checked = (parseInt(cb.value) === pythonWeekday);
@@ -1495,14 +1586,17 @@ class GanttDynamic {
         }
 
         this.toggleEventTypeFields('open_class');
-        const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal'));
         modal.show();
     }
 
     editEvent(eventId) {
         const detailsUrl = GANTT_DETAILS_URL_TEMPLATE.replace('/0/', `/${eventId}/`);
         fetch(detailsUrl, { credentials: 'same-origin' })
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
             .then(data => {
                 document.getElementById('event-id').value = data.id;
                 document.getElementById('event-title').value = data.title;
@@ -1551,7 +1645,7 @@ class GanttDynamic {
                 occBadge.className = `occupancy-badge ${occClass}`;
                 occBadge.textContent = `${data.bookings_count} / ${data.capacity} (${data.occupancy_pct}%)`;
 
-                const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+                const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal'));
                 modal.show();
             })
             .catch(err => {
@@ -1617,11 +1711,14 @@ class GanttDynamic {
             },
             body: JSON.stringify(payload)
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(res => {
             if (res.success) {
                 this.showAlert(res.message || 'Aula criada com sucesso!', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal')).hide();
                 this.loadGanttData();
             } else {
                 this.showAlert(res.error || 'Erro ao agendar aula.', 'danger');
@@ -1658,11 +1755,14 @@ class GanttDynamic {
             },
             body: JSON.stringify(payload)
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(res => {
             if (res.success) {
                 this.showAlert('Aula atualizada com sucesso!', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal')).hide();
                 this.loadGanttData();
             } else {
                 this.showAlert(res.error || 'Erro ao atualizar aula.', 'danger');
@@ -1692,11 +1792,14 @@ class GanttDynamic {
             },
             body: JSON.stringify({ event_id: eventId, delete_series: deleteSeries })
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(res => {
             if (res.success) {
                 this.showAlert(res.message || 'Aula eliminada com sucesso.', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal')).hide();
                 this.loadGanttData();
             } else {
                 this.showAlert(res.error || 'Erro ao eliminar aula.', 'danger');
@@ -1709,7 +1812,13 @@ class GanttDynamic {
     }
 
     updateCurrentTimeLine() {
-        if (this.currentMode !== 'daily') return;
+        const timeLine = document.getElementById('current-time-line');
+        if (!timeLine) return;
+
+        if (this.currentMode !== 'daily' || this.selectedDate !== this.formatDate(new Date())) {
+            timeLine.style.display = 'none';
+            return;
+        }
 
         const now = new Date();
         const currentHour = now.getHours();
@@ -1718,13 +1827,17 @@ class GanttDynamic {
         const startHour = this.currentView === 'standard' ? 6 : 0;
         const endHour = this.currentView === 'standard' ? 22 : 23;
 
-        const timeLine = document.getElementById('current-time-line');
-        if (!timeLine) return;
-
         if (currentHour >= startHour && currentHour <= endHour) {
             const position = (currentHour - startHour) * 80 + (currentMinute / 60) * 80;
-            timeLine.style.left = `${position + 260}px`; // 260px largura do sidebar
+            const resourceCol = document.querySelector('.resource-label') || document.querySelector('.gantt-corner-header');
+            const offsetLeft = resourceCol ? resourceCol.offsetWidth : 240;
+            timeLine.style.left = `${offsetLeft + position}px`;
             timeLine.style.display = 'block';
+
+            const grid = document.getElementById('gantt-grid');
+            if (grid) {
+                timeLine.style.height = `${grid.scrollHeight + 52}px`;
+            }
         } else {
             timeLine.style.display = 'none';
         }

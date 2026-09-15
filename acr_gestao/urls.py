@@ -21,9 +21,14 @@ def health(_request):
     http_status = 200 if db_ok else 503
     return JsonResponse({"status": status, "db": db_ok}, status=http_status)
 
+from core import views as core_views
+
 urlpatterns = [
     # Health check (manter para monitorização)
     path('health/', health),
+
+    # Estatísticas do Django Admin dashboard (antes de admin.site.urls para evitar route shadowing)
+    path('admin/dashboard-stats/', core_views.admin_dashboard_stats, name='admin_dashboard_stats'),
 
     # Django Admin padrão
     path('admin/', admin.site.urls),

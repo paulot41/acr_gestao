@@ -19,9 +19,14 @@ urlpatterns = [
     path('dashboard/clients/', dashboard_views.clients_overview, name='admin_clients_overview'),
     path('dashboard/instructors/', dashboard_views.instructors_overview, name='admin_instructors_overview'),
 
+    # Alertas do Dashboard
+    path('alerts/<int:alert_id>/read/', dashboard_views.alert_mark_read, name='alert_mark_read'),
+    path('alerts/<int:alert_id>/dismiss/', dashboard_views.alert_dismiss, name='alert_dismiss'),
+
     # Auth
     path('login/', auth_views.login_view, name='login'),
     path('logout/', auth_views.logout_view, name='logout'),
+    path('profile/', auth_views.profile_view, name='profile'),
 
     # Credit History
     path('credit-history/', dashboard_views.credit_history_view, name='credit_history'),
@@ -67,6 +72,8 @@ urlpatterns = [
     # Modalidades
     path('modalities/', web_views.modality_list, name='modality_list'),
     path('modalities/add/', web_views.modality_add, name='modality_add'),
+    path('modalities/<int:pk>/edit/', web_views.modality_edit, name='modality_edit'),
+    path('modalities/<int:pk>/delete/', web_views.modality_delete, name='modality_delete'),
 
     # Instrutores
     path('instructors/', web_views.instructor_list, name='instructor_list'),
@@ -125,6 +132,9 @@ urlpatterns = [
     path('api/form-data/', views.get_form_data, name='api_form_data'),
     path('api/validate-conflict/', views.validate_event_conflict, name='api_validate_conflict'),
     path('api/bookings/<int:booking_id>/cancel/', views.cancel_booking_api, name='api_cancel_booking'),
+    path('api/events/<int:event_id>/details/', views.get_event_details, name='api_event_details'),
+    path('admin/dashboard-stats/', views.admin_dashboard_stats, name='admin_dashboard_stats'),
+
 
     # Espaços (Resources)
     path('resources/', web_views.resource_list, name='resource_list'),
